@@ -48,8 +48,9 @@ async function convertPdfToDocx(pdfUrl: string): Promise<Buffer> {
       fs.mkdirSync(tempDir, { recursive: true });
     }
     
-    // 使用官方範例的方式初始化 ConvertAPI
-    var convertapi = require('convertapi')('token_ZXIdJcO7');
+    // 使用官方範例的方式初始化 ConvertAPI (改用動態導入)
+    const convertapiModule = await import('convertapi');
+    const convertapi = new convertapiModule.default('token_ZXIdJcO7');
     
     // 直接使用完整 URL 進行轉換
     const result = await convertapi.convert('docx', {
