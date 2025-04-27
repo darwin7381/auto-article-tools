@@ -41,9 +41,39 @@ async function getR2PresignedUrl(key: string): Promise<string> {
   return url;
 }
 
+// 解碼 HTML 實體編碼 (如 &#xxxxx;) 為 UTF-8 字符
+function decodeHtmlEntities(html: string): string {
+  console.log('開始解碼 HTML 實體編碼');
+  
+  // 使用正則表達式替換 HTML 實體編碼
+  const decodedHtml = html
+    // 處理十進制 HTML 實體編碼 (如 &#12345;)
+    .replace(/&#(\d+);/g, (match, dec) => {
+      return String.fromCharCode(parseInt(dec, 10));
+    })
+    // 處理十六進制 HTML 實體編碼 (如 &#x1234;)
+    .replace(/&#x([0-9a-f]+);/gi, (match, hex) => {
+      return String.fromCharCode(parseInt(hex, 16));
+    })
+    // 處理常見的命名 HTML 實體
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  
+  console.log('HTML 實體解碼完成');
+  return decodedHtml;
+}
+
 // 保存 HTML 到本地文件系統
 async function saveHtmlToLocal(html: string, fileId: string): Promise<string> {
   console.log(`保存 HTML 到本地, 文件ID: ${fileId}`);
+  
+  // 預處理：解碼 HTML 實體
+  const decodedHtml = decodeHtmlEntities(html);
+  console.log(`HTML 實體解碼完成，準備保存文件`);
   
   const localDir = path.resolve(process.cwd(), 'public/processed-markdown');
   if (!fs.existsSync(localDir)) {
@@ -51,7 +81,7 @@ async function saveHtmlToLocal(html: string, fileId: string): Promise<string> {
   }
   
   const localPath = path.join(localDir, `${fileId}.html`);
-  fs.writeFileSync(localPath, html);
+  fs.writeFileSync(localPath, decodedHtml);
   
   const publicPath = `/processed-markdown/${fileId}.html`;
   return publicPath;
