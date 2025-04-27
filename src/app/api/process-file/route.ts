@@ -4,7 +4,7 @@ import mammoth from 'mammoth';
 import fs from 'fs';
 import path from 'path';
 
-// 改用動態導入pdf-parse以避免初始化錯誤
+// 改用直接導入pdf-parse的具體處理模塊，避免初始化測試代碼
 // import pdfParse from 'pdf-parse';
 
 // R2 存儲客戶端配置
@@ -156,8 +156,8 @@ async function processPDF(buffer: Buffer, fileId: string): Promise<{ r2Key: stri
   try {
     console.log('正在處理PDF文件...');
     
-    // 動態導入pdf-parse以避免初始化問題
-    const pdfParse = (await import('pdf-parse')).default;
+    // 直接導入特定處理模塊，避免初始化問題
+    const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
     
     // 使用pdf-parse提取文本
     const data = await pdfParse(buffer);
