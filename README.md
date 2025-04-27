@@ -36,3 +36,17 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## 環境變數設置
+
+本項目需要配置以下環境變數才能正常運行，請在項目根目錄創建`.env.local`文件並添加：
+
+```bash
+# Cloudflare R2 配置
+CLOUDFLARE_R2_ENDPOINT="https://xxxxxxxxxxxx.r2.cloudflarestorage.com"
+CLOUDFLARE_R2_ACCESS_KEY_ID="您的訪問密鑰"
+CLOUDFLARE_R2_SECRET_ACCESS_KEY="您的密鑰"
+CLOUDFLARE_R2_BUCKET_NAME="auto-article-tools"
+```
+
+請在Cloudflare R2控制台獲取相應的配置信息。
