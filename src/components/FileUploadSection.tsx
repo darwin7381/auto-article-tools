@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardHeader, CardBody, CardFooter } from '@heroui/react';
 import { Input } from '@heroui/react';
 import { Button } from '@heroui/react';
@@ -12,20 +12,62 @@ export default function FileUploadSection() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkType, setLinkType] = useState('website');
-
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0]);
     }
   };
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type === 'application/pdf' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        setSelectedFile(file);
+      } else {
+        alert('只能上傳 PDF 或 DOCX 文件');
+      }
+    }
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleReset = () => {
+    if (selectedTab === 'file') {
+      setSelectedFile(null);
+    } else {
+      setLinkUrl('');
+      setLinkType('website');
+    }
+  };
+
   const handleUpload = () => {
     if (selectedTab === 'file' && selectedFile) {
       console.log('上傳文件:', selectedFile);
+      alert(`準備處理文件: ${selectedFile.name}`);
       // 實際上傳邏輯將在後續階段實現
     } else if (selectedTab === 'link' && linkUrl) {
       console.log('處理連結:', linkUrl, '類型:', linkType);
+      alert(`準備處理連結: ${linkUrl}`);
       // 連結處理邏輯將在後續階段實現
+    }
+  };
+
+  const handleAreaClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
@@ -43,12 +85,12 @@ export default function FileUploadSection() {
             selectedKey={selectedTab}
             onSelectionChange={(key) => setSelectedTab(key.toString())}
             color="primary"
-            variant="underlined"
+            variant="solid"
             classNames={{
               base: "w-full",
-              tabList: "gap-6 relative rounded-none p-0 border-b border-divider",
-              cursor: "w-full bg-primary-500",
-              tab: "max-w-fit px-2 h-12",
+              tabList: "gap-6 relative rounded-xl p-1 border border-divider bg-gray-100 dark:bg-gray-800",
+              cursor: "bg-white dark:bg-gray-700 shadow-medium",
+              tab: "max-w-fit px-3 h-10 rounded-lg",
               tabContent: "group-data-[selected=true]:text-primary-600 dark:group-data-[selected=true]:text-primary-400 font-medium"
             }}
           >
@@ -69,7 +111,13 @@ export default function FileUploadSection() {
                     選擇文件
                   </label>
                   
-                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl transition-colors hover:border-primary-300 dark:hover:border-primary-700">
+                  <div 
+                    className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl transition-colors hover:border-primary-300 dark:hover:border-primary-700 cursor-pointer"
+                    onClick={handleAreaClick}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
+                  >
                     <div className="p-6 text-center">
                       <div className="mb-3 flex justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-gray-400 dark:text-gray-500">
@@ -92,6 +140,7 @@ export default function FileUploadSection() {
                       <input
                         type="file"
                         id="file-upload"
+                        ref={fileInputRef}
                         accept=".pdf,.docx"
                         onChange={handleFileChange}
                         className="hidden"
@@ -189,13 +238,15 @@ export default function FileUploadSection() {
                     </svg>
                   }
                   classNames={{
+                    base: "max-w-full",
                     label: "text-primary-600 dark:text-primary-400 font-medium",
                     inputWrapper: [
                       "shadow-sm",
                       "bg-white dark:bg-gray-800",
                       "hover:bg-white dark:hover:bg-gray-800",
                       "group-data-[focus=true]:bg-white dark:group-data-[focus=true]:bg-gray-800"
-                    ]
+                    ],
+                    input: "text-base"
                   }}
                 />
                 
@@ -274,6 +325,7 @@ export default function FileUploadSection() {
             color="primary" 
             variant="flat" 
             className="font-medium"
+            onClick={handleReset}
           >
             重置
           </Button>
