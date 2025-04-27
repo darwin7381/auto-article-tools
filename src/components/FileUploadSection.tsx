@@ -83,40 +83,6 @@ export default function FileUploadSection() {
     }
   };
 
-  async function uploadFileToR2(file: File): Promise<{ success: boolean; fileUrl?: string; fileId?: string }> {
-    try {
-      setIsUploading(true);
-      
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || '上傳失敗');
-      }
-      
-      console.log('文件上傳成功:', result);
-      setUploadSuccess(true);
-      setUploadError(null);
-      return { 
-        success: true, 
-        fileUrl: result.fileUrl, // 假設 API 返回此字段
-        fileId: result.fileId    // 假設 API 返回此字段
-      };
-    } catch (error) {
-      console.error('文件上傳錯誤:', error);
-      setUploadError(error instanceof Error ? error.message : '上傳失敗，請稍後重試');
-      setUploadSuccess(false);
-      return { success: false };
-    }
-  }
-
   const handleLinkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLinkUrl(e.target.value);
     if (e.target.value) {
@@ -209,57 +175,32 @@ export default function FileUploadSection() {
       }
 
       setIsUploading(true);
-      const uploadResult = await uploadFileToR2(selectedFile);
-      if (!uploadResult.success) {
-        setIsUploading(false);
-        return;
-      }
-
+      
       try {
-        setIsProcessing(true);
+        // 使用FormData發送文件
+        const formData = new FormData();
+        formData.append('file', selectedFile);
         
-        // 獲取文件類型和 ID
-        const fileName = selectedFile.name;
-        const isPdf = fileName.toLowerCase().endsWith('.pdf');
-        const fileType = isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        
-        // 統一使用 process-file 端點，讓後端自動判斷和處理
-        const apiEndpoint = '/api/process-file';
-        
-        console.log(`正在處理文件: ${fileName}`);
-
-        const response = await fetch(apiEndpoint, {
+        const response = await fetch('/api/upload', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fileId: uploadResult.fileId || fileName,
-            fileUrl: uploadResult.fileUrl || fileName,
-            fileType: fileType,
-          }),
+          body: formData,
         });
-
+        
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || '處理失敗');
+          throw new Error(errorData.error || '上傳失敗');
         }
-
-        const processResult = await response.json();
-        console.log('處理結果:', processResult);
-        setProcessSuccess(true);
         
-        // 根據不同API回傳結果獲取正確的URL
-        if (isPdf) {
-          setMarkdownUrl(processResult.htmlUrl); // PDF處理會回傳HTML URL
-        } else {
-          setMarkdownUrl(processResult.markdownUrl); // DOCX處理會回傳Markdown URL
-        }
+        const data = await response.json();
+        setUploadSuccess(true);
+        
+        // 傳遞文件URL、文件類型以及原始文件名
+        await handleUploadSuccess(data.fileUrl, selectedFile.type, selectedFile.name);
       } catch (error) {
-        console.error('處理錯誤:', error);
-        setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
+        console.error('上傳錯誤:', error);
+        setUploadError(error instanceof Error ? error.message : '上傳失敗，請稍後重試');
+        setUploadSuccess(false);
       } finally {
-        setIsProcessing(false);
         setIsUploading(false);
       }
     } else if (selectedTab === 'link') {
@@ -275,6 +216,57 @@ export default function FileUploadSection() {
   const handleAreaClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  };
+
+  /**
+   * 處理上傳成功後的文件處理邏輯
+   * @param fileUrl 上傳成功後的文件URL
+   * @param fileType 文件MIME類型
+   * @param fileName 原始文件名
+   */
+  const handleUploadSuccess = async (fileUrl: string, fileType: string, fileName: string): Promise<void> => {
+    try {
+      setIsProcessing(true);
+      
+      // 獲取文件類型
+      const isPdf = fileType.includes('pdf');
+      
+      // 根據文件類型選擇不同的處理端點
+      const apiEndpoint = isPdf 
+        ? '/api/process-pdf' 
+        : '/api/process-file';
+      
+      console.log(`正在處理文件: ${fileUrl}, 使用端點: ${apiEndpoint}`);
+        
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileUrl: fileUrl,
+          fileType: isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          fileName: fileName  // 傳遞原始文件名
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '處理失敗');
+      }
+      
+      const processResult = await response.json();
+      console.log('處理結果:', processResult);
+      setProcessSuccess(true);
+      
+      // 根據不同API回傳結果獲取正確的URL
+      setMarkdownUrl(processResult.markdownUrl);
+    } catch (error) {
+      console.error('處理錯誤:', error);
+      setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
