@@ -106,6 +106,87 @@ export default function FileUploadSection() {
     }
   };
 
+  const handleLinkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLinkUrl(e.target.value);
+    if (e.target.value) {
+      const isValid = validateUrl(e.target.value);
+      if (isValid) {
+        // 自動檢測URL類型
+        detectUrlType(e.target.value);
+      }
+    } else {
+      setUrlError(null);
+    }
+  };
+
+  // 添加URL類型自動檢測功能
+  const detectUrlType = (url: string) => {
+    try {
+      // 僅檢查URL有效性，不需要urlObj變量
+      new URL(url);
+      
+      // 檢測Google Docs
+      if (url.includes('docs.google.com')) {
+        setLinkType('gdocs');
+        return;
+      }
+      
+      // 檢測Medium
+      if (url.includes('medium.com') || url.match(/^https:\/\/[\w-]+\.medium\.com/)) {
+        setLinkType('medium');
+        return;
+      }
+      
+      // 檢測WeChat
+      if (url.includes('weixin.qq.com') || url.includes('mp.weixin.qq.com')) {
+        setLinkType('wechat');
+        return;
+      }
+      
+      // 默認為一般網站
+      setLinkType('website');
+    } catch (error) {
+      // URL無效，不更改類型
+      console.error('URL檢測失敗:', error);
+    }
+  };
+
+  // 處理連結提交
+  const handleLinkSubmit = async () => {
+    if (!linkUrl || !validateUrl(linkUrl)) {
+      setUrlError('請輸入有效的URL');
+      return;
+    }
+    
+    setIsUploading(true);
+    setUploadError(null);
+    
+    try {
+      const response = await fetch('/api/parse-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: linkUrl, type: linkType }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || '連結處理失敗');
+      }
+      
+      console.log('連結處理成功:', data);
+      setUploadSuccess(true);
+    } catch (error) {
+      console.error('連結處理錯誤:', error);
+      setUploadError(error instanceof Error ? error.message : '連結處理失敗，請稍後再試');
+      setUploadSuccess(false);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleUpload = async () => {
     if (selectedTab === 'file' && selectedFile) {
       const result = await uploadFileToR2(selectedFile);
@@ -113,25 +194,13 @@ export default function FileUploadSection() {
         console.log('文件已上傳並準備處理:', result);
       }
     } else if (selectedTab === 'link' && linkUrl) {
-      if (validateUrl(linkUrl)) {
-        console.log('處理連結:', linkUrl, '類型:', linkType);
-        // 連結處理邏輯將在後續階段實現
-      }
+      await handleLinkSubmit();
     }
   };
 
   const handleAreaClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
-    }
-  };
-
-  const handleLinkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLinkUrl(e.target.value);
-    if (e.target.value) {
-      validateUrl(e.target.value);
-    } else {
-      setUrlError(null);
     }
   };
 
@@ -304,6 +373,21 @@ export default function FileUploadSection() {
                   errorMessage={urlError}
                   description="輸入包含文章內容的網頁連結"
                   isClearable
+                  variant="bordered"
+                  radius="lg"
+                  color="primary"
+                  labelPlacement="outside"
+                  classNames={{
+                    label: "text-primary-600 dark:text-primary-400 font-medium mb-1",
+                    inputWrapper: [
+                      "shadow-sm",
+                      "bg-white dark:bg-gray-800",
+                      "hover:bg-white dark:hover:bg-gray-800",
+                      "group-data-[focus=true]:bg-white dark:group-data-[focus=true]:bg-gray-800",
+                      "border-gray-300 dark:border-gray-700"
+                    ],
+                    input: "placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                  }}
                   startContent={
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
@@ -312,6 +396,28 @@ export default function FileUploadSection() {
                   }
                 />
               </div>
+              
+              {uploadError && selectedTab === 'link' && (
+                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800/30">
+                  <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    {uploadError}
+                  </p>
+                </div>
+              )}
+              
+              {uploadSuccess && selectedTab === 'link' && (
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
+                  <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    連結處理成功，準備進行下一步操作
+                  </p>
+                </div>
+              )}
               
               <div className="space-y-3">
                 <p className="text-sm font-medium text-primary-600 dark:text-primary-400">連結類型</p>

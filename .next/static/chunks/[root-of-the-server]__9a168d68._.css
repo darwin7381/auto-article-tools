@@ -472,6 +472,10 @@
     margin-right: calc(var(--spacing) * 3);
   }
 
+  .mb-1 {
+    margin-bottom: calc(var(--spacing) * 1);
+  }
+
   .mb-2 {
     margin-bottom: calc(var(--spacing) * 2);
   }
@@ -1189,6 +1193,10 @@
     background-color: var(--color-white);
   }
 
+  .placeholder\:text-gray-500::placeholder {
+    color: var(--color-gray-500);
+  }
+
   @media (hover: hover) {
     .hover\:border-gray-400:hover {
       border-color: var(--color-gray-400);
@@ -1522,6 +1530,12 @@
   @media (prefers-color-scheme: dark) {
     .dark\:group-data-\[focus\=true\]\:bg-gray-800:is(:where(.group)[data-focus="true"] *) {
       background-color: var(--color-gray-800);
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .dark\:placeholder\:text-gray-400::placeholder {
+      color: var(--color-gray-400);
     }
   }
 

@@ -20,6 +20,22 @@ const R2 = new S3Client({
   },
 });
 
+// 生成唯一文件名
+function generateUniqueFileName(originalName: string, fileType: string): string {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8);
+  const fileExtension = ALLOWED_FILE_TYPES[fileType];
+  
+  // 從原始檔名中提取檔名（不含副檔名）並移除特殊字符
+  const cleanOriginalName = originalName
+    .replace(new RegExp(`\\.${fileExtension}$`, 'i'), '')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .substring(0, 30); // 限制長度
+  
+  return `${cleanOriginalName}-${timestamp}-${randomStr}.${fileExtension}`;
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -49,9 +65,7 @@ export async function POST(request: Request) {
     }
 
     // 生成唯一文件名
-    const fileExtension = ALLOWED_FILE_TYPES[file.type];
-    const uniqueId = Date.now().toString();
-    const fileName = `${uniqueId}.${fileExtension}`;
+    const fileName = generateUniqueFileName(file.name, file.type);
     
     // 文件緩衝區
     const buffer = await file.arrayBuffer();
@@ -60,17 +74,19 @@ export async function POST(request: Request) {
     const metadata = {
       'Content-Type': file.type,
       'original-filename': file.name,
+      'upload-timestamp': Date.now().toString(),
     };
 
-    // 上傳到R2
+    // 上傳到R2的input文件夾
     const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'auto-article-tools';
-    const key = `uploads/${fileName}`;
+    const key = `input/${fileName}`;
 
     const command = new PutObjectCommand({
       Bucket: bucketName,
       Key: key,
       Body: Buffer.from(buffer),
       Metadata: metadata,
+      ContentType: file.type,
     });
 
     await R2.send(command);
@@ -85,16 +101,18 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      fileId: fileName.replace(`.${ALLOWED_FILE_TYPES[file.type]}`, ''), // 返回不帶副檔名的唯一ID
       fileUrl: key,
       presignedUrl,
       fileName: file.name,
       fileSize: file.size,
       fileType: file.type,
+      uploadTime: new Date().toISOString(),
     });
   } catch (error) {
     console.error('文件上傳失敗:', error);
     return NextResponse.json(
-      { error: '文件上傳失敗' },
+      { error: '文件上傳失敗，請稍後再試' },
       { status: 500 }
     );
   }

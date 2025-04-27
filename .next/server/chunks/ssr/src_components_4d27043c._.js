@@ -111,6 +111,78 @@ function FileUploadSection() {
             setIsUploading(false);
         }
     };
+    const handleLinkChange = (e)=>{
+        setLinkUrl(e.target.value);
+        if (e.target.value) {
+            const isValid = validateUrl(e.target.value);
+            if (isValid) {
+                // 自動檢測URL類型
+                detectUrlType(e.target.value);
+            }
+        } else {
+            setUrlError(null);
+        }
+    };
+    // 添加URL類型自動檢測功能
+    const detectUrlType = (url)=>{
+        try {
+            // 僅檢查URL有效性，不需要urlObj變量
+            new URL(url);
+            // 檢測Google Docs
+            if (url.includes('docs.google.com')) {
+                setLinkType('gdocs');
+                return;
+            }
+            // 檢測Medium
+            if (url.includes('medium.com') || url.match(/^https:\/\/[\w-]+\.medium\.com/)) {
+                setLinkType('medium');
+                return;
+            }
+            // 檢測WeChat
+            if (url.includes('weixin.qq.com') || url.includes('mp.weixin.qq.com')) {
+                setLinkType('wechat');
+                return;
+            }
+            // 默認為一般網站
+            setLinkType('website');
+        } catch (error) {
+            // URL無效，不更改類型
+            console.error('URL檢測失敗:', error);
+        }
+    };
+    // 處理連結提交
+    const handleLinkSubmit = async ()=>{
+        if (!linkUrl || !validateUrl(linkUrl)) {
+            setUrlError('請輸入有效的URL');
+            return;
+        }
+        setIsUploading(true);
+        setUploadError(null);
+        try {
+            const response = await fetch('/api/parse-url', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: linkUrl,
+                    type: linkType
+                })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || '連結處理失敗');
+            }
+            console.log('連結處理成功:', data);
+            setUploadSuccess(true);
+        } catch (error) {
+            console.error('連結處理錯誤:', error);
+            setUploadError(error instanceof Error ? error.message : '連結處理失敗，請稍後再試');
+            setUploadSuccess(false);
+        } finally{
+            setIsUploading(false);
+        }
+    };
     const handleUpload = async ()=>{
         if (selectedTab === 'file' && selectedFile) {
             const result = await uploadFileToR2(selectedFile);
@@ -118,23 +190,12 @@ function FileUploadSection() {
                 console.log('文件已上傳並準備處理:', result);
             }
         } else if (selectedTab === 'link' && linkUrl) {
-            if (validateUrl(linkUrl)) {
-                console.log('處理連結:', linkUrl, '類型:', linkType);
-            // 連結處理邏輯將在後續階段實現
-            }
+            await handleLinkSubmit();
         }
     };
     const handleAreaClick = ()=>{
         if (fileInputRef.current) {
             fileInputRef.current.click();
-        }
-    };
-    const handleLinkChange = (e)=>{
-        setLinkUrl(e.target.value);
-        if (e.target.value) {
-            validateUrl(e.target.value);
-        } else {
-            setUrlError(null);
         }
     };
     // 定義Tab項
@@ -157,19 +218,19 @@ function FileUploadSection() {
                             d: "M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
                         }, void 0, false, {
                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                            lineNumber: 145,
+                            lineNumber: 214,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                        lineNumber: 144,
+                        lineNumber: 213,
                         columnNumber: 11
                     }, this),
                     "上傳文件"
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                lineNumber: 143,
+                lineNumber: 212,
                 columnNumber: 9
             }, this),
             content: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$heroui$2f$card$2f$dist$2f$chunk$2d$MW56SEHC$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__card_default__as__Card$3e$__["Card"], {
@@ -186,7 +247,7 @@ function FileUploadSection() {
                                         children: "選擇文件"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 155,
+                                        lineNumber: 224,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -213,17 +274,17 @@ function FileUploadSection() {
                                                             d: "M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                            lineNumber: 169,
+                                                            lineNumber: 238,
                                                             columnNumber: 25
                                                         }, this)
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 168,
+                                                        lineNumber: 237,
                                                         columnNumber: 23
                                                     }, this)
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 167,
+                                                    lineNumber: 236,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -234,7 +295,7 @@ function FileUploadSection() {
                                                             children: selectedFile ? `已選擇: ${selectedFile.name}` : '拖放文件到這裡或點擊選擇'
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                            lineNumber: 173,
+                                                            lineNumber: 242,
                                                             columnNumber: 23
                                                         }, this),
                                                         selectedFile && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -246,13 +307,13 @@ function FileUploadSection() {
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                            lineNumber: 179,
+                                                            lineNumber: 248,
                                                             columnNumber: 25
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 172,
+                                                    lineNumber: 241,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -265,7 +326,7 @@ function FileUploadSection() {
                                                     "aria-label": "選擇文件上傳"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 185,
+                                                    lineNumber: 254,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$heroui$2f$button$2f$dist$2f$chunk$2d$KCYYJJH4$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__button_default__as__Button$3e$__["Button"], {
@@ -285,30 +346,30 @@ function FileUploadSection() {
                                                             d: "M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                            lineNumber: 200,
+                                                            lineNumber: 269,
                                                             columnNumber: 27
                                                         }, void 0)
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 199,
+                                                        lineNumber: 268,
                                                         columnNumber: 25
                                                     }, void 0),
                                                     className: "w-full rounded-lg h-10 font-medium text-white-700 hover:text-white-900 items-center justify-center whitespace-nowrap",
                                                     children: "瀏覽檔案"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 194,
+                                                    lineNumber: 263,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                            lineNumber: 166,
+                                            lineNumber: 235,
                                             columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 159,
+                                        lineNumber: 228,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -327,25 +388,25 @@ function FileUploadSection() {
                                                     d: "m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 212,
+                                                    lineNumber: 281,
                                                     columnNumber: 21
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 211,
+                                                lineNumber: 280,
                                                 columnNumber: 19
                                             }, this),
                                             "支持 PDF 和 DOCX 格式"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 210,
+                                        lineNumber: 279,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                lineNumber: 154,
+                                lineNumber: 223,
                                 columnNumber: 15
                             }, this),
                             uploadError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -366,24 +427,24 @@ function FileUploadSection() {
                                                 d: "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 222,
+                                                lineNumber: 291,
                                                 columnNumber: 23
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                            lineNumber: 221,
+                                            lineNumber: 290,
                                             columnNumber: 21
                                         }, this),
                                         uploadError
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                    lineNumber: 220,
+                                    lineNumber: 289,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                lineNumber: 219,
+                                lineNumber: 288,
                                 columnNumber: 17
                             }, this),
                             uploadSuccess && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -404,24 +465,24 @@ function FileUploadSection() {
                                                 d: "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 233,
+                                                lineNumber: 302,
                                                 columnNumber: 23
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                            lineNumber: 232,
+                                            lineNumber: 301,
                                             columnNumber: 21
                                         }, this),
                                         "文件上傳成功，準備處理"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                    lineNumber: 231,
+                                    lineNumber: 300,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                lineNumber: 230,
+                                lineNumber: 299,
                                 columnNumber: 17
                             }, this),
                             selectedFile && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -446,7 +507,7 @@ function FileUploadSection() {
                                                             d: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                            lineNumber: 246,
+                                                            lineNumber: 315,
                                                             columnNumber: 27
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
@@ -456,13 +517,13 @@ function FileUploadSection() {
                                                             d: "M10 10.5a0.5 0.5 0 01-0.5 0.5 0.5 0.5 0 01-0.5-0.5 0.5 0.5 0 110-1 0.5 0.5 0 110 1zM12 9.5v4M14 9.5v2M16 9.5v5"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                            lineNumber: 247,
+                                                            lineNumber: 316,
                                                             columnNumber: 27
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 245,
+                                                    lineNumber: 314,
                                                     columnNumber: 25
                                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
                                                     xmlns: "http://www.w3.org/2000/svg",
@@ -478,7 +539,7 @@ function FileUploadSection() {
                                                             d: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                            lineNumber: 251,
+                                                            lineNumber: 320,
                                                             columnNumber: 27
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
@@ -488,18 +549,18 @@ function FileUploadSection() {
                                                             d: "M12 11v4M9 17h6"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                            lineNumber: 252,
+                                                            lineNumber: 321,
                                                             columnNumber: 27
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 250,
+                                                    lineNumber: 319,
                                                     columnNumber: 25
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 243,
+                                                lineNumber: 312,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -509,7 +570,7 @@ function FileUploadSection() {
                                                         children: selectedFile.name
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 257,
+                                                        lineNumber: 326,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -520,19 +581,19 @@ function FileUploadSection() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 258,
+                                                        lineNumber: 327,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 256,
+                                                lineNumber: 325,
                                                 columnNumber: 21
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 242,
+                                        lineNumber: 311,
                                         columnNumber: 19
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$heroui$2f$button$2f$dist$2f$chunk$2d$KCYYJJH4$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__button_default__as__Button$3e$__["Button"], {
@@ -554,40 +615,40 @@ function FileUploadSection() {
                                                 d: "M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 269,
+                                                lineNumber: 338,
                                                 columnNumber: 25
                                             }, void 0)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                            lineNumber: 268,
+                                            lineNumber: 337,
                                             columnNumber: 23
                                         }, void 0),
                                         children: "重設"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 261,
+                                        lineNumber: 330,
                                         columnNumber: 19
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                lineNumber: 241,
+                                lineNumber: 310,
                                 columnNumber: 17
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                        lineNumber: 153,
+                        lineNumber: 222,
                         columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                    lineNumber: 152,
+                    lineNumber: 221,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                lineNumber: 151,
+                lineNumber: 220,
                 columnNumber: 9
             }, this)
         },
@@ -609,19 +670,19 @@ function FileUploadSection() {
                             d: "M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"
                         }, void 0, false, {
                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                            lineNumber: 287,
+                            lineNumber: 356,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                        lineNumber: 286,
+                        lineNumber: 355,
                         columnNumber: 11
                     }, this),
                     "輸入連結"
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                lineNumber: 285,
+                lineNumber: 354,
                 columnNumber: 9
             }, this),
             content: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$heroui$2f$card$2f$dist$2f$chunk$2d$MW56SEHC$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__card_default__as__Card$3e$__["Card"], {
@@ -642,6 +703,21 @@ function FileUploadSection() {
                                     errorMessage: urlError,
                                     description: "輸入包含文章內容的網頁連結",
                                     isClearable: true,
+                                    variant: "bordered",
+                                    radius: "lg",
+                                    color: "primary",
+                                    labelPlacement: "outside",
+                                    classNames: {
+                                        label: "text-primary-600 dark:text-primary-400 font-medium mb-1",
+                                        inputWrapper: [
+                                            "shadow-sm",
+                                            "bg-white dark:bg-gray-800",
+                                            "hover:bg-white dark:hover:bg-gray-800",
+                                            "group-data-[focus=true]:bg-white dark:group-data-[focus=true]:bg-gray-800",
+                                            "border-gray-300 dark:border-gray-700"
+                                        ],
+                                        input: "placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                                    },
                                     startContent: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
                                         xmlns: "http://www.w3.org/2000/svg",
                                         className: "w-4 h-4 text-gray-400",
@@ -656,31 +732,107 @@ function FileUploadSection() {
                                                 d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 309,
+                                                lineNumber: 393,
                                                 columnNumber: 23
                                             }, void 0),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
                                                 d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 310,
+                                                lineNumber: 394,
                                                 columnNumber: 23
                                             }, void 0)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 308,
+                                        lineNumber: 392,
                                         columnNumber: 21
                                     }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                    lineNumber: 297,
+                                    lineNumber: 366,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                lineNumber: 296,
+                                lineNumber: 365,
                                 columnNumber: 15
+                            }, this),
+                            uploadError && selectedTab === 'link' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800/30",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                    className: "text-sm text-red-600 dark:text-red-400 flex items-center gap-2",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
+                                            xmlns: "http://www.w3.org/2000/svg",
+                                            fill: "none",
+                                            viewBox: "0 0 24 24",
+                                            strokeWidth: 1.5,
+                                            stroke: "currentColor",
+                                            className: "w-5 h-5",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+                                                strokeLinecap: "round",
+                                                strokeLinejoin: "round",
+                                                d: "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/FileUploadSection.tsx",
+                                                lineNumber: 404,
+                                                columnNumber: 23
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/FileUploadSection.tsx",
+                                            lineNumber: 403,
+                                            columnNumber: 21
+                                        }, this),
+                                        uploadError
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/components/FileUploadSection.tsx",
+                                    lineNumber: 402,
+                                    columnNumber: 19
+                                }, this)
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/FileUploadSection.tsx",
+                                lineNumber: 401,
+                                columnNumber: 17
+                            }, this),
+                            uploadSuccess && selectedTab === 'link' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800/30",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                    className: "text-sm text-green-600 dark:text-green-400 flex items-center gap-2",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
+                                            xmlns: "http://www.w3.org/2000/svg",
+                                            fill: "none",
+                                            viewBox: "0 0 24 24",
+                                            strokeWidth: 1.5,
+                                            stroke: "currentColor",
+                                            className: "w-5 h-5",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+                                                strokeLinecap: "round",
+                                                strokeLinejoin: "round",
+                                                d: "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/FileUploadSection.tsx",
+                                                lineNumber: 415,
+                                                columnNumber: 23
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/FileUploadSection.tsx",
+                                            lineNumber: 414,
+                                            columnNumber: 21
+                                        }, this),
+                                        "連結處理成功，準備進行下一步操作"
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/components/FileUploadSection.tsx",
+                                    lineNumber: 413,
+                                    columnNumber: 19
+                                }, this)
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/FileUploadSection.tsx",
+                                lineNumber: 412,
+                                columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 className: "space-y-3",
@@ -690,7 +842,7 @@ function FileUploadSection() {
                                         children: "連結類型"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 317,
+                                        lineNumber: 423,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -716,7 +868,7 @@ function FileUploadSection() {
                                                                 r: "10"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 325,
+                                                                lineNumber: 431,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -726,20 +878,20 @@ function FileUploadSection() {
                                                                 y2: "12"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 326,
+                                                                lineNumber: 432,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
                                                                 d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 327,
+                                                                lineNumber: 433,
                                                                 columnNumber: 23
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 324,
+                                                        lineNumber: 430,
                                                         columnNumber: 21
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -747,13 +899,13 @@ function FileUploadSection() {
                                                         children: "一般網站"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 329,
+                                                        lineNumber: 435,
                                                         columnNumber: 21
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 320,
+                                                lineNumber: 426,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -774,14 +926,14 @@ function FileUploadSection() {
                                                                 d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 337,
+                                                                lineNumber: 443,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("polyline", {
                                                                 points: "14 2 14 8 20 8"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 338,
+                                                                lineNumber: 444,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -791,7 +943,7 @@ function FileUploadSection() {
                                                                 y2: "13"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 339,
+                                                                lineNumber: 445,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -801,20 +953,20 @@ function FileUploadSection() {
                                                                 y2: "17"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 340,
+                                                                lineNumber: 446,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("polyline", {
                                                                 points: "10 9 9 9 8 9"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 341,
+                                                                lineNumber: 447,
                                                                 columnNumber: 23
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 336,
+                                                        lineNumber: 442,
                                                         columnNumber: 21
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -822,13 +974,13 @@ function FileUploadSection() {
                                                         children: "Google Docs"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 343,
+                                                        lineNumber: 449,
                                                         columnNumber: 21
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 332,
+                                                lineNumber: 438,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -854,7 +1006,7 @@ function FileUploadSection() {
                                                                 ry: "2"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 351,
+                                                                lineNumber: 457,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("circle", {
@@ -863,20 +1015,20 @@ function FileUploadSection() {
                                                                 r: "1.5"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 352,
+                                                                lineNumber: 458,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
                                                                 d: "M21 15l-5-5L5 21"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 353,
+                                                                lineNumber: 459,
                                                                 columnNumber: 23
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 350,
+                                                        lineNumber: 456,
                                                         columnNumber: 21
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -884,13 +1036,13 @@ function FileUploadSection() {
                                                         children: "Medium"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 355,
+                                                        lineNumber: 461,
                                                         columnNumber: 21
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 346,
+                                                lineNumber: 452,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -911,7 +1063,7 @@ function FileUploadSection() {
                                                                 d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 363,
+                                                                lineNumber: 469,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -921,7 +1073,7 @@ function FileUploadSection() {
                                                                 y2: "10"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 364,
+                                                                lineNumber: 470,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -931,7 +1083,7 @@ function FileUploadSection() {
                                                                 y2: "10"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 365,
+                                                                lineNumber: 471,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("line", {
@@ -941,13 +1093,13 @@ function FileUploadSection() {
                                                                 y2: "10"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                                lineNumber: 366,
+                                                                lineNumber: 472,
                                                                 columnNumber: 23
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 362,
+                                                        lineNumber: 468,
                                                         columnNumber: 21
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -955,19 +1107,19 @@ function FileUploadSection() {
                                                         children: "WeChat"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 368,
+                                                        lineNumber: 474,
                                                         columnNumber: 21
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                lineNumber: 358,
+                                                lineNumber: 464,
                                                 columnNumber: 19
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 319,
+                                        lineNumber: 425,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -988,52 +1140,52 @@ function FileUploadSection() {
                                                         d: "m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                        lineNumber: 375,
+                                                        lineNumber: 481,
                                                         columnNumber: 23
                                                     }, this)
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 374,
+                                                    lineNumber: 480,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                     children: "選擇正確的連結類型可以幫助系統更準確地提取文章內容。例如，WeChat 和 Medium 等平台有特殊的內容結構，需要專門的處理方法。"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                                    lineNumber: 377,
+                                                    lineNumber: 483,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                                            lineNumber: 373,
+                                            lineNumber: 479,
                                             columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                                        lineNumber: 372,
+                                        lineNumber: 478,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                lineNumber: 316,
+                                lineNumber: 422,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                        lineNumber: 295,
+                        lineNumber: 364,
                         columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                    lineNumber: 294,
+                    lineNumber: 363,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                lineNumber: 293,
+                lineNumber: 362,
                 columnNumber: 9
             }, this)
         }
@@ -1052,7 +1204,7 @@ function FileUploadSection() {
                             children: "文件輸入"
                         }, void 0, false, {
                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                            lineNumber: 394,
+                            lineNumber: 500,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1060,13 +1212,13 @@ function FileUploadSection() {
                             children: "選擇上傳文件或輸入文章連結"
                         }, void 0, false, {
                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                            lineNumber: 395,
+                            lineNumber: 501,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                    lineNumber: 393,
+                    lineNumber: 499,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$heroui$2f$card$2f$dist$2f$chunk$2d$LGSBTEIA$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__card_body_default__as__CardBody$3e$__["CardBody"], {
@@ -1090,17 +1242,17 @@ function FileUploadSection() {
                                 children: item.content
                             }, item.id, false, {
                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                lineNumber: 415,
+                                lineNumber: 521,
                                 columnNumber: 15
                             }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/FileUploadSection.tsx",
-                        lineNumber: 399,
+                        lineNumber: 505,
                         columnNumber: 11
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                    lineNumber: 398,
+                    lineNumber: 504,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$heroui$2f$card$2f$dist$2f$chunk$2d$TE6SZS6W$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__card_footer_default__as__CardFooter$3e$__["CardFooter"], {
@@ -1114,7 +1266,7 @@ function FileUploadSection() {
                             children: "重置"
                         }, void 0, false, {
                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                            lineNumber: 423,
+                            lineNumber: 529,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$heroui$2f$button$2f$dist$2f$chunk$2d$KCYYJJH4$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__button_default__as__Button$3e$__["Button"], {
@@ -1136,35 +1288,35 @@ function FileUploadSection() {
                                     d: "M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                                    lineNumber: 440,
+                                    lineNumber: 546,
                                     columnNumber: 19
                                 }, void 0)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/FileUploadSection.tsx",
-                                lineNumber: 439,
+                                lineNumber: 545,
                                 columnNumber: 17
                             }, void 0),
                             children: selectedTab === 'file' ? '上傳並處理' : '處理連結'
                         }, void 0, false, {
                             fileName: "[project]/src/components/FileUploadSection.tsx",
-                            lineNumber: 431,
+                            lineNumber: 537,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/FileUploadSection.tsx",
-                    lineNumber: 422,
+                    lineNumber: 528,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/FileUploadSection.tsx",
-            lineNumber: 392,
+            lineNumber: 498,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/components/FileUploadSection.tsx",
-        lineNumber: 391,
+        lineNumber: 497,
         columnNumber: 5
     }, this);
 }
