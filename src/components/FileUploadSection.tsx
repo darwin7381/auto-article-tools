@@ -18,6 +18,7 @@ export default function FileUploadSection() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [processSuccess, setProcessSuccess] = useState(false);
   const [markdownUrl, setMarkdownUrl] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -82,12 +83,10 @@ export default function FileUploadSection() {
     }
   };
 
-  const uploadFileToR2 = async (file: File) => {
-    setIsUploading(true);
-    setUploadError(null);
-    setUploadSuccess(false);
-    
+  async function uploadFileToR2(file: File): Promise<{ success: boolean; fileUrl?: string; fileId?: string }> {
     try {
+      setIsUploading(true);
+      
       const formData = new FormData();
       formData.append('file', file);
       
@@ -102,17 +101,21 @@ export default function FileUploadSection() {
         throw new Error(result.error || '上傳失敗');
       }
       
-      console.log('上傳成功:', result);
+      console.log('文件上傳成功:', result);
       setUploadSuccess(true);
-      return result;
+      setUploadError(null);
+      return { 
+        success: true, 
+        fileUrl: result.fileUrl, // 假設 API 返回此字段
+        fileId: result.fileId    // 假設 API 返回此字段
+      };
     } catch (error) {
-      console.error('上傳錯誤:', error);
+      console.error('文件上傳錯誤:', error);
       setUploadError(error instanceof Error ? error.message : '上傳失敗，請稍後重試');
-      return null;
-    } finally {
-      setIsUploading(false);
+      setUploadSuccess(false);
+      return { success: false };
     }
-  };
+  }
 
   const handleLinkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLinkUrl(e.target.value);
@@ -195,48 +198,76 @@ export default function FileUploadSection() {
     }
   };
 
-  const handleUpload = async () => {
-    if (selectedTab === 'file' && selectedFile) {
-      const result = await uploadFileToR2(selectedFile);
-      if (result) {
-        console.log('文件已上傳:', result);
-        
-        // 調用process-file API處理文件
-        try {
-          setUploadSuccess(true);
-          setIsUploading(true); // 继续显示上传状态
-          
-          const response = await fetch('/api/process-file', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              fileId: result.fileId,
-              fileUrl: result.fileUrl,
-              fileType: result.fileType
-            }),
-          });
-          
-          const processResult = await response.json();
-          
-          if (!response.ok) {
-            throw new Error(processResult.error || '處理失敗');
-          }
-          
-          console.log('文件處理成功:', processResult);
-          setProcessSuccess(true);
-          setMarkdownUrl(processResult.markdownUrl);
-          setUploadError(null);
-        } catch (error) {
-          console.error('文件處理錯誤:', error);
-          setUploadError(error instanceof Error ? error.message : '文件處理失敗，請稍後重試');
-          setUploadSuccess(false);
-        } finally {
-          setIsUploading(false);
-        }
+  const handleUpload = async (): Promise<void> => {
+    if (isUploading || isProcessing) return;
+    setUploadError(null);
+
+    if (selectedTab === 'file') {
+      if (!selectedFile) {
+        setUploadError('請選擇要上傳的文件');
+        return;
       }
-    } else if (selectedTab === 'link' && linkUrl) {
+
+      setIsUploading(true);
+      const uploadResult = await uploadFileToR2(selectedFile);
+      if (!uploadResult.success) {
+        setIsUploading(false);
+        return;
+      }
+
+      try {
+        setIsProcessing(true);
+        
+        // 獲取文件類型和 ID
+        const fileName = selectedFile.name;
+        const isPdf = fileName.toLowerCase().endsWith('.pdf');
+        const fileType = isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        
+        // 統一使用 process-file 端點，讓後端自動判斷和處理
+        const apiEndpoint = '/api/process-file';
+        
+        console.log(`正在處理文件: ${fileName}`);
+
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileId: uploadResult.fileId || fileName,
+            fileUrl: uploadResult.fileUrl || fileName,
+            fileType: fileType,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || '處理失敗');
+        }
+
+        const processResult = await response.json();
+        console.log('處理結果:', processResult);
+        setProcessSuccess(true);
+        
+        // 根據不同API回傳結果獲取正確的URL
+        if (isPdf) {
+          setMarkdownUrl(processResult.htmlUrl); // PDF處理會回傳HTML URL
+        } else {
+          setMarkdownUrl(processResult.markdownUrl); // DOCX處理會回傳Markdown URL
+        }
+      } catch (error) {
+        console.error('處理錯誤:', error);
+        setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
+      } finally {
+        setIsProcessing(false);
+        setIsUploading(false);
+      }
+    } else if (selectedTab === 'link') {
+      if (!linkUrl) {
+        setUploadError('請輸入有效的連結');
+        return;
+      }
+      
       await handleLinkSubmit();
     }
   };
@@ -607,11 +638,11 @@ export default function FileUploadSection() {
           <Button 
             color="primary" 
             onClick={handleUpload}
-            disabled={(selectedTab === 'file' && !selectedFile) || (selectedTab === 'link' && !linkUrl) || isUploading}
-            isLoading={isUploading}
+            disabled={(selectedTab === 'file' && !selectedFile) || (selectedTab === 'link' && !linkUrl) || isProcessing}
+            isLoading={isProcessing}
             className="font-medium shadow-sm whitespace-nowrap inline-flex items-center justify-center"
             startContent={
-              !isUploading && (
+              !isProcessing && (
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
                 </svg>

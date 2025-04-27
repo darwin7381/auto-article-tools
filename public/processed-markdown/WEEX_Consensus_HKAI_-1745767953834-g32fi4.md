@@ -1,12 +1,12 @@
 ---
 source: docx
-fileId: WEEX_Consensus_HKAI_-1745760250645-jd74nf
-processTime: 2025-04-27T13:24:13.058Z
+fileId: WEEX_Consensus_HKAI_-1745767953834-g32fi4
+processTime: 2025-04-27T15:32:36.466Z
 ---
 
 ## <a id="_ttg0mweo9odq"></a>**WEEX强势亮相 Consensus HK，与行业精英携手推动以AI 赋能加密交易**
 
-![](https://yourcdndomain.com/images/WEEX_Consensus_HKAI_-1745760250645-jd74nf-1745760252300-8p9bc2.png)
+![](https://yourcdndomain.com/images/WEEX_Consensus_HKAI_-1745767953834-g32fi4-1745767955595-pxk88i.png)
 
 
 
