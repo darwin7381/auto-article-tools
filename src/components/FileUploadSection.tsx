@@ -195,7 +195,7 @@ export default function FileUploadSection() {
         setUploadSuccess(true);
         
         // 傳遞文件URL、文件類型以及原始文件名
-        await handleUploadSuccess(data.fileUrl, selectedFile.type, selectedFile.name);
+        await handleUploadSuccess(data.fileUrl, selectedFile.type);
       } catch (error) {
         console.error('上傳錯誤:', error);
         setUploadError(error instanceof Error ? error.message : '上傳失敗，請稍後重試');
@@ -223,9 +223,8 @@ export default function FileUploadSection() {
    * 處理上傳成功後的文件處理邏輯
    * @param fileUrl 上傳成功後的文件URL
    * @param fileType 文件MIME類型
-   * @param fileName 原始文件名
    */
-  const handleUploadSuccess = async (fileUrl: string, fileType: string, fileName: string): Promise<void> => {
+  const handleUploadSuccess = async (fileUrl: string, fileType: string): Promise<void> => {
     try {
       setIsProcessing(true);
       
@@ -247,7 +246,7 @@ export default function FileUploadSection() {
         body: JSON.stringify({
           fileUrl: fileUrl,
           fileType: isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          fileName: fileName  // 傳遞原始文件名
+          fileId: fileUrl.split('/').pop()?.split('.')[0] || new Date().getTime().toString()  // 從 fileUrl 提取 fileId 或使用時間戳
         }),
       });
       

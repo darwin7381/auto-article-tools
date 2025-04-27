@@ -1,7 +1,7 @@
 ---
 source: docx
-fileId: 7de0036b-1e8a-4f57-97da-35645afee911
-processTime: 2025-04-27T21:07:42.178Z
+fileId: ------Web3-Innovators-Season-------1745788522363-vqp0cg
+processTime: 2025-04-27T21:15:36.285Z
 ---
 
 **新聞稿 即時發布**
@@ -113,15 +113,15 @@ Web3Labs
 
 請按此處下載高像素新聞圖片。
 
-<table><tr><td>![](https://yourcdndomain.com/images/7de0036b-1e8a-4f57-97da-35645afee911-1745788060872-buvp2s.png)
+<table><tr><td>![](https://files.blocktempo.ai/images/------Web3-Innovators-Season-------1745788522363-vqp0cg-1745788534964-qvtpio.png)
 
-
+![動區塊日報模板 Ver.1.5 母版-3](https://hackmd.io/_uploads/SJmXk731xg.png)
 
 </td></tr><tr><td>數碼港作為本港的 Web3 基地，致力以三大策略支柱專注推動 Web3 生態圈發展，包括培育人才、推動產業發展以及提升公眾對 Web3 行業的認知，並於本月底起推出「Web3 Innovator Season」主題季度，夥拍不同業界夥伴，舉辦多元化的國際大型 Web3 系列活動，讓業界和企業更掌握前沿發展，推動跨界別業務合作和交流，同時增加大眾對於
 
 Web3 應用的接觸點。
 
-</td></tr><tr><td>![](https://yourcdndomain.com/images/7de0036b-1e8a-4f57-97da-35645afee911-1745788061582-pzl89v.jpeg)
+</td></tr><tr><td>![](https://files.blocktempo.ai/images/------Web3-Innovators-Season-------1745788522363-vqp0cg-1745788535838-1r4464.jpeg)
 
 
 

@@ -16,7 +16,7 @@ const R2 = new S3Client({
 
 // 圖片上傳到R2並返回URL
 async function uploadImageToR2(imageBuffer: Buffer, fileName: string, contentType: string): Promise<string> {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'auto-article-tools';
+  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'blocktempo-ai';
   const key = `images/${fileName}`;
   
   const command = new PutObjectCommand({
@@ -28,15 +28,14 @@ async function uploadImageToR2(imageBuffer: Buffer, fileName: string, contentTyp
   
   await R2.send(command);
   
-  // 這裡應該返回圖片的公開訪問URL
-  // 實際部署時需要配置R2的公開訪問策略或使用Cloudflare Workers
-  const baseUrl = process.env.R2_PUBLIC_URL || 'https://yourcdndomain.com';
+  // 使用我們的 Cloudflare 自訂網域
+  const baseUrl = process.env.R2_PUBLIC_URL || 'https://files.blocktempo.ai';
   return `${baseUrl}/${key}`;
 }
 
 // 從R2獲取文件
 async function getFileFromR2(fileKey: string): Promise<Buffer> {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'auto-article-tools';
+  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'blocktempo-ai';
   
   const command = new GetObjectCommand({
     Bucket: bucketName,
@@ -53,7 +52,7 @@ async function getFileFromR2(fileKey: string): Promise<Buffer> {
 
 // 保存處理結果為Markdown
 async function saveMarkdownToR2(content: string, fileId: string): Promise<string> {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'auto-article-tools';
+  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'blocktempo-ai';
   const key = `processed/${fileId}.md`;
   
   const command = new PutObjectCommand({
