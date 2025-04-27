@@ -788,6 +788,16 @@
     background-color: var(--color-gray-800);
   }
 
+  .bg-gray-900\/90 {
+    background-color: #101828e6;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-gray-900\/90 {
+      background-color: color-mix(in oklab, var(--color-gray-900) 90%, transparent);
+    }
+  }
+
   .bg-green-50 {
     background-color: var(--color-green-50);
   }
@@ -826,6 +836,10 @@
 
   .p-0 {
     padding: calc(var(--spacing) * 0);
+  }
+
+  .p-0\.5 {
+    padding: calc(var(--spacing) * .5);
   }
 
   .p-1 {
@@ -886,6 +900,10 @@
 
   .py-2 {
     padding-block: calc(var(--spacing) * 2);
+  }
+
+  .py-2\.5 {
+    padding-block: calc(var(--spacing) * 2.5);
   }
 
   .py-4 {
@@ -1093,9 +1111,43 @@
   }
 
   @media (hover: hover) {
+    .hover\:border-gray-400:hover {
+      border-color: var(--color-gray-400);
+    }
+  }
+
+  @media (hover: hover) {
+    .hover\:bg-gray-50:hover {
+      background-color: var(--color-gray-50);
+    }
+  }
+
+  @media (hover: hover) {
     .hover\:bg-white:hover {
       background-color: var(--color-white);
     }
+  }
+
+  @media (hover: hover) {
+    .hover\:text-gray-900:hover {
+      color: var(--color-gray-900);
+    }
+  }
+
+  .data-\[selected\=true\]\:bg-gray-800[data-selected="true"] {
+    background-color: var(--color-gray-800);
+  }
+
+  .data-\[selected\=true\]\:bg-white[data-selected="true"] {
+    background-color: var(--color-white);
+  }
+
+  .data-\[selected\=true\]\:text-foreground[data-selected="true"] {
+    color: var(--foreground);
+  }
+
+  .data-\[selected\=true\]\:text-white[data-selected="true"] {
+    color: var(--color-white);
   }
 
   @media (width >= 48rem) {
@@ -1399,6 +1451,24 @@
       .dark\:hover\:bg-gray-800:hover {
         background-color: var(--color-gray-800);
       }
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .dark\:data-\[selected\=true\]\:bg-gray-800[data-selected="true"] {
+      background-color: var(--color-gray-800);
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .dark\:data-\[selected\=true\]\:bg-gray-900[data-selected="true"] {
+      background-color: var(--color-gray-900);
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .dark\:data-\[selected\=true\]\:text-white[data-selected="true"] {
+      color: var(--color-white);
     }
   }
 }
