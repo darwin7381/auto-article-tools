@@ -3,15 +3,21 @@ import ProgressSection from "../components/ProgressSection";
 import PreviewSection from "../components/PreviewSection";
 import WordPressSection from "../components/WordPressSection";
 import FeaturesSection from "../components/FeaturesSection";
+import UserNav from "../components/UserNav";
 
 export default function HomePage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <header className="text-center mb-12 bg-gradient-to-r from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-xl p-8 shadow-medium">
-        <h1 className="text-4xl font-bold mb-2 text-primary-600 dark:text-primary-400">文件處理與WordPress發布系統</h1>
-        <p className="text-xl text-gray-600 dark:text-gray-300">
-          DOCX/PDF 自動處理並發布到 WordPress
-        </p>
+      <header className="mb-12 bg-gradient-to-r from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-xl p-8 shadow-medium">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-4xl font-bold text-primary-600 dark:text-primary-400">文件處理與WordPress發布系統</h1>
+            <p className="text-xl text-gray-600 dark:text-gray-300">
+              DOCX/PDF 自動處理並發布到 WordPress
+            </p>
+          </div>
+          <UserNav />
+        </div>
       </header>
 
       <div className="space-y-8">
