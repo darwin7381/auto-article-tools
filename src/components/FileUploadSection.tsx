@@ -16,12 +16,16 @@ export default function FileUploadSection() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [processSuccess, setProcessSuccess] = useState(false);
+  const [markdownUrl, setMarkdownUrl] = useState<string | null>(null);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0]);
       setUploadError(null);
       setUploadSuccess(false);
+      setProcessSuccess(false);
+      setMarkdownUrl(null);
     }
   };
 
@@ -35,6 +39,8 @@ export default function FileUploadSection() {
         setSelectedFile(file);
         setUploadError(null);
         setUploadSuccess(false);
+        setProcessSuccess(false);
+        setMarkdownUrl(null);
       } else {
         setUploadError('只能上傳 PDF 或 DOCX 文件');
       }
@@ -56,6 +62,8 @@ export default function FileUploadSection() {
       setSelectedFile(null);
       setUploadError(null);
       setUploadSuccess(false);
+      setProcessSuccess(false);
+      setMarkdownUrl(null);
     } else {
       setLinkUrl('');
       setLinkType('website');
@@ -191,7 +199,42 @@ export default function FileUploadSection() {
     if (selectedTab === 'file' && selectedFile) {
       const result = await uploadFileToR2(selectedFile);
       if (result) {
-        console.log('文件已上傳並準備處理:', result);
+        console.log('文件已上傳:', result);
+        
+        // 調用process-file API處理文件
+        try {
+          setUploadSuccess(true);
+          setIsUploading(true); // 继续显示上传状态
+          
+          const response = await fetch('/api/process-file', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              fileId: result.fileId,
+              fileUrl: result.fileUrl,
+              fileType: result.fileType
+            }),
+          });
+          
+          const processResult = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(processResult.error || '處理失敗');
+          }
+          
+          console.log('文件處理成功:', processResult);
+          setProcessSuccess(true);
+          setMarkdownUrl(processResult.markdownUrl);
+          setUploadError(null);
+        } catch (error) {
+          console.error('文件處理錯誤:', error);
+          setUploadError(error instanceof Error ? error.message : '文件處理失敗，請稍後重試');
+          setUploadSuccess(false);
+        } finally {
+          setIsUploading(false);
+        }
       }
     } else if (selectedTab === 'link' && linkUrl) {
       await handleLinkSubmit();
@@ -295,14 +338,41 @@ export default function FileUploadSection() {
                 </div>
               )}
               
-              {uploadSuccess && (
+              {uploadSuccess && !processSuccess && (
                 <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
                   <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    文件上傳成功，準備處理
+                    文件上傳成功，正在處理中...
                   </p>
+                </div>
+              )}
+              
+              {processSuccess && (
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      文件處理完成，已生成Markdown檔案
+                    </p>
+                    {markdownUrl && (
+                      <a 
+                        href={markdownUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-primary-600 dark:text-primary-400 flex items-center gap-1 hover:underline"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        查看
+                      </a>
+                    )}
+                  </div>
                 </div>
               )}
               
