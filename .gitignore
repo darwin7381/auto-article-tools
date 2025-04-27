@@ -1,1 +1,37 @@
 node_modules
+
+# 依賴目錄
+node_modules
+/.pnp
+.pnp.js
+
+# 測試覆蓋率
+/coverage
+
+# Next.js 構建輸出
+/.next/
+/out/
+
+# 生產環境構建
+/build
+
+# 其他文件
+.DS_Store
+*.pem
+
+# 調試日誌
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# 本地環境文件
+.env*.local
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
