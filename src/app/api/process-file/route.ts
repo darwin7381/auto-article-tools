@@ -4,9 +4,6 @@ import mammoth from 'mammoth';
 import fs from 'fs';
 import path from 'path';
 
-// 改用直接導入pdf-parse的具體處理模塊，避免初始化測試代碼
-// import pdfParse from 'pdf-parse';
-
 // R2 存儲客戶端配置
 const R2 = new S3Client({
   region: 'auto',
@@ -151,57 +148,41 @@ ${markdown}`;
   }
 }
 
-// 處理PDF文件
-async function processPDF(buffer: Buffer, fileId: string): Promise<{ r2Key: string; localPath: string }> {
+// 定義請求體的接口類型
+interface ProcessFileRequest {
+  fileId: string;
+  fileUrl: string;
+  fileType: string;
+  [key: string]: unknown; // 允許其他可能的字段
+}
+
+// 自動為PDF文件重定向到process-pdf端點
+async function forwardToPdfProcessor(requestBody: ProcessFileRequest): Promise<Response> {
   try {
-    console.log('正在處理PDF文件...');
+    // 轉發請求到處理PDF的API
+    const pdfResponse = await fetch(new URL('/api/process-pdf', process.env.NEXTAUTH_URL || 'http://localhost:3000'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
     
-    // 直接導入特定處理模塊，避免初始化問題
-    const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
-    
-    // 使用pdf-parse提取文本
-    const data = await pdfParse(buffer);
-    
-    // 提取文本內容
-    const text = data.text;
-    console.log('成功提取PDF文本內容');
-    
-    // 注意：這個基本實現只提取了文本，沒有提取圖片
-    // PDF圖片提取需要更複雜的處理，可能需要使用pdf.js或其他庫
-    // 這裡只是基本示例，實際項目需要實現完整的PDF圖片提取
-    
-    // 生成Markdown
-    const markdown = `---
-source: pdf
-fileId: ${fileId}
-pageCount: ${data.numpages}
-processTime: ${new Date().toISOString()}
----
-
-# ${data.info?.Title || 'Untitled Document'}
-
-${text
-  .split('\n')
-  .filter((line: string) => line.trim() !== '')
-  .join('\n\n')}
-`;
-    
-    // 保存Markdown到R2
-    const r2Key = await saveMarkdownToR2(markdown, fileId);
-    
-    // 保存Markdown到本地
-    const localPath = await saveMarkdownToLocal(markdown, fileId);
-    
-    return { r2Key, localPath };
+    // 直接返回轉發後的響應
+    return pdfResponse;
   } catch (error) {
-    console.error('PDF處理錯誤:', error);
-    throw error;
+    console.error('轉發到PDF處理API失敗:', error);
+    return new Response(
+      JSON.stringify({ error: 'PDF處理失敗，請稍後重試' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { fileId, fileUrl, fileType } = await request.json();
+    const requestBody = await request.json();
+    const { fileId, fileUrl, fileType } = requestBody;
     
     if (!fileId || !fileUrl) {
       return NextResponse.json(
@@ -211,6 +192,13 @@ export async function POST(request: Request) {
     }
     
     console.log('接收到處理請求:', { fileId, fileUrl, fileType });
+    
+    // 自動判斷是否為PDF並相應處理
+    if (fileType === 'application/pdf') {
+      // 為PDF文件直接轉發到PDF處理API
+      console.log('檢測到PDF文件，轉發至PDF處理API');
+      return forwardToPdfProcessor(requestBody);
+    }
     
     // 從R2獲取文件
     let fileBuffer;
@@ -225,27 +213,23 @@ export async function POST(request: Request) {
       );
     }
     
-    let processResult;
-    
-    // 根據文件類型處理
-    if (fileType === 'application/pdf') {
-      processResult = await processPDF(fileBuffer, fileId);
-    } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      processResult = await processDOCX(fileBuffer, fileId);
+    // 處理DOCX文件
+    if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const processResult = await processDOCX(fileBuffer, fileId);
+      return NextResponse.json({
+        success: true,
+        fileId,
+        markdownKey: processResult.r2Key,
+        markdownUrl: processResult.localPath,
+        status: 'processed',
+      });
     } else {
+      // 非PDF或DOCX的情況
       return NextResponse.json(
-        { error: '不支持的文件類型' },
+        { error: '不支持的文件類型，僅支持PDF和DOCX文件' },
         { status: 400 }
       );
     }
-    
-    return NextResponse.json({
-      success: true,
-      fileId,
-      markdownKey: processResult.r2Key,
-      markdownUrl: processResult.localPath,
-      status: 'processed',
-    });
     
   } catch (error) {
     console.error('文件處理錯誤:', error);
