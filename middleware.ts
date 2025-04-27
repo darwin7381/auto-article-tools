@@ -2,18 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 
-// 公开路由列表
+// 唯一公开路由是登录页面
 const publicRoutes = [
-  "/",
   "/sign-in",
-  "/sign-up",
-  // API 路由
-  "/api/process-file",
-  "/api/process-pdf",
-  "/api/parse-url",
-  "/api/process-url",
-  "/api/upload",
-  "/api/images"
+  "/api/clerk-webhook" // 给 Clerk webhook 的路由，如果需要
 ];
 
 export function middleware(request: NextRequest) {
@@ -27,8 +19,23 @@ export function middleware(request: NextRequest) {
       const prefix = route.slice(0, -1);
       return nextUrl.pathname.startsWith(prefix);
     }
-    return nextUrl.pathname === route;
+    return nextUrl.pathname === route || 
+           nextUrl.pathname.startsWith(route + "/");
   });
+
+  // 如果是静态资源，允许访问
+  if (
+    nextUrl.pathname.startsWith("/_next") ||
+    nextUrl.pathname.endsWith(".svg") ||
+    nextUrl.pathname.endsWith(".png") ||
+    nextUrl.pathname.endsWith(".jpg") ||
+    nextUrl.pathname.endsWith(".jpeg") ||
+    nextUrl.pathname.endsWith(".ico") ||
+    nextUrl.pathname.endsWith(".webp") ||
+    nextUrl.pathname.endsWith(".gif")
+  ) {
+    return NextResponse.next();
+  }
 
   // 如果是公开路由，或者用户已登录，则允许访问
   if (isPublicRoute || userId) {
@@ -41,7 +48,13 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // 排除静态文件和API路由
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/"
   ],
 };
