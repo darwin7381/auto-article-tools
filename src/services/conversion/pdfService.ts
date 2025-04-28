@@ -110,27 +110,45 @@ export async function processPdf(fileUrl: string, fileId: string): Promise<DocxP
  * @returns 處理結果
  */
 async function processDocxViaApi(fileId: string, docxKey: string): Promise<DocxProcessResult> {
-  // 設置API URL
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const apiUrl = `${baseUrl}/api/process-file`;
-  
-  // 發送請求
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    body: JSON.stringify({
-      fileUrl: docxKey,
-      fileId: fileId,
-      fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    }),
-    headers: {
-      'Content-Type': 'application/json'
+  try {
+    // 直接導入所需服務
+    const { getFileFromR2 } = await import('@/services/storage/r2Service');
+    const { processDOCX } = await import('@/services/conversion/docxService');
+    const { enhanceMarkdown } = await import('@/agents/contentAgent');
+    
+    // 從 R2 獲取 DOCX 文件
+    const fileBuffer = await getFileFromR2(docxKey);
+    
+    // 直接處理 DOCX 文件
+    const processResult = await processDOCX(fileBuffer, fileId);
+    
+    try {
+      // 嘗試使用 AI Agent 進行處理
+      const agentResult = await enhanceMarkdown(fileId, processResult.r2Key);
+      
+      return {
+        success: true,
+        fileId,
+        markdownKey: agentResult.markdownKey,
+        markdownUrl: agentResult.markdownUrl,
+        status: 'processed-by-ai-agent',
+      };
+    } catch (aiError) {
+      console.error('AI Agent 處理失敗:', aiError);
+      
+      // 如果 AI 處理失敗，返回基本處理結果
+      return {
+        success: true,
+        fileId,
+        markdownKey: processResult.r2Key,
+        markdownUrl: processResult.localPath,
+        status: 'processed',
+      };
     }
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`處理DOCX失敗: ${response.status} ${response.statusText} - ${errorText}`);
+  } catch (error) {
+    console.error('直接處理 DOCX 失敗:', error);
+    
+    // 如果直接處理失敗，返回錯誤
+    throw new Error(`處理 DOCX 失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
   }
-  
-  return await response.json();
 } 
