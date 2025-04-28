@@ -93,3 +93,82 @@ PDF文件處理流程如下：
 - 文件名會被處理成安全格式，並添加時間戳和隨機字符串確保唯一性
 - 圖片會被單獨提取並上傳，在Markdown中通過URL引用
 - 處理大文件可能需要更長時間，請耐心等待
+
+# 文件處理與WordPress發布系統
+
+自動處理 DOCX/PDF 文件並發布到 WordPress 的集成工具。
+
+## 功能特點
+
+- 支持上傳 DOCX 和 PDF 文件
+- 自動提取文本內容和圖片
+- 使用 OpenAI 增強內容品質
+- 輸出標準化的 Markdown 格式
+- 一鍵發布到 WordPress 網站
+
+## 技術架構
+
+### 前端
+
+- Next.js 15 前端框架
+- TailwindCSS 樣式
+- Heroui UI 組件
+
+### 後端
+
+- Next.js API 路由
+- Cloudflare R2 存儲
+- OpenAI API 內容增強
+
+### 服務層設計
+
+本項目採用服務層(Service Layer)設計模式，將功能模塊化:
+
+```
+src/
+├── services/
+│   ├── storage/         # 存儲服務
+│   │   ├── r2Service.ts     # R2雲存儲操作
+│   │   └── localService.ts  # 本地文件操作
+│   ├── document/        # 文檔處理服務
+│   │   └── markdownService.ts  # Markdown處理
+│   ├── conversion/      # 文件轉換服務
+│   │   ├── docxService.ts      # DOCX處理
+│   │   └── pdfService.ts       # PDF處理
+│   └── utils/           # 工具服務
+│       └── openaiService.ts    # OpenAI處理
+```
+
+#### 主要服務模塊:
+
+- **存儲服務**: 處理文件的上傳、下載和存儲
+- **文檔服務**: 處理Markdown的創建和格式化
+- **轉換服務**: 處理文件格式轉換(PDF→DOCX→Markdown)
+- **工具服務**: 提供OpenAI內容增強等功能
+
+## 安裝與設置
+
+1. 克隆儲存庫
+2. 安裝依賴: `npm install`
+3. 設置環境變量(.env.local):
+   ```
+   OPENAI_API_KEY=your_api_key
+   CLOUDFLARE_R2_ACCESS_KEY_ID=your_access_key
+   CLOUDFLARE_R2_SECRET_ACCESS_KEY=your_secret_key
+   CLOUDFLARE_R2_ENDPOINT=your_endpoint
+   CLOUDFLARE_R2_BUCKET_NAME=your_bucket_name
+   R2_PUBLIC_URL=your_public_url
+   ```
+4. 啟動開發服務器: `npm run dev`
+
+## 使用方法
+
+1. 訪問應用網址
+2. 上傳DOCX或PDF文件
+3. 等待處理完成
+4. 預覽生成的內容
+5. 發布到WordPress(需配置WordPress連接)
+
+## 開發指南
+
+查看 planning.md 獲取詳細的開發規劃和說明。

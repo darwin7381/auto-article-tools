@@ -1,17 +1,5 @@
 import { NextResponse } from 'next/server';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-
-// 配置 S3 客户端
-const s3Client = new S3Client({
-  region: 'auto',
-  endpoint: process.env.CLOUDFLARE_R2_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || '',
-  },
-});
-
-const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'blocktempo-ai';
+import { uploadFileToR2 } from '@/services/storage/r2Service';
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +14,7 @@ export async function POST(request: Request) {
     
     console.log(`收到文件: ${file.name} Type: ${file.type} Size: ${file.size}`);
     
-    // 安全处理文件名
+    // 安全處理文件名
     const fileNameParts = file.name.split('.');
     const fileExt = fileNameParts.pop()?.toLowerCase() || '';
     const sanitizedName = fileNameParts.join('-').replace(/[^a-zA-Z0-9-]/g, '-');
@@ -39,32 +27,26 @@ export async function POST(request: Request) {
     
     console.log(`生成的文件名: ${fileName}`);
     
-    // 读取文件内容
+    // 讀取文件內容
     console.log('正在讀取文件內容...');
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     console.log(`文件內容讀取完成, 大小: ${buffer.length}`);
     
     try {
-      // 上传到 R2
+      // 上傳到 R2
       const key = `input/${fileName}`;
-      console.log(`準備上傳到R2, Bucket: ${bucketName} Key: ${key}`);
+      console.log(`準備上傳到R2, Key: ${key}`);
       
-      const command = new PutObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: file.type,
-      });
-      
-      await s3Client.send(command);
+      // 使用服務層上傳文件
+      await uploadFileToR2(buffer, key, file.type);
       console.log(`文件成功上傳到R2`);
       
-      // 返回成功结果
+      // 返回成功結果
       return NextResponse.json({
         success: true,
-        fileId: fileId,  // 返回不带扩展名的文件ID
-        fileUrl: key,    // 文件在 R2 中的完整路径
+        fileId: fileId,  // 返回不帶擴展名的文件ID
+        fileUrl: key,    // 文件在 R2 中的完整路徑
         fileName: file.name,  // 原始文件名
         fileSize: file.size,
         fileType: file.type,
