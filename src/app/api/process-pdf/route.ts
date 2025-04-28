@@ -61,6 +61,7 @@ async function convertPdfToDocx(pdfUrl: string): Promise<Buffer> {
     const savedFiles = await result.saveFiles(tempDir);
     console.log(`保存的文件: ${savedFiles}`);
     
+    // @ts-expect-error - convertapi 類型定義問題
     if (!savedFiles || savedFiles.length === 0) {
       throw new Error('沒有生成任何文件');
     }
