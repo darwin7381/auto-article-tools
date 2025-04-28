@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { getFileFromR2 } from '../services/storage/r2Service';
 import { saveMarkdown } from '../services/document/markdownService';
+import { createChatConfig } from './common/agentUtils';
 
 /**
  * 內容處理Agent - 專門處理文檔內容增強
@@ -33,34 +34,34 @@ export async function processContent(markdownContent: string): Promise<string> {
     return markdownContent;
   }
 
-  // 系統提示詞
+  // 系統提示詞 - 專注於內容指導，不包含格式控制
   const systemPrompt = `你是一個 30 年經驗的彭博社資深編輯，擅長任何形式的正規專業新聞稿處理。你的任務是：
 
 1. 將來源內容統一轉換為正規的台灣繁體為主的內容
-2. 進行內容初步處理、整理，使其成為專業的 PR 新聞文章
-3. 需注意，要保留原始文章的所有重要信息和細節，包括連結、圖片、表格等，且處於正確位置
-4. 將內容以 Markdown 格式輸出，保持標題層級正確、段落清晰、列表正確
-
-請保持專業的寫作風格，確保輸出的Markdown格式完整正確，可以直接顯示。
-直接返回處理後的Markdown內容，不需要添加任何元數據。`;
+2. 若是內容處理涉及翻譯，請確實考量實際語意表達，以免有些詞或標題在翻譯後失去語境含義
+3. 進行內容初步處理、整理，使其成為專業的 PR 新聞稿
+4. 但需注意，要保留原始文章的所有重要信息和細節，包括連結、圖片、表格...格式和位置相符等
+5. 不要遺漏任何重要資訊，或過度簡化格式，仍須遵正客戶所給的原始內容格式和佈局，僅有大錯誤或大問題時，才進行修正
+6. 輸出必須保持正確的 Markdown 格式，維持標題層級、段落和列表的格式`;
 
   // 用戶提示詞
-  const userPrompt = `請處理以下來源內容，你正在進行將客戶或合作公司給的稿件，統一處理為正規專業的新聞稿：
+  const userPrompt = `請處理以下來源內容，你正在進行將客戶或合作公司給的稿件，統一處理為正規專業的新聞稿，但必須尊重原始內容，不要遺漏任何重要資訊或錯誤簡化格式或過度進行改寫：
 
 ${markdownContent}`;
 
-  // 設置模型參數
-  const modelConfig = {
-    model: "GPT-4.1",
-    temperature: 0.3,
-    max_tokens: 200000,
-    top_p: 1
-  };
-
   try {
     console.log('開始使用AI處理內容...');
-    const response = await openaiClient.chat.completions.create({
-      ...modelConfig,
+    
+    // 使用工具函數創建API配置
+    const config = createChatConfig("gpt-4.1", {
+      temperature: 0.3,
+      max_tokens: 16000,
+      top_p: 0.95,
+    });
+    
+    // API調用
+    const completion = await openaiClient.chat.completions.create({
+      ...config,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -68,7 +69,7 @@ ${markdownContent}`;
     });
 
     // 獲取回應內容
-    const content = response.choices[0].message.content;
+    const content = completion.choices[0].message.content;
     if (!content) {
       console.warn('AI回應為空，返回原始內容');
       return markdownContent;
