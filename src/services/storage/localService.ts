@@ -50,7 +50,10 @@ export function readFromLocalStorage(fileName: string, dirName = 'processed-mark
  * @returns 創建的臨時目錄路徑
  */
 export function createTempDirectory(dirname = 'temp'): string {
-  const tempDir = path.join(process.cwd(), dirname);
+  // 在 Vercel 環境中使用 /tmp 目錄，該目錄在 Serverless 環境中通常是可寫的
+  const tempDir = process.env.NODE_ENV === 'production' 
+    ? path.join('/tmp', dirname)
+    : path.join(process.cwd(), dirname);
   
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
