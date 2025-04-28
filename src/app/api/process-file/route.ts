@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getFileFromR2 } from '@/services/storage/r2Service';
 import { processDOCX } from '@/services/conversion/docxService';
-import { enhanceMarkdownWithOpenAI } from '@/services/utils/openaiService';
+import { enhanceMarkdown } from '@/agents/contentAgent';
 
 // 定義請求體的接口類型
 interface ProcessFileRequest {
@@ -74,21 +74,21 @@ export async function POST(request: Request) {
       const processResult = await processDOCX(fileBuffer, fileId);
       
       try {
-        // 然後再調用OpenAI進行處理
-        console.log('基礎處理完成，開始使用 OpenAI 進行進一步處理...');
-        const openaiResult = await enhanceMarkdownWithOpenAI(fileId, processResult.r2Key);
+        // 然後再調用AI Agent進行處理
+        console.log('基礎處理完成，開始使用 AI Agent 進行進一步處理...');
+        const agentResult = await enhanceMarkdown(fileId, processResult.r2Key);
         
-        // 返回OpenAI處理結果
+        // 返回AI處理結果
         return NextResponse.json({
           success: true,
           fileId,
-          markdownKey: openaiResult.markdownKey,
-          markdownUrl: openaiResult.markdownUrl,
-          status: 'processed-by-openai',
+          markdownKey: agentResult.markdownKey,
+          markdownUrl: agentResult.markdownUrl,
+          status: 'processed-by-ai-agent',
         });
       } catch (error) {
-        // 如果OpenAI處理失敗，返回基本處理結果
-        console.error('OpenAI處理失敗:', error);
+        // 如果AI處理失敗，返回基本處理結果
+        console.error('AI Agent處理失敗:', error);
         return NextResponse.json({
           success: true,
           fileId,
