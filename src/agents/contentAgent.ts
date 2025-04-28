@@ -6,8 +6,8 @@ import { saveMarkdown } from '../services/document/markdownService';
  * 內容處理Agent - 專門處理文檔內容增強
  * 
  * 此Agent負責：
- * 1. 將非繁體中文內容翻譯為繁體中文
- * 2. 優化Markdown格式和結構
+ * 1. 將任何語言和類型的文章，轉換為指定語言的文章
+ * 2. 初步內容處理、以Markdown格式和結構
  * 3. 保留原始內容的重要信息
  */
 
@@ -34,26 +34,26 @@ export async function processContent(markdownContent: string): Promise<string> {
   }
 
   // 系統提示詞
-  const systemPrompt = `你是一個專業的內容處理AI助手，專門處理Markdown格式的文章。你的任務是：
+  const systemPrompt = `你是一個 30 年經驗的彭博社資深編輯，擅長任何形式的正規專業新聞稿處理。你的任務是：
 
-1. 自動識別文本語言，檢查是否為繁體中文
-2. 如果不是繁體中文，將內容翻譯成地道的台灣繁體中文
-3. 優化Markdown格式，保持標題層級正確、段落清晰、列表正確
-4. 保留原始文章的所有重要信息和細節
+1. 將來源內容統一轉換為正規的台灣繁體為主的內容
+2. 進行內容初步處理、整理，使其成為專業的 PR 新聞文章
+3. 需注意，要保留原始文章的所有重要信息和細節，包括連結、圖片、表格等，且處於正確位置
+4. 將內容以 Markdown 格式輸出，保持標題層級正確、段落清晰、列表正確
 
 請保持專業的寫作風格，確保輸出的Markdown格式完整正確，可以直接顯示。
 直接返回處理後的Markdown內容，不需要添加任何元數據。`;
 
   // 用戶提示詞
-  const userPrompt = `請處理以下Markdown文本：
+  const userPrompt = `請處理以下來源內容，你正在進行將客戶或合作公司給的稿件，統一處理為正規專業的新聞稿：
 
 ${markdownContent}`;
 
   // 設置模型參數
   const modelConfig = {
-    model: "gpt-4o",
+    model: "GPT-4.1",
     temperature: 0.3,
-    max_tokens: 8000,
+    max_tokens: 200000,
     top_p: 1
   };
 
