@@ -1,7 +1,7 @@
 ---
 source: docx
-fileId: Bluefin---article-content-1745870736608-0wqf5o
-processTime: 2025-04-28T20:05:42.477Z
+fileId: Bluefin---article-content-1745876705472-fadhg5
+processTime: 2025-04-28T21:45:10.507Z
 ---
 
 Bluefin is the latest decentralized exchange live on Arbitrum. Focusing on performance, security, and usability, Bluefin aims to bring the experience of a centralized exchange to the world of DeFi.

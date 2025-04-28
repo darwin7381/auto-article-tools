@@ -14,8 +14,9 @@ import path from 'path';
  */
 export function saveToLocalStorage(content: string, fileName: string, dirName = 'processed-markdown'): string {
   // 在 Vercel 環境中使用 /tmp 目錄，該目錄在 Serverless 環境中通常是可寫的
+  // 直接保存在 /tmp 根目錄下，與 markdown-proxy 一致
   const dirPath = process.env.NODE_ENV === 'production' 
-    ? path.join('/tmp', dirName)
+    ? path.join('/tmp') 
     : path.join(process.cwd(), 'public', dirName);
   
   if (!fs.existsSync(dirPath)) {
@@ -26,11 +27,13 @@ export function saveToLocalStorage(content: string, fileName: string, dirName = 
   const filePath = path.join(dirPath, fileName);
   fs.writeFileSync(filePath, content, 'utf-8');
   
+  // 輸出保存位置以便調試
+  console.log(`Markdown 文件保存至: ${filePath}`);
+  
   // 返回訪問路徑
-  // 在生產環境中這個路徑將不再是可直接訪問的URL，
-  // 而是一個表示臨時文件位置的路徑標識
+  // 在生產環境中使用代理API路由
   return process.env.NODE_ENV === 'production'
-    ? `/api/markdown-proxy/${fileName}` // 這需要創建一個API路由來代理訪問臨時文件
+    ? `/api/markdown-proxy/${fileName}` 
     : `/${dirName}/${fileName}`;
 }
 
@@ -62,13 +65,16 @@ export function readFromLocalStorage(fileName: string, dirName = 'processed-mark
  */
 export function createTempDirectory(dirname = 'temp'): string {
   // 在 Vercel 環境中使用 /tmp 目錄，該目錄在 Serverless 環境中通常是可寫的
+  // 為了保持一致性，在生產環境直接使用 /tmp 根目錄
   const tempDir = process.env.NODE_ENV === 'production' 
-    ? path.join('/tmp', dirname)
+    ? path.join('/tmp')
     : path.join(process.cwd(), dirname);
   
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
+  
+  console.log(`臨時目錄創建於: ${tempDir}`);
   
   return tempDir;
 }
