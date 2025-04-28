@@ -8,10 +8,13 @@ import fs from 'fs';
  */
 
 // ConvertAPI Token
-const CONVERT_API_TOKEN = process.env.CONVERT_API_TOKEN || 'token_ZXIdJcO7';
+const CONVERT_API_TOKEN = process.env.CONVERT_API_TOKEN;
+if (!CONVERT_API_TOKEN) {
+  throw new Error('CONVERT_API_TOKEN 環境變量未設置');
+}
 
 // R2公開URL
-const FILES_PUBLIC_URL = process.env.R2_PUBLIC_URL || 'https://files.blocktempo.ai';
+const FILES_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 
 /**
  * 將PDF轉換為DOCX
@@ -29,7 +32,7 @@ export async function convertPdfToDocx(pdfUrl: string): Promise<Buffer> {
     
     // 使用動態導入ConvertAPI
     const convertapiModule = await import('convertapi');
-    const convertapi = new convertapiModule.default(CONVERT_API_TOKEN);
+    const convertapi = new convertapiModule.default(CONVERT_API_TOKEN as string);
     
     // 直接使用完整URL進行轉換
     const result = await convertapi.convert('docx', {
