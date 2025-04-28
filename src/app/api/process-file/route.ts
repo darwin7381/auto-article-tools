@@ -83,6 +83,32 @@ async function saveMarkdownToLocal(content: string, fileId: string): Promise<str
   return `/processed-markdown/${fileId}.md`;
 }
 
+// 使用 OpenAI 進一步處理 Markdown
+async function processWithOpenAI(fileId: string, markdownKey: string): Promise<Response> {
+  try {
+    // 設置要調用 process-openai API 的伺服器 URL
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const apiUrl = `${baseUrl}/api/process-openai`;
+    
+    // 發送請求到 process-openai API
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      body: JSON.stringify({
+        fileId: fileId,
+        markdownKey: markdownKey
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    return response;
+  } catch (error) {
+    console.error('OpenAI 處理請求失敗:', error);
+    throw error;
+  }
+}
+
 // 處理DOCX文件
 async function processDOCX(buffer: Buffer, fileId: string): Promise<{ r2Key: string; localPath: string }> {
   try {
@@ -214,14 +240,35 @@ export async function POST(request: Request) {
     
     // 處理DOCX文件
     if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      // 先完成基本處理並保存為markdown
       const processResult = await processDOCX(fileBuffer, fileId);
-      return NextResponse.json({
-        success: true,
-        fileId,
-        markdownKey: processResult.r2Key,
-        markdownUrl: processResult.localPath,
-        status: 'processed',
-      });
+      
+      try {
+        // 然後再調用OpenAI進行處理
+        console.log('基礎處理完成，開始使用 OpenAI 進行進一步處理...');
+        const openaiResponse = await processWithOpenAI(fileId, processResult.r2Key);
+        const openaiResult = await openaiResponse.json();
+        
+        // 返回OpenAI處理結果
+        return NextResponse.json({
+          success: true,
+          fileId,
+          markdownKey: openaiResult.markdownKey,
+          markdownUrl: openaiResult.markdownUrl,
+          detectedLanguage: openaiResult.detectedLanguage,
+          status: 'processed-by-openai',
+        });
+      } catch (error) {
+        // 如果OpenAI處理失敗，返回基本處理結果
+        console.error('OpenAI處理失敗:', error);
+        return NextResponse.json({
+          success: true,
+          fileId,
+          markdownKey: processResult.r2Key,
+          markdownUrl: processResult.localPath,
+          status: 'processed',
+        });
+      }
     } else {
       // 非PDF或DOCX的情況
       return NextResponse.json(
