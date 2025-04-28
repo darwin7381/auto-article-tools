@@ -10,7 +10,6 @@
  * @returns 格式化後的系統提示詞
  */
 export function formatSystemPrompt(basePrompt: string, options?: {
-  requireStructuredOutput?: boolean;
   includeInstructions?: string[];
 }): string {
   let prompt = basePrompt;
@@ -23,12 +22,51 @@ export function formatSystemPrompt(basePrompt: string, options?: {
     });
   }
   
-  // 添加結構化輸出要求
-  if (options?.requireStructuredOutput) {
-    prompt += '\n\n請以JSON格式回應，具有以下結構:\n```json\n{\n  "result": "處理結果",\n  "metadata": {\n    // 其他相關信息\n  }\n}\n```';
+  return prompt;
+}
+
+/**
+ * 創建基本的ChatGPT API配置
+ * @param model 模型名稱
+ * @param options 模型選項
+ * @returns API 配置對象
+ */
+export function createChatConfig(model: string = "gpt-4o", options?: {
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  seed?: number;
+}) {
+  return {
+    model,
+    temperature: options?.temperature,
+    max_tokens: options?.max_tokens,
+    top_p: options?.top_p,
+    frequency_penalty: options?.frequency_penalty,
+    presence_penalty: options?.presence_penalty,
+    seed: options?.seed,
+  };
+}
+
+/**
+ * 設置JSON輸出格式
+ * @returns JSON格式配置
+ */
+export function withJsonOutput(schema?: object) {
+  if (schema) {
+    return {
+      response_format: {
+        type: "json_schema",
+        schema
+      }
+    };
   }
   
-  return prompt;
+  return {
+    response_format: { type: "json_object" }
+  };
 }
 
 /**
