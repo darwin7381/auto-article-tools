@@ -1,12 +1,12 @@
 ---
 source: docx
-fileId: ----WEEX-----Consensus-HK-----------AI--------1745847590436-fiy8z7
-processTime: 2025-04-28T13:39:53.240Z
+fileId: ----WEEX-----Consensus-HK-----------AI--------1745848371145-609um5
+processTime: 2025-04-28T13:52:53.851Z
 ---
 
 ## <a id="_ttg0mweo9odq"></a>**WEEX强势亮相 Consensus HK，与行业精英携手推动以AI 赋能加密交易**
 
-![](https://files.blocktempo.ai/images/----WEEX-----Consensus-HK-----------AI--------1745847590436-fiy8z7-1745847592070-z5r08c.png)
+![](https://files.blocktempo.ai/images/----WEEX-----Consensus-HK-----------AI--------1745848371145-609um5-1745848372763-q2nx9g.png)
 
 
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enhanceMarkdownWithOpenAI } from '@/services/utils/openaiService';
+import { enhanceMarkdown } from '@/agents/contentAgent';
 
 export async function POST(request: Request) {
   try {
@@ -15,15 +15,15 @@ export async function POST(request: Request) {
     
     console.log('接收到內容處理請求:', { fileId, markdownKey });
 
-    // 使用OpenAI處理服務增強內容
+    // 使用AI Agent處理內容
     try {
-      const result = await enhanceMarkdownWithOpenAI(fileId, markdownKey);
+      const result = await enhanceMarkdown(fileId, markdownKey);
       return NextResponse.json(result);
     } catch (error) {
       if (error instanceof Error && error.message.includes('OpenAI客戶端未初始化')) {
         return NextResponse.json(
           { 
-            error: 'OpenAI API密鑰無效或未設置，無法進行AI處理',
+            error: 'AI服務未正確初始化，無法進行處理',
             skipAI: true,
             fileId,
             markdownKey,

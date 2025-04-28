@@ -7,7 +7,4 @@ export * from './document/markdownService';
 
 // 轉換服務
 export * from './conversion/docxService';
-export * from './conversion/pdfService';
-
-// 工具服務
-export * from './utils/openaiService'; 
+export * from './conversion/pdfService'; 
