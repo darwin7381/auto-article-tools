@@ -40,10 +40,10 @@ async function getImageFromR2(key: string): Promise<{ buffer: Buffer; contentTyp
 // 處理 GET 請求
 export async function GET(
   request: Request,
-  context: { params: { imageName: string } }
+  { params }: { params: Promise<{ imageName: string }> }
 ) {
   try {
-    const imageName = context.params.imageName;
+    const { imageName } = await params;
     
     if (!imageName) {
       return NextResponse.json(
