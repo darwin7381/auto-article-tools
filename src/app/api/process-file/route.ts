@@ -1,177 +1,7 @@
 import { NextResponse } from 'next/server';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import mammoth from 'mammoth';
-import fs from 'fs';
-import path from 'path';
-
-// R2 存儲客戶端配置
-const R2 = new S3Client({
-  region: 'auto',
-  endpoint: process.env.CLOUDFLARE_R2_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || '',
-  },
-});
-
-// 圖片上傳到R2並返回URL
-async function uploadImageToR2(imageBuffer: Buffer, fileName: string, contentType: string): Promise<string> {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'blocktempo-ai';
-  const key = `images/${fileName}`;
-  
-  const command = new PutObjectCommand({
-    Bucket: bucketName,
-    Key: key,
-    Body: imageBuffer,
-    ContentType: contentType,
-  });
-  
-  await R2.send(command);
-  
-  // 使用我們的 Cloudflare 自訂網域
-  const baseUrl = process.env.R2_PUBLIC_URL || 'https://files.blocktempo.ai';
-  return `${baseUrl}/${key}`;
-}
-
-// 從R2獲取文件
-async function getFileFromR2(fileKey: string): Promise<Buffer> {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'blocktempo-ai';
-  
-  const command = new GetObjectCommand({
-    Bucket: bucketName,
-    Key: fileKey,
-  });
-  
-  const response = await R2.send(command);
-  // 修正any類型
-  const stream = response.Body as { transformToByteArray(): Promise<Uint8Array> };
-  
-  // 將流數據轉換為Buffer
-  return Buffer.from(await stream.transformToByteArray());
-}
-
-// 保存處理結果為Markdown
-async function saveMarkdownToR2(content: string, fileId: string): Promise<string> {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'blocktempo-ai';
-  const key = `processed/${fileId}.md`;
-  
-  const command = new PutObjectCommand({
-    Bucket: bucketName,
-    Key: key,
-    Body: content,
-    ContentType: 'text/markdown',
-  });
-  
-  await R2.send(command);
-  return key;
-}
-
-// 保存Markdown到本地存儲
-async function saveMarkdownToLocal(content: string, fileId: string): Promise<string> {
-  // 創建目錄（如果不存在）
-  const dirPath = path.join(process.cwd(), 'public', 'processed-markdown');
-  
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-  
-  // 寫入文件
-  const filePath = path.join(dirPath, `${fileId}.md`);
-  fs.writeFileSync(filePath, content, 'utf-8');
-  
-  // 返回公開訪問路徑
-  return `/processed-markdown/${fileId}.md`;
-}
-
-// 使用 OpenAI 進一步處理 Markdown
-async function processWithOpenAI(fileId: string, markdownKey: string): Promise<Response> {
-  try {
-    // 設置要調用 process-openai API 的伺服器 URL
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const apiUrl = `${baseUrl}/api/process-openai`;
-    
-    // 發送請求到 process-openai API
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      body: JSON.stringify({
-        fileId: fileId,
-        markdownKey: markdownKey
-      }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    return response;
-  } catch (error) {
-    console.error('OpenAI 處理請求失敗:', error);
-    throw error;
-  }
-}
-
-// 處理DOCX文件
-async function processDOCX(buffer: Buffer, fileId: string): Promise<{ r2Key: string; localPath: string }> {
-  try {
-    // 提取文本和圖片
-    const result = await mammoth.convertToHtml(
-      { buffer },
-      {
-        convertImage: mammoth.images.imgElement(async (image) => {
-          const imageBuffer = await image.read('base64');
-          const contentType = image.contentType || 'image/png';
-          const imageName = `${fileId}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${contentType.split('/')[1]}`;
-          
-          // 上傳圖片到R2
-          const imageUrl = await uploadImageToR2(
-            Buffer.from(imageBuffer, 'base64'),
-            imageName,
-            contentType
-          );
-          
-          return {
-            src: imageUrl
-          };
-        })
-      }
-    );
-    
-    // 將HTML轉換為Markdown格式（簡單實現，實際可能需要更複雜的HTML到Markdown轉換）
-    // 修正正則表達式，移除'g'和's'標誌
-    const markdown = result.value
-      .replace(/<h1>(.*?)<\/h1>/g, '# $1\n\n')
-      .replace(/<h2>(.*?)<\/h2>/g, '## $1\n\n')
-      .replace(/<h3>(.*?)<\/h3>/g, '### $1\n\n')
-      .replace(/<p>(.*?)<\/p>/g, '$1\n\n')
-      .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
-      .replace(/<em>(.*?)<\/em>/g, '*$1*')
-      .replace(/<ul>(.*?)<\/ul>/g, '$1\n')
-      .replace(/<li>(.*?)<\/li>/g, '- $1\n')
-      .replace(/<ol>(.*?)<\/ol>/g, '$1\n')
-      .replace(/<li>(.*?)<\/li>/g, '1. $1\n')
-      .replace(/<a href="(.*?)">(.*?)<\/a>/g, '[$2]($1)')
-      .replace(/<img src="(.*?)".*?>/g, '![]($1)\n\n');
-    
-    // 添加元數據
-    const finalMarkdown = `---
-source: docx
-fileId: ${fileId}
-processTime: ${new Date().toISOString()}
----
-
-${markdown}`;
-    
-    // 保存Markdown到R2
-    const r2Key = await saveMarkdownToR2(finalMarkdown, fileId);
-    
-    // 保存Markdown到本地
-    const localPath = await saveMarkdownToLocal(finalMarkdown, fileId);
-    
-    return { r2Key, localPath };
-  } catch (error) {
-    console.error('DOCX處理錯誤:', error);
-    throw error;
-  }
-}
+import { getFileFromR2 } from '@/services/storage/r2Service';
+import { processDOCX } from '@/services/conversion/docxService';
+import { enhanceMarkdownWithOpenAI } from '@/services/utils/openaiService';
 
 // 定義請求體的接口類型
 interface ProcessFileRequest {
@@ -206,7 +36,7 @@ async function forwardToPdfProcessor(requestBody: ProcessFileRequest): Promise<R
 
 export async function POST(request: Request) {
   try {
-    const requestBody = await request.json();
+    const requestBody = await request.json() as ProcessFileRequest;
     const { fileId, fileUrl, fileType } = requestBody;
     
     if (!fileId || !fileUrl) {
@@ -246,8 +76,7 @@ export async function POST(request: Request) {
       try {
         // 然後再調用OpenAI進行處理
         console.log('基礎處理完成，開始使用 OpenAI 進行進一步處理...');
-        const openaiResponse = await processWithOpenAI(fileId, processResult.r2Key);
-        const openaiResult = await openaiResponse.json();
+        const openaiResult = await enhanceMarkdownWithOpenAI(fileId, processResult.r2Key);
         
         // 返回OpenAI處理結果
         return NextResponse.json({
@@ -255,7 +84,6 @@ export async function POST(request: Request) {
           fileId,
           markdownKey: openaiResult.markdownKey,
           markdownUrl: openaiResult.markdownUrl,
-          detectedLanguage: openaiResult.detectedLanguage,
           status: 'processed-by-openai',
         });
       } catch (error) {
