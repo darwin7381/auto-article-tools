@@ -18,29 +18,39 @@ export async function GET(
     
     console.log(`嘗試獲取 Markdown 文件: ${fileName}`);
     
-    // 在臨時目錄中尋找文件
-    const filePath = path.join('/tmp', 'processed-markdown', fileName);
+    // 可能的路徑列表
+    const possiblePaths = [
+      path.join('/tmp', 'processed-markdown', fileName),
+      path.join('/tmp', fileName),
+      path.join('/tmp', 'temp', 'processed-markdown', fileName),
+      path.join('/tmp', 'temp', fileName)
+    ];
     
-    // 檢查文件是否存在
-    if (!fs.existsSync(filePath)) {
-      console.error(`文件不存在: ${filePath}`);
-      return NextResponse.json(
-        { error: '找不到文件' },
-        { status: 404 }
-      );
+    // 嘗試各個可能的路徑
+    for (const filePath of possiblePaths) {
+      if (fs.existsSync(filePath)) {
+        console.log(`找到文件: ${filePath}`);
+        
+        // 讀取文件內容
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        
+        // 返回文件內容
+        return new NextResponse(fileContent, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/markdown; charset=utf-8',
+            'Cache-Control': 'public, max-age=86400', // 緩存一天
+          },
+        });
+      }
     }
     
-    // 讀取文件內容
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    
-    // 返回文件內容
-    return new NextResponse(fileContent, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/markdown; charset=utf-8',
-        'Cache-Control': 'public, max-age=86400', // 緩存一天
-      },
-    });
+    // 如果所有路徑都沒找到文件
+    console.error(`文件不存在，嘗試了以下路徑: ${possiblePaths.join(', ')}`);
+    return NextResponse.json(
+      { error: '找不到文件' },
+      { status: 404 }
+    );
   } catch (error) {
     console.error('獲取 Markdown 文件時出錯:', error);
     return NextResponse.json(
