@@ -10,6 +10,59 @@
 
 3. 文件上傳、處理的 API 已實現，但未實現進度狀態的追蹤和反饋
 
+## 新API架構介紹
+
+最新的重構將處理流程分為多個獨立的API端點，每個端點負責特定階段的處理，架構如下：
+
+```
+前端 ──> /api/upload ───────────────────┐
+                                        │
+                                        v
+                                 上傳完成，返回fileUrl
+                                        │
+                                        v
+前端 ──> /api/extract-content ──────────┐
+         │                              │
+         │                              v
+         │                        返回提取的內容結果
+         │                              │
+         v                              v
+    ┌────────────────┐           前端更新提取階段進度
+    │ 根據文件類型選擇 │              │
+    └────────────────┘              │
+         │                          v
+         ├──> /api/processors/process-pdf  ──> 如需轉換為DOCX
+         │          │                               │
+         │          │                               v
+         │          └──────────> /api/processors/process-docx
+         │                                          │
+         └──> /api/processors/process-docx <────────┘
+                                                    │
+                                                    v
+前端 <────────────────────────── 返回提取結果（文本+圖片）
+                                                    │
+                                                    v
+前端 ──> /api/process-openai ──────────────> 處理提取內容
+                                                    │
+                                                    v
+前端 <────────────────────────── 返回AI處理後的內容
+```
+
+### API層級結構
+
+1. **協調層API**
+   - `/api/extract-content`: 根據文件類型選擇處理器，統一協調提取流程
+
+2. **處理器層API**
+   - `/api/processors/process-pdf`: 專門處理PDF轉換為DOCX
+   - `/api/processors/process-docx`: 專門處理DOCX提取內容
+
+3. **AI處理層API**
+   - `/api/process-openai`: 處理內容增強，包括語言檢測、翻譯等任務
+
+4. **儲存層API**
+   - `/api/save-markdown`: 保存最終處理結果
+
 ## 執行計劃
 
 ### 1. 創建進度狀態管理系統
@@ -37,14 +90,16 @@
 1. **上傳文件** (`upload`)
    - 狀態：pending -> processing -> completed/error
    - 功能：接收用戶上傳的PDF/DOCX文件或URL，上傳到服務器
+   - API：`/api/upload`
 
 2. **提取內容** (`extract`)
    - 狀態：pending -> processing -> completed/error
    - 功能：從PDF/DOCX提取文本和圖片，或從URL抓取內容
-   - API：`/api/process-file` 或 `/api/process-pdf`
+   - API：`/api/extract-content` (協調器)
+     - 處理器：`/api/processors/process-pdf` 和 `/api/processors/process-docx`
    - 輸出：生成初步Markdown文件
 
-3. **內容處理** (`process`)
+3. **AI 初步內容處理** (`process`)
    - 狀態：pending -> processing -> completed/error
    - 功能：使用OpenAI進行內容處理，包括語言識別、翻譯、格式優化等
    - API：`/api/process-openai`
@@ -73,21 +128,22 @@
 3. **進度計算**
    - 每個階段佔總進度的均等比例 (25%)
    - 總體進度 = 已完成階段進度 + 當前階段進度百分比的相應比例
+   - 在新API架構下，前端可獲取更準確的進度數據，而非模擬進度
 
 4. **錯誤處理**
    - 任何階段發生錯誤時，設置該階段狀態為 `error`
    - 對於提取階段錯誤，整個流程停止
    - 對於處理階段錯誤，可選擇使用原始內容繼續處理
 
-### 實際處理流程
+### 前端實際處理流程
 
 #### 文件處理流程
-1. 用戶上傳文件 -> 觸發 `startFileProcessing`
-2. 上傳文件到服務器 -> 更新 `upload` 階段進度
-3. 提取文件內容 -> 完成 `upload` 階段 -> 開始 `extract` 階段
-4. 內容提取完成 -> 完成 `extract` 階段 -> 開始 `process` 階段
-5. OpenAI處理內容 -> 更新 `process` 階段進度
-6. 處理完成 -> 完成 `process` 階段 -> 開始和完成 `complete` 階段
+1. 用戶上傳文件 -> 觸發 `startFileProcessing` -> `/api/upload` -> 返回fileUrl
+2. 前端調用 `/api/extract-content` -> 更新「提取內容」階段進度
+3. 獲取提取結果 -> 完成「提取內容」階段 -> 觸發 `completeStage('extract')` -> `moveToNextStage()`
+4. 前端調用 `/api/process-openai` -> 更新「AI 初步內容處理」階段進度
+5. 獲取AI處理結果 -> 完成「AI 初步內容處理」階段 -> 觸發 `completeStage('process')` -> `moveToNextStage()`
+6. 更新「處理完成」階段 -> 顯示最終結果 -> 觸發 `completeStage('complete')`
 
 #### URL處理流程
 1. 用戶輸入URL -> 觸發 `startUrlProcessing`
@@ -100,17 +156,16 @@
 ### 錯誤處理策略
 
 1. **上傳錯誤**
-   - 設置 `upload` 階段為 `error`
+   - 設置 `upload` 階段為 `error`，調用 `setStageError('upload', errorMessage)`
    - 顯示錯誤消息，允許用戶重試
 
 2. **提取錯誤**
-   - 設置 `extract` 階段為 `error`
+   - 設置 `extract` 階段為 `error`，調用 `setStageError('extract', errorMessage)`
    - 顯示錯誤消息，允許用戶重試
 
 3. **處理錯誤**
-   - 設置 `process` 階段為 `error`
-   - 仍然允許流程繼續到 `complete` 階段
-   - 使用原始未處理的內容作為結果
+   - 設置 `process` 階段為 `error`，調用 `setStageError('process', errorMessage)`
+   - 在新架構下，仍可使用未處理的提取內容
    - 錯誤消息說明處理失敗，但原始內容可用
 
 ## 用戶界面交互
