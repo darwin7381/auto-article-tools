@@ -1,45 +1,37 @@
 import { NextResponse } from 'next/server';
-import { enhanceMarkdown } from '@/agents/contentAgent';
+import { processContent } from '@/agents/contentAgent';
 
 export async function POST(request: Request) {
   try {
-    const requestBody = await request.json();
-    const { fileId, markdownKey } = requestBody;
+    // 只接受原始Markdown內容，不處理任何文件讀取
+    const { markdown } = await request.json();
     
-    if (!fileId || !markdownKey) {
-      return NextResponse.json(
-        { error: '缺少必要參數' },
-        { status: 400 }
-      );
+    if (!markdown) {
+      return NextResponse.json({ error: '缺少必要參數: markdown' }, { status: 400 });
     }
     
-    console.log('接收到內容處理請求:', { fileId, markdownKey });
-
-    // 使用AI Agent處理內容
+    // 僅負責OpenAI處理，不包含任何存儲邏輯
     try {
-      const result = await enhanceMarkdown(fileId, markdownKey);
-      return NextResponse.json(result);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('OpenAI客戶端未初始化')) {
-        return NextResponse.json(
-          { 
-            error: 'AI服務未正確初始化，無法進行處理',
-            skipAI: true,
-            fileId,
-            markdownKey,
-            status: 'skipped-ai-processing'
-          },
-          { status: 200 }
-        );
-      }
-      throw error;
+      const enhancedContent = await processContent(markdown);
+      
+      return NextResponse.json({
+        success: true,
+        content: enhancedContent
+      });
+    } catch (aiError) {
+      console.error("OpenAI處理失敗:", aiError);
+      return NextResponse.json({
+        success: false,
+        error: 'OpenAI處理失敗',
+        message: aiError instanceof Error ? aiError.message : '未知錯誤'
+      }, { status: 500 });
     }
-    
   } catch (error) {
-    console.error('處理錯誤:', error);
-    return NextResponse.json(
-      { error: '內容處理失敗', details: error instanceof Error ? error.message : '未知錯誤' },
-      { status: 500 }
-    );
+    console.error("請求處理錯誤:", error);
+    return NextResponse.json({ 
+      success: false, 
+      error: '請求處理錯誤',
+      message: error instanceof Error ? error.message : '未知錯誤'
+    }, { status: 500 });
   }
 } 
