@@ -87,10 +87,10 @@ ${markdownContent}`;
 /**
  * 增強Markdown內容
  * @param fileId 文件ID
- * @param markdownKey Markdown文件在R2的鍵值
+ * @param markdownPath Markdown文件路徑
  * @returns 處理結果
  */
-export async function enhanceMarkdown(fileId: string, markdownKey: string): Promise<{
+export async function enhanceMarkdown(fileId: string, markdownPath: string): Promise<{
   success: boolean;
   fileId: string;
   markdownKey: string;
@@ -98,7 +98,7 @@ export async function enhanceMarkdown(fileId: string, markdownKey: string): Prom
 }> {
   try {
     // 從R2獲取Markdown內容
-    const markdownBuffer = await getFileFromR2(markdownKey);
+    const markdownBuffer = await getFileFromR2(markdownPath);
     const markdownContent = markdownBuffer.toString('utf-8');
     
     try {

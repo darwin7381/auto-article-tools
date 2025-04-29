@@ -5,8 +5,19 @@ import { Card, CardHeader, CardBody, CardFooter } from '@heroui/react';
 import { Input } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Tabs, Tab } from '@heroui/react';
+import { useProcessing } from '@/context/ProcessingContext';
 
 export default function FileUploadSection() {
+  const { 
+    startFileProcessing, 
+    startUrlProcessing,
+    updateStageProgress, 
+    completeStage, 
+    moveToNextStage, 
+    setStageError, 
+    processState
+  } = useProcessing();
+  
   const [selectedTab, setSelectedTab] = useState('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState('');
@@ -128,6 +139,76 @@ export default function FileUploadSection() {
     }
   };
 
+  /**
+   * 處理上傳成功後的文件處理邏輯
+   * @param fileUrl 上傳成功後的文件URL
+   * @param fileType 文件MIME類型
+   */
+  const handleUploadSuccess = async (fileUrl: string, fileType: string): Promise<void> => {
+    try {
+      setIsProcessing(true);
+      
+      // 獲取文件類型
+      const isPdf = fileType.includes('pdf');
+      
+      // 根據文件類型選擇不同的處理端點
+      const apiEndpoint = isPdf ? '/api/process-pdf' : '/api/process-file';
+      
+      console.log(`正在處理文件: ${fileUrl}, 使用端點: ${apiEndpoint}`);
+      
+      // 更新提取階段進度
+      updateStageProgress('extract', 30, '開始提取文件內容...');
+      
+      // 這一個API調用會完成所有處理步驟：提取內容 -> AI處理 -> 儲存結果
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileUrl: fileUrl,
+          fileType: isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          fileId: fileUrl.split('/').pop()?.split('.')[0] || Date.now().toString()
+        }),
+      });
+      
+      updateStageProgress('extract', 80, '文件內容提取中...');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '處理失敗');
+      }
+      
+      const processResult = await response.json();
+      console.log('處理結果:', processResult);
+      
+      // 完成提取階段
+      completeStage('extract', '文件內容提取完成');
+      moveToNextStage();
+      
+      // 處理階段 (已在後端完成，這裡只更新UI)
+      updateStageProgress('process', 50, '內容處理中...');
+      setTimeout(() => {
+        completeStage('process', '內容處理完成');
+        moveToNextStage();
+        
+        // 完成所有處理
+        completeStage('complete', '全部處理完成');
+        
+        setProcessSuccess(true);
+        setMarkdownUrl(processResult.markdownUrl);
+      }, 500);
+      
+    } catch (error) {
+      console.error('處理錯誤:', error);
+      setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
+      
+      // 設置錯誤狀態
+      const currentStage = processState?.currentStage || 'extract';
+      setStageError(currentStage, error instanceof Error ? error.message : '處理失敗，請稍後重試');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // 處理連結提交
   const handleLinkSubmit = async () => {
     if (!linkUrl || !validateUrl(linkUrl)) {
@@ -139,6 +220,10 @@ export default function FileUploadSection() {
     setUploadError(null);
     
     try {
+      // 初始化URL處理進度
+      startUrlProcessing(linkUrl, linkType);
+      updateStageProgress('upload', 30, '正在處理URL...');
+      
       const response = await fetch('/api/parse-url', {
         method: 'POST',
         headers: {
@@ -146,6 +231,8 @@ export default function FileUploadSection() {
         },
         body: JSON.stringify({ url: linkUrl, type: linkType }),
       });
+      
+      updateStageProgress('upload', 70, '正在解析URL內容...');
       
       const data = await response.json();
       
@@ -155,10 +242,32 @@ export default function FileUploadSection() {
       
       console.log('連結處理成功:', data);
       setUploadSuccess(true);
+      
+      // 完成上傳階段
+      completeStage('upload', 'URL解析完成');
+      moveToNextStage();
+      
+      // 繼續處理後續階段 (這裡通常會有爬蟲提取內容的操作)
+      // 目前URL處理功能尚未完全實現，先模擬進度
+      updateStageProgress('extract', 50, '提取網頁內容...');
+      setTimeout(() => {
+        completeStage('extract', '網頁內容提取完成');
+        moveToNextStage();
+        
+        updateStageProgress('process', 50, '處理內容中...');
+        setTimeout(() => {
+          completeStage('process', '內容處理完成');
+          moveToNextStage();
+          
+          completeStage('complete', '所有處理完成');
+        }, 1500);
+      }, 1500);
+      
     } catch (error) {
       console.error('連結處理錯誤:', error);
       setUploadError(error instanceof Error ? error.message : '連結處理失敗，請稍後再試');
       setUploadSuccess(false);
+      setStageError('upload', error instanceof Error ? error.message : '連結處理失敗，請稍後再試');
     } finally {
       setIsUploading(false);
     }
@@ -177,9 +286,18 @@ export default function FileUploadSection() {
       setIsUploading(true);
       
       try {
+        // 初始化處理進度追蹤
+        const fileId = `file-${Date.now()}`;
+        startFileProcessing(fileId, selectedFile.name, selectedFile.type, selectedFile.size);
+        
+        // 更新上傳階段進度
+        updateStageProgress('upload', 20, '準備上傳文件...');
+        
         // 使用FormData發送文件
         const formData = new FormData();
         formData.append('file', selectedFile);
+        
+        updateStageProgress('upload', 50, '正在上傳文件...');
         
         const response = await fetch('/api/upload', {
           method: 'POST',
@@ -194,12 +312,18 @@ export default function FileUploadSection() {
         const data = await response.json();
         setUploadSuccess(true);
         
+        // 完成上傳階段，進入提取階段
+        updateStageProgress('upload', 100, '文件上傳完成');
+        completeStage('upload', '文件上傳成功');
+        moveToNextStage();
+        
         // 傳遞文件URL、文件類型以及原始文件名
         await handleUploadSuccess(data.fileUrl, selectedFile.type);
       } catch (error) {
         console.error('上傳錯誤:', error);
         setUploadError(error instanceof Error ? error.message : '上傳失敗，請稍後重試');
         setUploadSuccess(false);
+        setStageError('upload', error instanceof Error ? error.message : '上傳失敗，請稍後重試');
       } finally {
         setIsUploading(false);
       }
@@ -216,56 +340,6 @@ export default function FileUploadSection() {
   const handleAreaClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
-    }
-  };
-
-  /**
-   * 處理上傳成功後的文件處理邏輯
-   * @param fileUrl 上傳成功後的文件URL
-   * @param fileType 文件MIME類型
-   */
-  const handleUploadSuccess = async (fileUrl: string, fileType: string): Promise<void> => {
-    try {
-      setIsProcessing(true);
-      
-      // 獲取文件類型
-      const isPdf = fileType.includes('pdf');
-      
-      // 根據文件類型選擇不同的處理端點
-      const apiEndpoint = isPdf 
-        ? '/api/process-pdf' 
-        : '/api/process-file';
-      
-      console.log(`正在處理文件: ${fileUrl}, 使用端點: ${apiEndpoint}`);
-        
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fileUrl: fileUrl,
-          fileType: isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          fileId: fileUrl.split('/').pop()?.split('.')[0] || new Date().getTime().toString()  // 從 fileUrl 提取 fileId 或使用時間戳
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '處理失敗');
-      }
-      
-      const processResult = await response.json();
-      console.log('處理結果:', processResult);
-      setProcessSuccess(true);
-      
-      // 根據不同API回傳結果獲取正確的URL
-      setMarkdownUrl(processResult.markdownUrl);
-    } catch (error) {
-      console.error('處理錯誤:', error);
-      setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
-    } finally {
-      setIsProcessing(false);
     }
   };
 
