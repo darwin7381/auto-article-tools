@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getApiUrl } from '@/services/utils/apiHelpers';
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
       if (fileType === 'application/pdf') {
         // 先由PDF處理器處理
         console.log('使用PDF處理器...');
-        const pdfResponse = await fetch(new URL('/api/processors/process-pdf', process.env.NEXTAUTH_URL || 'http://localhost:3000'), {
+        const pdfResponse = await fetch(getApiUrl('/api/processors/process-pdf'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
         
         // 繼續處理轉換後的DOCX
         console.log('PDF轉換完成，繼續處理DOCX...');
-        const docxResponse = await fetch(new URL('/api/processors/process-docx', process.env.NEXTAUTH_URL || 'http://localhost:3000'), {
+        const docxResponse = await fetch(getApiUrl('/api/processors/process-docx'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
       else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         // 直接使用DOCX處理器
         console.log('使用DOCX處理器...');
-        const docxResponse = await fetch(new URL('/api/processors/process-docx', process.env.NEXTAUTH_URL || 'http://localhost:3000'), {
+        const docxResponse = await fetch(getApiUrl('/api/processors/process-docx'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getFileFromR2 } from '@/services/storage/r2Service';
 import { processDOCX } from '@/services/conversion/docxService';
 import { enhanceMarkdown } from '@/agents/contentAgent';
+import { getApiUrl } from '@/services/utils/apiHelpers';
 
 // 定義請求體的接口類型
 interface ProcessFileRequest {
@@ -15,7 +16,7 @@ interface ProcessFileRequest {
 async function forwardToPdfProcessor(requestBody: ProcessFileRequest): Promise<Response> {
   try {
     // 轉發請求到處理PDF的API
-    const pdfResponse = await fetch(new URL('/api/process-pdf', process.env.NEXTAUTH_URL || 'http://localhost:3000'), {
+    const pdfResponse = await fetch(getApiUrl('/api/process-pdf'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
