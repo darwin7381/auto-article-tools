@@ -63,10 +63,54 @@
 
 ### 3.2 後端服務
 - **技術選擇**：Next.js API Routes
-- **API 設計**：RESTful API 設計
-- **文件處理**：使用適當的庫處理 DOCX 和 PDF 文件
-  - DOCX: `mammoth.js` 或 `docx4js`
-  - PDF: `pdf-parse` 或 `pdf.js`
+- **API 設計**：RESTful API 設計，採用模組化架構
+- **API 架構圖**：
+
+```
+前端 ──> /api/upload ───────────────────┐
+                                        │
+                                        v
+                                 上傳完成，返回fileUrl
+                                        │
+                                        v
+前端 ──> /api/extract-content ──────────┐
+         │                              │
+         │                              v
+         │                        返回提取的內容結果
+         │                              │
+         v                              v
+    ┌────────────────┐           前端更新提取階段進度
+    │ 根據文件類型選擇 │              │
+    └────────────────┘              │
+         │                          v
+         ├──> /api/processors/process-pdf  ──> 如需轉換為DOCX
+         │          │                               │
+         │          │                               v
+         │          └──────────> /api/processors/process-docx
+         │                                          │
+         └──> /api/processors/process-docx <────────┘
+                                                    │
+                                                    v
+前端 <────────────────────────── 返回提取結果（文本+圖片）
+                                                    │
+                                                    v
+前端 ──> /api/process-openai ──────────────> 處理提取內容
+                                                    │
+                                                    v
+前端 <────────────────────────── 返回AI處理後的內容
+                                                    │
+                                                    v
+前端 ──> /api/save-markdown ───────────────> 保存最終結果
+```
+
+- **文件處理**：採用分層處理架構
+  - **協調層**：`/api/extract-content` 統一協調處理流程
+  - **處理器層**：
+    - `/api/processors/process-pdf` - 專門處理PDF轉換
+    - `/api/processors/process-docx` - 專門處理DOCX提取
+  - **AI處理層**：`/api/process-openai` - 處理AI相關任務
+  - **儲存層**：`/api/save-markdown` - 保存處理結果
+
 - **爬蟲服務**：
   - 整合 FireScrawl Tools 進行網頁爬取
   - FireScrawl 提供強大的內容抓取、轉換能力

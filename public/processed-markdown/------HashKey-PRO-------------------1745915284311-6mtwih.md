@@ -1,7 +1,7 @@
 ---
 source: docx
-fileId: ------HashKey-PRO-------------------1745890611154-ewd5bz
-processTime: 2025-04-29T01:36:52.941Z
+fileId: ------HashKey-PRO-------------------1745915284311-6mtwih
+processTime: 2025-04-29T08:28:06.711Z
 ---
 
 <a id="_Hlk119680101"></a>**新聞稿<br />**
@@ -12,7 +12,7 @@ processTime: 2025-04-29T01:36:52.941Z
 
 <p><img alt="A picture containing text, screenshot, computer, software
 
-Description automatically generated" src="https://files.blocktempo.ai/images/------HashKey-PRO-------------------1745890611154-ewd5bz-1745890612449-lnkqqs.jpeg" />*<br />*</p><a id="_Hlk132367237"></a>**香港，2023年4月14日** **—**亞洲領先的虛擬資產集團HashKey Group宣佈，旗下全新的合規交易平台[HashKey PRO](https://pro.hashkey.com/)在第二季度正式上線。[HashKey PRO](https://pro.hashkey.com/)旨在為投資者提供一個堅實平台，讓投資者可以安全地交易虛擬資產。 
+Description automatically generated" src="https://files.blocktempo.ai/images/------HashKey-PRO-------------------1745915284311-6mtwih-1745915286106-ytyxmv.jpeg" />*<br />*</p><a id="_Hlk132367237"></a>**香港，2023年4月14日** **—**亞洲領先的虛擬資產集團HashKey Group宣佈，旗下全新的合規交易平台[HashKey PRO](https://pro.hashkey.com/)在第二季度正式上線。[HashKey PRO](https://pro.hashkey.com/)旨在為投資者提供一個堅實平台，讓投資者可以安全地交易虛擬資產。 
 
 **標準之上** 
 

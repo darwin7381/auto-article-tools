@@ -1,22 +1,50 @@
 import { NextResponse } from 'next/server';
 import { processContent } from '@/agents/contentAgent';
+import { getFileFromR2 } from '@/services/storage/r2Service';
+import { saveMarkdown } from '@/services/document/markdownService';
 
 export async function POST(request: Request) {
   try {
-    // 只接受原始Markdown內容，不處理任何文件讀取
-    const { markdown } = await request.json();
+    // 支持直接接收markdown內容或markdown URL
+    const reqBody = await request.json();
+    const { markdown, markdownUrl } = reqBody;
     
-    if (!markdown) {
-      return NextResponse.json({ error: '缺少必要參數: markdown' }, { status: 400 });
+    let markdownContent = '';
+    let fileId = '';
+    
+    // 確定使用哪種方式獲取Markdown
+    if (markdown) {
+      // 直接使用提供的Markdown內容
+      markdownContent = markdown;
+      fileId = reqBody.fileId || `file-${Date.now()}`;
+    } else if (markdownUrl) {
+      // 從R2獲取Markdown內容
+      try {
+        console.log('從URL獲取Markdown內容:', markdownUrl);
+        const markdownBuffer = await getFileFromR2(markdownUrl);
+        markdownContent = markdownBuffer.toString('utf-8');
+        fileId = markdownUrl.split('/').pop()?.split('.')[0] || `file-${Date.now()}`;
+      } catch (fetchError) {
+        return NextResponse.json({ error: '無法獲取Markdown內容', details: fetchError instanceof Error ? fetchError.message : '未知錯誤' }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ error: '缺少必要參數: markdown 或 markdownUrl' }, { status: 400 });
     }
     
-    // 僅負責OpenAI處理，不包含任何存儲邏輯
+    // 處理OpenAI處理
     try {
-      const enhancedContent = await processContent(markdown);
+      console.log('開始使用OpenAI處理內容...');
+      const enhancedContent = await processContent(markdownContent);
+      
+      // 保存處理後的結果
+      const { r2Key, localPath } = await saveMarkdown(enhancedContent, fileId, '-ai-enhanced');
       
       return NextResponse.json({
         success: true,
-        content: enhancedContent
+        content: enhancedContent.substring(0, 200) + '...', // 僅返回部分內容預覽
+        markdownKey: r2Key,
+        markdownUrl: localPath,
+        fileId
       });
     } catch (aiError) {
       console.error("OpenAI處理失敗:", aiError);

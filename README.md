@@ -22,6 +22,62 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## API 架構
+
+本系統採用模組化API架構，將處理流程分為多個獨立的階段：
+
+```
+前端 ──> /api/upload ───────────────────┐
+                                        │
+                                        v
+                                 上傳完成，返回fileUrl
+                                        │
+                                        v
+前端 ──> /api/extract-content ──────────┐
+         │                              │
+         │                              v
+         │                        返回提取的內容結果
+         │                              │
+         v                              v
+    ┌────────────────┐           前端更新提取階段進度
+    │ 根據文件類型選擇 │              │
+    └────────────────┘              │
+         │                          v
+         ├──> /api/processors/process-pdf  ──> 如需轉換為DOCX
+         │          │                               │
+         │          │                               v
+         │          └──────────> /api/processors/process-docx
+         │                                          │
+         └──> /api/processors/process-docx <────────┘
+                                                    │
+                                                    v
+前端 <────────────────────────── 返回提取結果（文本+圖片）
+                                                    │
+                                                    v
+前端 ──> /api/process-openai ──────────────> 處理提取內容
+                                                    │
+                                                    v
+前端 <────────────────────────── 返回AI處理後的內容
+                                                    │
+                                                    v
+前端 ──> /api/save-markdown ───────────────> 保存最終結果
+```
+
+### API端點說明
+
+#### 協調器API
+- `/api/extract-content` - 統一內容提取入口，根據文件類型調用相應處理器
+
+#### 處理器API
+- `/api/processors/process-pdf` - 專門處理PDF轉換為DOCX
+- `/api/processors/process-docx` - 專門處理DOCX內容提取
+
+#### AI處理API
+- `/api/process-openai` - 處理內容增強，包括語言檢測、翻譯等AI相關任務
+
+#### 儲存API
+- `/api/save-markdown` - 保存處理結果
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
