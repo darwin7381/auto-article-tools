@@ -148,55 +148,79 @@ export default function FileUploadSection() {
     try {
       setIsProcessing(true);
       
-      // 獲取文件類型
-      const isPdf = fileType.includes('pdf');
+      // 獲取文件ID
+      const fileId = fileUrl.split('/').pop()?.split('.')[0] || Date.now().toString();
       
-      // 根據文件類型選擇不同的處理端點
-      const apiEndpoint = isPdf ? '/api/process-pdf' : '/api/process-file';
+      console.log(`正在處理文件: ${fileUrl}, 文件類型: ${fileType}, 文件ID: ${fileId}`);
       
-      console.log(`正在處理文件: ${fileUrl}, 使用端點: ${apiEndpoint}`);
+      // 1. 内容提取階段
+      updateStageProgress('extract', 10, '開始提取文件內容...');
       
-      // 更新提取階段進度
-      updateStageProgress('extract', 30, '開始提取文件內容...');
-      
-      // 這一個API調用會完成所有處理步驟：提取內容 -> AI處理 -> 儲存結果
-      const response = await fetch(apiEndpoint, {
+      const extractResponse = await fetch('/api/extract-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileUrl: fileUrl,
-          fileType: isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          fileId: fileUrl.split('/').pop()?.split('.')[0] || Date.now().toString()
+          fileType: fileType,
+          fileId: fileId
         }),
       });
       
-      updateStageProgress('extract', 80, '文件內容提取中...');
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '處理失敗');
+      if (!extractResponse.ok) {
+        const errorData = await extractResponse.json();
+        throw new Error(errorData.error || '提取內容失敗');
       }
       
-      const processResult = await response.json();
-      console.log('處理結果:', processResult);
+      updateStageProgress('extract', 90, '文件內容提取完成...');
+      
+      const extractResult = await extractResponse.json();
+      console.log('內容提取結果:', extractResult);
       
       // 完成提取階段
       completeStage('extract', '文件內容提取完成');
       moveToNextStage();
       
-      // 處理階段 (已在後端完成，這裡只更新UI)
-      updateStageProgress('process', 50, '內容處理中...');
-      setTimeout(() => {
-        completeStage('process', '內容處理完成');
+      // 2. AI處理階段
+      updateStageProgress('process', 10, '開始AI處理...');
+      
+      try {
+        // 調用AI處理API
+        const openaiResponse = await fetch('/api/process-openai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            markdownUrl: extractResult.markdownKey, // 使用提取階段獲得的markdown的R2鍵值
+            fileId: fileId
+          }),
+        });
+        
+        if (!openaiResponse.ok) {
+          throw new Error('AI處理失敗');
+        }
+        
+        updateStageProgress('process', 90, 'AI處理完成...');
+        
+        const processResult = await openaiResponse.json();
+        console.log('AI處理結果:', processResult);
+        
+        // 完成處理階段
+        completeStage('process', 'AI內容處理完成');
         moveToNextStage();
         
         // 完成所有處理
         completeStage('complete', '全部處理完成');
         
         setProcessSuccess(true);
-        setMarkdownUrl(processResult.markdownUrl);
-      }, 500);
-      
+        setMarkdownUrl(extractResult.markdownUrl); // 使用提取階段的URL
+      } catch (aiError) {
+        console.error('AI處理錯誤:', aiError);
+        // 即使AI處理失敗，仍然標記為部分成功
+        setStageError('process', aiError instanceof Error ? aiError.message : 'AI處理失敗');
+        
+        // 仍然顯示提取結果
+        setProcessSuccess(true);
+        setMarkdownUrl(extractResult.markdownUrl);
+      }
     } catch (error) {
       console.error('處理錯誤:', error);
       setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');

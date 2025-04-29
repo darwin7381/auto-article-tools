@@ -19,7 +19,7 @@ interface ProcessingContextType {
 const defaultStages: ProcessStage[] = [
   { id: 'upload', name: '上傳文件', status: 'pending', progress: 0 },
   { id: 'extract', name: '提取內容', status: 'pending', progress: 0 },
-  { id: 'process', name: '內容處理', status: 'pending', progress: 0 },
+  { id: 'process', name: 'AI 初步內容處理', status: 'pending', progress: 0 },
   { id: 'complete', name: '處理完成', status: 'pending', progress: 0 },
 ];
 
