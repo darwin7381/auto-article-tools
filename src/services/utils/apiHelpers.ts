@@ -40,9 +40,17 @@ export function getApiUrl(path: string): string {
   // 确保在服务器端API路由中总是使用完整URL
   if (typeof window === 'undefined') {
     // 服务器端 - 总是使用完整URL
-    return `${baseUrl || 'http://localhost:3000'}${normalizedPath}`;
+    if (baseUrl) {
+      // 确保baseUrl包含协议前缀
+      const urlWithProtocol = baseUrl.startsWith('http') 
+        ? baseUrl 
+        : `https://${baseUrl}`;
+      
+      return `${urlWithProtocol}${normalizedPath}`;
+    }
+    return `http://localhost:3000${normalizedPath}`;
   }
   
   // 客户端 - 可以使用相对URL
-  return baseUrl ? `${baseUrl}${normalizedPath}` : normalizedPath;
+  return baseUrl ? (baseUrl.startsWith('http') ? `${baseUrl}${normalizedPath}` : `https://${baseUrl}${normalizedPath}`) : normalizedPath;
 } 
