@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { convertPdfToDocx } from '@/services/conversion/pdfService';
-import { uploadFileToR2 } from '@/services/storage/r2Service';
+import { uploadFileToR2, R2_PUBLIC_URL } from '@/services/storage/r2Service';
 
 export async function POST(request: Request) {
   try {
@@ -23,11 +23,15 @@ export async function POST(request: Request) {
       const docxKey = `upload/${fileId}.docx`;
       await uploadFileToR2(docxBuffer, docxKey, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       
-      // 返回處理結果
+      // 生成 DOCX 的公開 URL
+      const docxUrl = `${R2_PUBLIC_URL}/${docxKey}`;
+      
+      // 返回處理結果，包含公開訪問URL
       return NextResponse.json({
         success: true,
         fileId,
         docxKey,
+        docxUrl,
         status: 'pdf-converted'
       });
     } catch (error) {

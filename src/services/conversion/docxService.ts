@@ -21,11 +21,12 @@ export interface DocxProcessResult {
  * 處理DOCX文件並轉換為Markdown
  * @param buffer DOCX文件內容
  * @param fileId 文件ID
- * @returns 處理結果，包含R2鍵值和本地路徑
+ * @returns 處理結果，包含R2鍵值和公開訪問URL
  */
 export async function processDOCX(buffer: Buffer, fileId: string): Promise<{ 
   r2Key: string; 
-  localPath: string; 
+  localPath: string;
+  publicUrl: string;
 }> {
   try {
     // 提取文本和圖片

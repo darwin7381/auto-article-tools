@@ -32,12 +32,12 @@ export async function POST(request: Request) {
       // 處理DOCX文件並轉換為Markdown
       const processResult = await processDOCX(fileBuffer, fileId);
       
-      // 返回處理結果
+      // 返回處理結果，使用R2的公開URL而非本地路徑
       return NextResponse.json({
         success: true,
         fileId,
         markdownKey: processResult.r2Key,
-        markdownUrl: processResult.localPath,
+        markdownUrl: processResult.publicUrl, // 使用R2公開URL
         status: 'content-extracted'
       });
     } catch (error) {
