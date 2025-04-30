@@ -1,4 +1,4 @@
-import { uploadFileToR2 } from '../storage/r2Service';
+import { uploadFileToR2, R2_PUBLIC_URL } from '../storage/r2Service';
 import { saveToLocalStorage } from '../storage/localService';
 
 /**
@@ -10,11 +10,12 @@ import { saveToLocalStorage } from '../storage/localService';
  * @param content Markdown內容
  * @param fileId 文件ID
  * @param suffix 可選的後綴（如'-enhanced'）
- * @returns 保存結果
+ * @returns 保存結果，包含R2路径和公开访问URL
  */
 export async function saveMarkdown(content: string, fileId: string, suffix = ''): Promise<{
   r2Key: string;
   localPath: string;
+  publicUrl: string;
 }> {
   const fileName = suffix ? `${fileId}${suffix}.md` : `${fileId}.md`;
   const r2Key = `processed/${fileName}`;
@@ -22,10 +23,13 @@ export async function saveMarkdown(content: string, fileId: string, suffix = '')
   // 保存到R2
   await uploadFileToR2(Buffer.from(content), r2Key, 'text/markdown');
   
-  // 保存到本地
+  // 生成R2的公開訪問URL
+  const publicUrl = `${R2_PUBLIC_URL}/${r2Key}`;
+  
+  // 保存到本地 (僅用於開發環境)
   const localPath = saveToLocalStorage(content, fileName);
   
-  return { r2Key, localPath };
+  return { r2Key, localPath, publicUrl };
 }
 
 interface MarkdownMetadata {
