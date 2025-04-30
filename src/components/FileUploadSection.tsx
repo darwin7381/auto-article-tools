@@ -189,8 +189,7 @@ export default function FileUploadSection() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            markdownKey: extractResult.markdownKey,  // 正确的R2存储键值
-            markdownUrl: extractResult.markdownUrl,  // 用于获取内容的公开URL
+            markdownKey: extractResult.markdownKey,  // 存储在R2的键值，用于服务器端获取内容
             fileId: fileId
           }),
         });
@@ -212,7 +211,8 @@ export default function FileUploadSection() {
         completeStage('complete', '全部處理完成');
         
         setProcessSuccess(true);
-        setMarkdownUrl(extractResult.markdownUrl); // 使用提取階段的URL
+        // 使用公开访问的URL - 优先使用processResult中的URL，否则回退到extractResult中的URL
+        setMarkdownUrl(processResult.publicUrl || extractResult.publicUrl || extractResult.markdownUrl);
       } catch (aiError) {
         console.error('AI處理錯誤:', aiError);
         // 即使AI處理失敗，仍然標記為部分成功
@@ -220,7 +220,7 @@ export default function FileUploadSection() {
         
         // 仍然顯示提取結果
         setProcessSuccess(true);
-        setMarkdownUrl(extractResult.markdownUrl);
+        setMarkdownUrl(extractResult.publicUrl || extractResult.markdownUrl);
       }
     } catch (error) {
       console.error('處理錯誤:', error);

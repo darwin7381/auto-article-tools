@@ -1,19 +1,20 @@
 ```markdown
-# 新聞稿 即時發布
+**新聞稿 即時發布**
 
-## 數碼港「Web3 Innovators Season」系列主題活動
+# 數碼港「Web3 Innovators Season」系列主題活動  
+引領 Web3 浪潮 深化公眾及業界認知 加速本地 Web3 生態圈發展
 
-### 引領 Web3 浪潮 深化公眾及業界認知 加速本地 Web3 生態圈發展
+**香港，2023 年 10 月 18 日** — 作為本港的 Web3 基地，數碼港致力強化香港 Web3 生態圈。為深化公眾對行業的認知及促進業界交流，數碼港將於 10 月至 11 月期間推出一系列 Web3 主題活動。「Web3 Innovators Season」將夥拍不同業界夥伴，舉辦多元化的國際大型 Web3 系列活動，包括首屆以太坊香港活動「ETH Hong Kong」，讓業界和企業更掌握前沿發展，推動跨界別業務合作和交流，同時增加大眾對於 Web3 應用的接觸點。
 
-香港，2023 年 10 月 18 日 — 作為本港的 Web3 基地，數碼港致力強化香港 Web3 生態圈。為深化[公眾對行業認知及促進業界交流，數碼港將](https://docs.google.com/document/u/0/d/1DrKZurZG7QxSGuW9YG9MeRabI5MxBIKQ_tO8pRCLOJw/edit)於 10 月至 11 月期間推出一系列 Web3 主題活動。數碼港的「Web3 Innovators Season」將夥拍不同業界夥伴，舉辦多元化的國際大型 Web3 系列活動，包括首屆以太坊香港活動「ETH Hong Kong」，讓業界和企業更掌握前沿發展，推動跨界別業務合作和交流，同時增加大眾對於 Web3 應用的接觸點。
+「Web3 Innovators Season」以全港首屆「ETH Hong Kong」揭開序幕，特邀以太坊創始人 Vitalik Buterin 等重磅嘉賓作主講，分享區塊鏈和 Web3 技術的未來發展方向。匯聚過百名環球專家及創業菁英的數碼港年度盛事「2023 數碼港創業投資論壇 (CVCF)」亦有多場與 Web3 相關的亮點後續活動，包括學者論壇 Web3 Scholars Conference、業界分享 Future of Web3.0 以及提案競賽 Ahoy!，還有專為 Web3 創新者而設的「探索創新之海 By Jumpstart」及「NEO 亞太區駭客松香港決賽」盛會，讓一眾行業領袖、初創公司等共同探討創新創業的新視角及機遇。
 
-[動區 BlockTempo](http://blocktempo.com/) 是全球最大的 Web3 [中文媒體](https://www.epochtimes.com/)，TempoAI 是全球最大的 AI 專門媒體。
+自今年年初獲財政預算案撥款 5,000 萬元以來，數碼港 Web3 基地迅速發展，已匯聚超過 210 間 Web3 企業及初創，專注以三大策略支柱推動 Web3 生態圈發展，包括培育人才、推動產業發展以及提升公眾對 Web3 行業的認知。數碼港的 Web3 Living Lab (Web3 生活體驗館) 亦已於今年 8 月底正式開幕，並邀得財政司司長陳茂波先生主持開幕禮。
 
-「Web3 Innovators Season」以全港首屆「ETH Hong Kong」揭開序幕，特邀以太坊創始人 Vitalik Buterin 等重磅嘉賓作主講，分享區塊鏈和 Web3 技術的未來發展方向。匯聚過百名環球專家及創業[菁英的數碼港年度盛事「2023 數碼港創業投資論壇 (CVCF)」](https://www.muken-life.com/blog/posts/wh-power-bank?srsltid=AfmBOoqfIEK-wiL36Sdd8euyc6CxvsN3z1jf149g3PMmVlV5yRPyvlJP)亦有多場與 Web3 相關的亮點後續活動，包括學者論壇 Web3 Scholars Conference、業界分享 Future of Web3.0 以及提案競賽 Ahoy!，還有專為 Web3 創新者而設的「探索創新之海 By Jumpstart」及「NEO 亞太區駭客松香港決賽」盛會，讓一眾行業領袖、初創公司等共同探討創新創業的新視角及機遇。
+**數碼港行政總裁任景信**表示：「作為香港的 Web3 基地，數碼港一直致力於促進區塊鏈和 Web3 技術的發展。『Web3 Innovators Season』系列主題活動，匯聚眾多國際知名的業界領袖、專家、開發者和創業家，將為本地及國際 Web3 社群提供平台，探索技術創新、跨界合作交流和創業機遇。我們將繼續與各界合作夥伴攜手，透過培育人才、推動產業發展以及提升公眾對 Web3 行業的認知，共同推動 Web3 生態圈的發展，並為香港的創業及 Web3 生態系統注入新的活力。」
 
-自今年年初獲財政預算案撥款 5,000 萬元以來，數碼港 Web3 基地迅速發展，已匯聚超過 210 間 Web3 企業及初創，專注以三大策略支柱推動 Web3 生態圈發展，包括培育人才、推動產業發展以及提升公眾對 Web3 行業的認知。而數碼港的 Web3 Living Lab (Web3 生活體驗館) 亦已於今年 8 月底正式開幕，並邀得財政司司長陳茂波先生主持開幕禮。
+---
 
-數碼港行政總裁任景信表示：「作為香港的 Web3 基地，數碼港一直致力於促進區塊鏈和 Web3 技術的發展。『Web3 Innovators Season』系列主題活動，匯聚眾多國際知名的業界領袖、專家、開發者和創業家，將為本地及國際 Web3 社群提供平台，探索技術創新、跨界合作交流和創業機遇。我們將繼續與各界合作夥伴攜手，透過培育人才、推動產業發展以及提升公眾對 Web3 行業的認知，共同推動 Web3 生態圈的發展，並為香港的創業及 Web3 生態系統注入新的活力。」
+## 主要活動詳情
 
 香港首個由以太坊社區舉辦的焦點活動首屆「ETH Hong Kong」將於 10 月 22 至 24 日於數碼港舉行。由 Scroll 和 Newman Capital 共同主辦、數碼港為初創生態夥伴的活動，邀得以太坊創始人 Vitalik Buterin 作主題演講，並將匯聚全球超過 50 位業界領袖及專家，分享獨特的見解和專業知識，聚焦技術研討和圓桌討論以太坊技術，包括技術框架、底層協議、跨鏈技術等，共同探討區塊鏈及 Web3 技術的未來發展。BeWater 以及 Scroll 更將舉辦 Hackathon，讓參與者深入探討 Web3 技術的開發和創新。
 
@@ -23,9 +24,9 @@
 
 ---
 
-## 數碼港「Web3 Innovators Season」系列主題活動一覽
+## 「Web3 Innovators Season」系列主題活動一覽
 
-| 活動 | 活動亮點 |
+| **活動** | **活動亮點** |
 |---|---|
 | **ETH Hong Kong**<br>- 日期：10 月 22 至 24 日<br>- 主辦機構：Scroll、Newman Capital<br>- 初創生態夥伴：數碼港 | 1. 邀請超過 50 位業界專家分享見解和專業知識<br>2. 特邀以太坊創始人 Vitalik Buterin 出席主題演講<br>3. 知名演講者包括 NEAR Protocol 共同創始人、Polygon Foundation 共同創始人以及 9gag 共同創始人等<br>4. Scroll 和 BeWater 主辦駭客松，促進開發者交流 |
 | **Big Demo Day**<br>- 日期：10 月 26 日<br>- 主辦機構：數碼港、Central Research | 1. 邀請本地知名企業及來自世界各地的 Web3 知名專家進行研討及交流<br>2. 路演環節設有不同專案進行演講，展示企業潛力 |
@@ -37,15 +38,17 @@
 
 ---
 
-### 請[按此處下載高像素新聞圖片](https://files.blocktempo.ai/images/------Web3-Innovators-Season-------copy-2-1745964881626-2oyh6u-1745964916287-8v7iem.jpeg)。
+## 新聞圖片下載
 
-![](https://files.blocktempo.ai/images/------Web3-Innovators-Season-------copy-2-1745964881626-2oyh6u-1745964916287-8v7iem.jpeg)
+請[按此處下載高像素新聞圖片](https://files.blocktempo.ai/images/------Web3-Innovators-Season-------1746020527666-rxt4ap-1746020539497-jk5x76.png)。
+
+![](https://files.blocktempo.ai/images/------Web3-Innovators-Season-------1746020527666-rxt4ap-1746020539497-jk5x76.png)
 
 數碼港作為本港的 Web3 基地，致力以三大策略支柱專注推動 Web3 生態圈發展，包括培育人才、推動產業發展以及提升公眾對 Web3 行業的認知，並於本月底起推出「Web3 Innovator Season」主題季度，夥拍不同業界夥伴，舉辦多元化的國際大型 Web3 系列活動，讓業界和企業更掌握前沿發展，推動跨界別業務合作和交流，同時增加大眾對於 Web3 應用的接觸點。
 
-![](https://files.blocktempo.ai/images/------Web3-Innovators-Season-------copy-2-1745964881626-2oyh6u-1745964916968-sjxbis.jpeg)
+![](https://files.blocktempo.ai/images/------Web3-Innovators-Season-------1746020527666-rxt4ap-1746020540435-fmqv6g.jpeg)
 
-數碼港行政總裁任景信表示：「『Web3 Innovators Season』系列主題活動，匯聚眾多國際知名的業界領袖、專家、開發者和創業家，將為本地及國際 Web3 社群提供平台，探索技術創新、跨界合作交流和創業機遇。」
+**數碼港行政總裁任景信**表示：「『Web3 Innovators Season』系列主題活動，匯聚眾多國際知名的業界領袖、專家、開發者和創業家，將為本地及國際 Web3 社群提供平台，探索技術創新、跨界合作交流和創業機遇。」
 
 ---
 

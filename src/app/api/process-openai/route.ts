@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   try {
     // 支持直接接收markdown內容或markdown URL
     const reqBody = await request.json();
-    const { markdown, markdownUrl } = reqBody;
+    const { markdown, markdownUrl, markdownKey } = reqBody;
     
     let markdownContent = '';
     let fileId = '';
@@ -27,8 +27,18 @@ export async function POST(request: Request) {
       } catch (fetchError) {
         return NextResponse.json({ error: '無法獲取Markdown內容', details: fetchError instanceof Error ? fetchError.message : '未知錯誤' }, { status: 400 });
       }
+    } else if (markdownKey) {
+      // 從R2使用key獲取Markdown內容
+      try {
+        console.log('從R2 Key獲取Markdown內容:', markdownKey);
+        const markdownBuffer = await getFileFromR2(markdownKey);
+        markdownContent = markdownBuffer.toString('utf-8');
+        fileId = reqBody.fileId || markdownKey.split('/').pop()?.split('.')[0] || `file-${Date.now()}`;
+      } catch (fetchError) {
+        return NextResponse.json({ error: '無法從R2獲取Markdown內容', details: fetchError instanceof Error ? fetchError.message : '未知錯誤' }, { status: 400 });
+      }
     } else {
-      return NextResponse.json({ error: '缺少必要參數: markdown 或 markdownUrl' }, { status: 400 });
+      return NextResponse.json({ error: '缺少必要參數: markdown, markdownUrl 或 markdownKey' }, { status: 400 });
     }
     
     // 處理OpenAI處理
@@ -37,13 +47,14 @@ export async function POST(request: Request) {
       const enhancedContent = await processContent(markdownContent);
       
       // 保存處理後的結果
-      const { r2Key, localPath } = await saveMarkdown(enhancedContent, fileId, '-ai-enhanced');
+      const { r2Key, localPath, publicUrl } = await saveMarkdown(enhancedContent, fileId, '-ai-enhanced');
       
       return NextResponse.json({
         success: true,
         content: enhancedContent.substring(0, 200) + '...', // 僅返回部分內容預覽
         markdownKey: r2Key,
         markdownUrl: localPath,
+        publicUrl: publicUrl,
         fileId
       });
     } catch (aiError) {
