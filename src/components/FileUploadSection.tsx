@@ -189,7 +189,8 @@ export default function FileUploadSection() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            markdownUrl: extractResult.markdownKey, // 使用提取階段獲得的markdown的R2鍵值
+            markdownKey: extractResult.markdownKey,  // 正确的R2存储键值
+            markdownUrl: extractResult.markdownUrl,  // 用于获取内容的公开URL
             fileId: fileId
           }),
         });
