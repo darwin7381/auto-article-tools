@@ -74,13 +74,33 @@ async function fetchMarkdownContent(keyPath: string): Promise<{ content: string;
   }
 }
 
-export default async function MarkdownPage({ params }: { params: { key: string[] } }) {
-  // 将参数数组连接成路径
-  const keyPath = params.key.join('/');
-  
-  // 获取Markdown内容
-  const { content, title, error } = await fetchMarkdownContent(keyPath);
-
-  // 传递数据给客户端组件
-  return <MarkdownViewer content={content} title={title} error={error} />;
+// 使用Next.js 15的正确方式处理动态参数
+export default async function MarkdownPage({ 
+  params 
+}: { 
+  params: Promise<{ key: string[] }> 
+}) {
+  try {
+    // 首先await整个params对象
+    const resolvedParams = await params;
+    
+    // 从解析后的params对象中安全地获取key
+    const routeSegments = resolvedParams.key;
+    
+    // 转换为路径
+    const keyPath = Array.isArray(routeSegments) ? routeSegments.join('/') : '';
+    
+    // 获取内容
+    const { content, title, error } = await fetchMarkdownContent(keyPath);
+    
+    // 渲染页面
+    return <MarkdownViewer content={content} title={title} error={error} />;
+  } catch (error) {
+    console.error('渲染页面失败:', error);
+    return <MarkdownViewer 
+      content="" 
+      title="错误" 
+      error={error instanceof Error ? error.message : '未知错误'} 
+    />;
+  }
 } 
