@@ -25,20 +25,40 @@ export async function POST(request: Request) {
         console.error('從R2獲取文件失敗:', error);
         return NextResponse.json(
           { error: '無法從存儲中獲取文件' },
-          { status: 500 }
+          { 
+            status: 500,
+            headers: {
+              'Content-Type': 'application/json;charset=UTF-8',
+              'Content-Encoding': 'identity'
+            }
+          }
         );
       }
       
       // 處理DOCX文件並轉換為Markdown
       const processResult = await processDOCX(fileBuffer, fileId);
       
+      // 明確記錄返回的結果
+      console.log('DOCX處理完成，返回結果:', {
+        markdownKey: processResult.r2Key,
+        publicUrl: processResult.publicUrl
+      });
+      
       // 返回處理結果，使用R2的公開URL而非本地路徑
+      // 明確設置好Content-Type和Content-Encoding，避免壓縮和解碼問題
       return NextResponse.json({
         success: true,
         fileId,
         markdownKey: processResult.r2Key,
         markdownUrl: processResult.publicUrl, // 使用R2公開URL
+        publicUrl: processResult.publicUrl,   // 添加publicUrl字段，確保前端能訪問
         status: 'content-extracted'
+      }, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+          'Content-Encoding': 'identity'
+        }
       });
     } catch (error) {
       throw error;
@@ -51,7 +71,13 @@ export async function POST(request: Request) {
     
     return NextResponse.json(
       { error: '處理 DOCX 時發生錯誤', details: errorMessage },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+          'Content-Encoding': 'identity'
+        }
+      }
     );
   }
 } 
