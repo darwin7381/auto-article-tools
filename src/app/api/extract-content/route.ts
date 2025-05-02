@@ -33,7 +33,9 @@ export async function POST(request: Request) {
           try {
             const errorData = JSON.parse(errorText);
             throw new Error(errorData.error || 'PDF處理失敗');
-          } catch (parseError) {
+          } 
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          catch (error) {
             throw new Error(`PDF處理失敗 (${pdfResponse.status}): ${errorText.substring(0, 200)}`);
           }
         }
@@ -45,8 +47,10 @@ export async function POST(request: Request) {
           console.log('PDF處理器返回原始內容:', responseText.substring(0, 500) + '...');
           pdfResult = JSON.parse(responseText);
           console.log('PDF處理結果:', pdfResult);
-        } catch (parseError) {
-          console.error('解析PDF處理結果失敗:', parseError);
+        } 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        catch (error) {
+          console.error('解析PDF處理結果失敗');
           throw new Error('無法解析PDF處理結果');
         }
         
@@ -69,7 +73,9 @@ export async function POST(request: Request) {
           try {
             const errorData = JSON.parse(errorText);
             throw new Error(errorData.error || 'DOCX處理失敗');
-          } catch (parseError) {
+          } 
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          catch (error) {
             throw new Error(`DOCX處理失敗 (${docxResponse.status}): ${errorText.substring(0, 200)}`);
           }
         }
@@ -81,23 +87,30 @@ export async function POST(request: Request) {
           console.log('DOCX處理器返回原始內容:', responseText.substring(0, 500) + '...');
           docxResult = JSON.parse(responseText);
           console.log('DOCX處理結果:', docxResult);
-        } catch (parseError) {
-          console.error('解析DOCX處理結果失敗:', parseError);
+        } 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        catch (error) {
+          console.error('解析DOCX處理結果失敗');
           throw new Error('無法解析DOCX處理結果');
         }
         
         // 確保docxResult包含所有必要的字段
         if (!docxResult.markdownKey && !docxResult.publicUrl) {
           console.error('DOCX處理結果缺少必要字段:', docxResult);
-          throw new Error('處理結果缺少必要字段 (markdownKey 或 publicUrl)');
+          throw new Error('處理結果缺少必要字段');
         }
         
-        // 顯式返回一個全新的NextResponse，不要直接轉發docxResponse
-        return NextResponse.json(docxResult, {
+        // 返回一個統一的響應結構
+        return NextResponse.json({
+          success: true,
+          fileId,
+          markdownKey: docxResult.markdownKey,
+          publicUrl: docxResult.publicUrl,
+          status: 'content-extracted'
+        }, {
           status: 200,
           headers: {
             'Content-Type': 'application/json;charset=UTF-8',
-            // 確保沒有壓縮，以防止解碼問題
             'Content-Encoding': 'identity'
           }
         });
@@ -119,7 +132,9 @@ export async function POST(request: Request) {
           try {
             const errorData = JSON.parse(errorText);
             throw new Error(errorData.error || 'DOCX處理失敗');
-          } catch (parseError) {
+          } 
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          catch (error) {
             throw new Error(`DOCX處理失敗 (${docxResponse.status}): ${errorText.substring(0, 200)}`);
           }
         }
@@ -131,23 +146,30 @@ export async function POST(request: Request) {
           console.log('DOCX處理器返回原始內容:', responseText.substring(0, 500) + '...');
           docxResult = JSON.parse(responseText);
           console.log('DOCX處理結果:', docxResult);
-        } catch (parseError) {
-          console.error('解析DOCX處理結果失敗:', parseError);
+        } 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        catch (error) {
+          console.error('解析DOCX處理結果失敗');
           throw new Error('無法解析DOCX處理結果');
         }
         
         // 確保docxResult包含所有必要的字段
         if (!docxResult.markdownKey && !docxResult.publicUrl) {
           console.error('DOCX處理結果缺少必要字段:', docxResult);
-          throw new Error('處理結果缺少必要字段 (markdownKey 或 publicUrl)');
+          throw new Error('處理結果缺少必要字段');
         }
         
-        // 顯式返回一個全新的NextResponse，不要直接轉發docxResponse
-        return NextResponse.json(docxResult, {
+        // 返回一個統一的響應結構
+        return NextResponse.json({
+          success: true,
+          fileId,
+          markdownKey: docxResult.markdownKey,
+          publicUrl: docxResult.publicUrl,
+          status: 'content-extracted'
+        }, {
           status: 200,
           headers: {
             'Content-Type': 'application/json;charset=UTF-8',
-            // 確保沒有壓縮，以防止解碼問題
             'Content-Encoding': 'identity'
           }
         });

@@ -211,17 +211,16 @@ export default function FileUploadSection() {
         completeStage('complete', '全部處理完成');
         
         setProcessSuccess(true);
-        // 使用公开访问的URL - 优先使用processResult中的URL，否则回退到extractResult中的URL
-        const markdownKey = processResult.markdownKey || extractResult.markdownKey;
-        // 直接使用publicUrl或构建viewer路径
-        if (processResult.publicUrl || extractResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(processResult.publicUrl || extractResult.publicUrl)}`);
-        } else if (markdownKey) {
+        
+        // 使用公开URL作为查看路径 - 仅使用publicUrl字段
+        if (processResult.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(processResult.publicUrl)}`);
+        } else if (extractResult.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
+        } else if (processResult.markdownKey || extractResult.markdownKey) {
           // 如果只有Key，则构建基于Key的viewer路径
+          const markdownKey = processResult.markdownKey || extractResult.markdownKey;
           setMarkdownUrl(`/viewer/processed/${markdownKey.split('/').pop() || ''}`);
-        } else {
-          // 兜底方案，直接使用任何可用的URL
-          setMarkdownUrl(processResult.markdownUrl || extractResult.markdownUrl);
         }
       } catch (aiError) {
         console.error('AI處理錯誤:', aiError);
@@ -230,16 +229,14 @@ export default function FileUploadSection() {
         
         // 仍然顯示提取結果
         setProcessSuccess(true);
-        const markdownKey = extractResult.markdownKey;
-        // 直接使用publicUrl或构建viewer路径
+        
+        // 使用公开URL作为查看路径 - 仅使用publicUrl字段
         if (extractResult.publicUrl) {
           setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
-        } else if (markdownKey) {
+        } else if (extractResult.markdownKey) {
           // 如果只有Key，则构建基于Key的viewer路径
+          const markdownKey = extractResult.markdownKey;
           setMarkdownUrl(`/viewer/processed/${markdownKey.split('/').pop() || ''}`);
-        } else {
-          // 兜底方案，直接使用任何可用的URL
-          setMarkdownUrl(extractResult.markdownUrl);
         }
       }
     } catch (error) {
