@@ -28,15 +28,30 @@ export async function POST(request: Request) {
         });
         
         if (!pdfResponse.ok) {
-          const errorData = await pdfResponse.json();
-          throw new Error(errorData.error || 'PDF處理失敗');
+          const errorText = await pdfResponse.text();
+          console.error('PDF處理器返回錯誤:', pdfResponse.status, pdfResponse.statusText, errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.error || 'PDF處理失敗');
+          } catch (parseError) {
+            throw new Error(`PDF處理失敗 (${pdfResponse.status}): ${errorText.substring(0, 200)}`);
+          }
         }
         
         // 獲取PDF轉換結果（DOCX文件）
-        const pdfResult = await pdfResponse.json();
+        let pdfResult;
+        try {
+          const responseText = await pdfResponse.text();
+          console.log('PDF處理器返回原始內容:', responseText.substring(0, 500) + '...');
+          pdfResult = JSON.parse(responseText);
+          console.log('PDF處理結果:', pdfResult);
+        } catch (parseError) {
+          console.error('解析PDF處理結果失敗:', parseError);
+          throw new Error('無法解析PDF處理結果');
+        }
         
         // 繼續處理轉換後的DOCX
-        console.log('PDF轉換完成，繼續處理DOCX...');
+        console.log('PDF轉換完成，繼續處理DOCX...', { docxKey: pdfResult.docxKey });
         const docxResponse = await fetch(getApiUrl('/api/processors/process-docx'), {
           method: 'POST',
           headers: {
@@ -49,12 +64,43 @@ export async function POST(request: Request) {
         });
         
         if (!docxResponse.ok) {
-          const errorData = await docxResponse.json();
-          throw new Error(errorData.error || 'DOCX處理失敗');
+          const errorText = await docxResponse.text();
+          console.error('DOCX處理器返回錯誤:', docxResponse.status, docxResponse.statusText, errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.error || 'DOCX處理失敗');
+          } catch (parseError) {
+            throw new Error(`DOCX處理失敗 (${docxResponse.status}): ${errorText.substring(0, 200)}`);
+          }
         }
         
-        // 返回最終結果
-        return docxResponse;
+        // 解析docxResponse，創建新的響應
+        let docxResult;
+        try {
+          const responseText = await docxResponse.text();
+          console.log('DOCX處理器返回原始內容:', responseText.substring(0, 500) + '...');
+          docxResult = JSON.parse(responseText);
+          console.log('DOCX處理結果:', docxResult);
+        } catch (parseError) {
+          console.error('解析DOCX處理結果失敗:', parseError);
+          throw new Error('無法解析DOCX處理結果');
+        }
+        
+        // 確保docxResult包含所有必要的字段
+        if (!docxResult.markdownKey && !docxResult.publicUrl) {
+          console.error('DOCX處理結果缺少必要字段:', docxResult);
+          throw new Error('處理結果缺少必要字段 (markdownKey 或 publicUrl)');
+        }
+        
+        // 顯式返回一個全新的NextResponse，不要直接轉發docxResponse
+        return NextResponse.json(docxResult, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json;charset=UTF-8',
+            // 確保沒有壓縮，以防止解碼問題
+            'Content-Encoding': 'identity'
+          }
+        });
       } 
       else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         // 直接使用DOCX處理器
@@ -68,12 +114,43 @@ export async function POST(request: Request) {
         });
         
         if (!docxResponse.ok) {
-          const errorData = await docxResponse.json();
-          throw new Error(errorData.error || 'DOCX處理失敗');
+          const errorText = await docxResponse.text();
+          console.error('DOCX處理器返回錯誤:', docxResponse.status, docxResponse.statusText, errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.error || 'DOCX處理失敗');
+          } catch (parseError) {
+            throw new Error(`DOCX處理失敗 (${docxResponse.status}): ${errorText.substring(0, 200)}`);
+          }
         }
         
-        // 返回處理結果
-        return docxResponse;
+        // 解析docxResponse，創建新的響應
+        let docxResult;
+        try {
+          const responseText = await docxResponse.text();
+          console.log('DOCX處理器返回原始內容:', responseText.substring(0, 500) + '...');
+          docxResult = JSON.parse(responseText);
+          console.log('DOCX處理結果:', docxResult);
+        } catch (parseError) {
+          console.error('解析DOCX處理結果失敗:', parseError);
+          throw new Error('無法解析DOCX處理結果');
+        }
+        
+        // 確保docxResult包含所有必要的字段
+        if (!docxResult.markdownKey && !docxResult.publicUrl) {
+          console.error('DOCX處理結果缺少必要字段:', docxResult);
+          throw new Error('處理結果缺少必要字段 (markdownKey 或 publicUrl)');
+        }
+        
+        // 顯式返回一個全新的NextResponse，不要直接轉發docxResponse
+        return NextResponse.json(docxResult, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json;charset=UTF-8',
+            // 確保沒有壓縮，以防止解碼問題
+            'Content-Encoding': 'identity'
+          }
+        });
       } 
       else {
         // 不支持的文件類型
@@ -93,7 +170,13 @@ export async function POST(request: Request) {
     
     return NextResponse.json(
       { error: '內容提取失敗', details: errorMessage },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+          'Content-Encoding': 'identity'
+        }
+      }
     );
   }
 } 
