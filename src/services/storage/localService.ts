@@ -9,10 +9,9 @@ import path from 'path';
  * 將內容保存到本地存儲
  * @param content 要保存的內容
  * @param fileName 文件名
- * @param dirName 公開目錄名（相對於public目錄）
  * @returns 公開訪問路徑
  */
-export function saveToLocalStorage(content: string, fileName: string, dirName = 'processed-markdown'): string {
+export function saveToLocalStorage(content: string, fileName: string): string {
   // 不再使用本地存儲，僅依賴R2
   // 返回空字符串，讓系統使用publicUrl
   console.log(`不再保存到本地存儲，fileName: ${fileName}`);
@@ -34,13 +33,10 @@ export function saveToLocalStorage(content: string, fileName: string, dirName = 
   const filePath = path.join(dirPath, fileName);
   fs.writeFileSync(filePath, content, 'utf-8');
   
-  // 輸出保存位置以便調試
-  console.log(`Markdown 文件保存至: ${filePath}`);
-  
-  // 返回訪問路徑
-  // 在生產環境中使用代理API路由
-  return process.env.NODE_ENV === 'production'
-    ? `/api/markdown-proxy/${fileName}` 
+  // 返回本地訪問URL
+  // 在生產環境不使用本地URL，而在本地開發時使用相對路徑
+  return process.env.NODE_ENV === 'production' 
+    ? '' 
     : `/${dirName}/${fileName}`;
   */
 }
@@ -48,15 +44,14 @@ export function saveToLocalStorage(content: string, fileName: string, dirName = 
 /**
  * 從本地讀取文件內容
  * @param fileName 文件名
- * @param dirName 目錄名
  * @returns 文件內容
  */
-export function readFromLocalStorage(fileName: string, dirName = 'processed-markdown'): string {
+export function readFromLocalStorage(fileName: string): string {
   console.warn('readFromLocalStorage 已不推薦使用，請使用 getFileFromR2 代替');
   // 在 Vercel 環境中使用 /tmp 目錄
   const dirPath = process.env.NODE_ENV === 'production' 
-    ? path.join('/tmp', dirName)
-    : path.join(process.cwd(), 'public', dirName);
+    ? path.join('/tmp')
+    : path.join(process.cwd(), 'public', 'processed-markdown');
     
   const filePath = path.join(dirPath, fileName);
   

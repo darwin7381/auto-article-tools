@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardBody } from '@heroui/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,15 +17,10 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
   const [viewMode, setViewMode] = useState<'markdown' | 'article'>('article');
   const [articleHtml, setArticleHtml] = useState('');
   
-  // 當內容或視圖模式更新時，處理HTML
-  useEffect(() => {
-    if (content && viewMode === 'article') {
-      convertToArticleHtml(content);
-    }
-  }, [content, viewMode]);
-  
-  // 將Markdown轉換為HTML文章
-  function convertToArticleHtml(markdownContent: string) {
+  // 使用useCallback優化函數，防止不必要的重複創建
+  const convertToArticleHtml = useCallback((markdownContent: string) => {
+    if (!markdownContent) return;
+    
     // 將相對路徑的圖片轉換為絕對路徑
     let processedContent = markdownContent;
     const baseUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://files.blocktempo.ai';
@@ -101,7 +96,14 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
     `);
     
     setArticleHtml(sanitizedHtml);
-  }
+  }, [title]);
+  
+  // 當內容或視圖模式更新時，處理HTML
+  useEffect(() => {
+    if (content && viewMode === 'article') {
+      convertToArticleHtml(content);
+    }
+  }, [content, viewMode, convertToArticleHtml]);
   
   return (
     <div className="container mx-auto p-4">
