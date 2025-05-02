@@ -42,18 +42,44 @@ export async function getFileFromR2(fileKey: string): Promise<Buffer> {
  * @param buffer 文件內容
  * @param key 文件在R2中的鍵值
  * @param contentType 文件MIME類型
- * @returns 上傳後的文件鍵值
+ * @returns 上傳後的文件信息，包含鍵值和公開URL
  */
-export async function uploadFileToR2(buffer: Buffer, key: string, contentType: string): Promise<string> {
+export async function uploadFileToR2(buffer: Buffer, key: string, contentType: string): Promise<{
+  key: string;
+  publicUrl: string;
+}> {
+  // 设置文件的元数据和Headers
+  const metadata: Record<string, string> = {
+    'Content-Disposition': 'inline'
+  };
+  
+  // 对于特定类型文件，添加额外控制
+  if (contentType.includes('markdown') || key.endsWith('.md')) {
+    contentType = 'text/markdown; charset=utf-8';
+  } else if (contentType.includes('json')) {
+    contentType = 'application/json; charset=utf-8';
+  } else if (contentType.includes('text')) {
+    contentType = `${contentType}; charset=utf-8`;
+  }
+
   const command = new PutObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
     Body: buffer,
     ContentType: contentType,
+    ContentEncoding: 'utf-8',
+    Metadata: metadata,
+    // 添加缓存控制，避免旧版本缓存问题
+    CacheControl: 'no-cache, max-age=0'
   });
   
   await R2Client.send(command);
-  return key;
+  
+  // 返回包含公開URL的對象
+  return {
+    key,
+    publicUrl: `${R2_PUBLIC_URL}/${key}`
+  };
 }
 
 /**

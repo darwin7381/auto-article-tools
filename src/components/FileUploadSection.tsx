@@ -212,7 +212,17 @@ export default function FileUploadSection() {
         
         setProcessSuccess(true);
         // 使用公开访问的URL - 优先使用processResult中的URL，否则回退到extractResult中的URL
-        setMarkdownUrl(processResult.publicUrl || extractResult.publicUrl || extractResult.markdownUrl);
+        const markdownKey = processResult.markdownKey || extractResult.markdownKey;
+        // 直接使用publicUrl或构建viewer路径
+        if (processResult.publicUrl || extractResult.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(processResult.publicUrl || extractResult.publicUrl)}`);
+        } else if (markdownKey) {
+          // 如果只有Key，则构建基于Key的viewer路径
+          setMarkdownUrl(`/viewer/processed/${markdownKey.split('/').pop() || ''}`);
+        } else {
+          // 兜底方案，直接使用任何可用的URL
+          setMarkdownUrl(processResult.markdownUrl || extractResult.markdownUrl);
+        }
       } catch (aiError) {
         console.error('AI處理錯誤:', aiError);
         // 即使AI處理失敗，仍然標記為部分成功
@@ -220,7 +230,17 @@ export default function FileUploadSection() {
         
         // 仍然顯示提取結果
         setProcessSuccess(true);
-        setMarkdownUrl(extractResult.publicUrl || extractResult.markdownUrl);
+        const markdownKey = extractResult.markdownKey;
+        // 直接使用publicUrl或构建viewer路径
+        if (extractResult.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
+        } else if (markdownKey) {
+          // 如果只有Key，则构建基于Key的viewer路径
+          setMarkdownUrl(`/viewer/processed/${markdownKey.split('/').pop() || ''}`);
+        } else {
+          // 兜底方案，直接使用任何可用的URL
+          setMarkdownUrl(extractResult.markdownUrl);
+        }
       }
     } catch (error) {
       console.error('處理錯誤:', error);
@@ -481,7 +501,7 @@ export default function FileUploadSection() {
                     </p>
                     {markdownUrl && (
                       <a 
-                        href={markdownUrl} 
+                        href={markdownUrl.startsWith('/viewer/') ? markdownUrl : `/viewer/${encodeURIComponent(markdownUrl)}`} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-sm font-medium text-primary-600 dark:text-primary-400 flex items-center gap-1 hover:underline"
