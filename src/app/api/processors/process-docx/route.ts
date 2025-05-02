@@ -50,8 +50,7 @@ export async function POST(request: Request) {
         success: true,
         fileId,
         markdownKey: processResult.r2Key,
-        markdownUrl: processResult.publicUrl, // 使用R2公開URL
-        publicUrl: processResult.publicUrl,   // 添加publicUrl字段，確保前端能訪問
+        publicUrl: processResult.publicUrl,   // 仅提供一个统一的URL字段
         status: 'content-extracted'
       }, {
         status: 200,
