@@ -13,6 +13,13 @@ import path from 'path';
  * @returns 公開訪問路徑
  */
 export function saveToLocalStorage(content: string, fileName: string, dirName = 'processed-markdown'): string {
+  // 不再使用本地存儲，僅依賴R2
+  // 返回空字符串，讓系統使用publicUrl
+  console.log(`不再保存到本地存儲，fileName: ${fileName}`);
+  return '';
+  
+  /* 
+  // 以下代碼已不再使用，但保留供參考
   // 在 Vercel 環境中使用 /tmp 目錄，該目錄在 Serverless 環境中通常是可寫的
   // 直接保存在 /tmp 根目錄下，與 markdown-proxy 一致
   const dirPath = process.env.NODE_ENV === 'production' 
@@ -35,6 +42,7 @@ export function saveToLocalStorage(content: string, fileName: string, dirName = 
   return process.env.NODE_ENV === 'production'
     ? `/api/markdown-proxy/${fileName}` 
     : `/${dirName}/${fileName}`;
+  */
 }
 
 /**
@@ -44,6 +52,7 @@ export function saveToLocalStorage(content: string, fileName: string, dirName = 
  * @returns 文件內容
  */
 export function readFromLocalStorage(fileName: string, dirName = 'processed-markdown'): string {
+  console.warn('readFromLocalStorage 已不推薦使用，請使用 getFileFromR2 代替');
   // 在 Vercel 環境中使用 /tmp 目錄
   const dirPath = process.env.NODE_ENV === 'production' 
     ? path.join('/tmp', dirName)
