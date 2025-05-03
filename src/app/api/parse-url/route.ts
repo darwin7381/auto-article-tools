@@ -13,6 +13,7 @@ interface UrlProcessResult {
     hasImages?: boolean;
     language?: string;
     urlId?: string;
+    documentId?: string;
   };
 }
 
@@ -44,9 +45,11 @@ async function saveUrlInfoToR2(url: string, type: string, data: UrlProcessResult
   // 準備儲存的數據
   const metadata = {
     'Content-Type': 'application/json',
-    'url': url,
+    'url': encodeURIComponent(url),
     'url-type': type,
-    'detected-title': data.metadata?.detectedTitle || 'Unknown',
+    'detected-title': data.metadata?.detectedTitle ? 
+      encodeURIComponent(data.metadata.detectedTitle).substring(0, 100) : 
+      'Unknown',
     'processed-time': new Date().toISOString(),
   };
   
@@ -106,6 +109,32 @@ async function handleGoogleDocs(url: string): Promise<UrlProcessResult> {
     throw new Error('提供的URL不是有效的Google Docs鏈接');
   }
   
+  // 從URL中提取文檔ID
+  let docId = '';
+  try {
+    const urlObj = new URL(url);
+    if (url.includes('/document/d/')) {
+      // 標準Google Docs URL格式: https://docs.google.com/document/d/DOC_ID/edit
+      const pathParts = urlObj.pathname.split('/');
+      for (let i = 0; i < pathParts.length; i++) {
+        if (pathParts[i] === 'd' && i + 1 < pathParts.length) {
+          docId = pathParts[i + 1];
+          break;
+        }
+      }
+    } else {
+      // 其他可能的Google Docs URL格式
+      docId = urlObj.searchParams.get('id') || '';
+    }
+  } catch (error) {
+    console.error('解析Google Docs URL錯誤:', error);
+  }
+
+  // 如果無法提取文檔ID，使用整個URL作為標識
+  if (!docId) {
+    docId = url.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+  }
+  
   return {
     title: 'Google Docs文件',
     url: url,
@@ -117,6 +146,7 @@ async function handleGoogleDocs(url: string): Promise<UrlProcessResult> {
       estimatedWordCount: 0, // 需API獲取
       hasImages: false, // 需API獲取
       language: 'unknown', // 需API獲取
+      documentId: docId // 添加文檔ID，方便後續處理
     }
   };
 }

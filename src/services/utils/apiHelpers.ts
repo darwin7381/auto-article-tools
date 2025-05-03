@@ -27,30 +27,17 @@ export function getBaseUrl() {
 }
 
 /**
- * 构建完整的API URL
- * @param path API路径，如 '/api/endpoint'
+ * 獲取API的完整URL
+ * @param path API路徑，通常以/api/開頭
  * @returns 完整的API URL
  */
 export function getApiUrl(path: string): string {
-  const baseUrl = getBaseUrl();
+  // 優先使用環境變數中的基礎URL
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   
-  // 确保path以/开头
+  // 確保路徑以/開頭
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   
-  // 确保在服务器端API路由中总是使用完整URL
-  if (typeof window === 'undefined') {
-    // 服务器端 - 总是使用完整URL
-    if (baseUrl) {
-      // 确保baseUrl包含协议前缀
-      const urlWithProtocol = baseUrl.startsWith('http') 
-        ? baseUrl 
-        : `https://${baseUrl}`;
-      
-      return `${urlWithProtocol}${normalizedPath}`;
-    }
-    return `http://localhost:3000${normalizedPath}`;
-  }
-  
-  // 客户端 - 可以使用相对URL
-  return baseUrl ? (baseUrl.startsWith('http') ? `${baseUrl}${normalizedPath}` : `https://${baseUrl}${normalizedPath}`) : normalizedPath;
+  // 返回完整URL
+  return `${baseUrl}${normalizedPath}`;
 } 
