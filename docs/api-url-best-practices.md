@@ -38,8 +38,8 @@ const response = await fetch(apiUrl, {...});
 ```
 
 `getApiUrl` 函數會根據運行環境自動選擇正確的基礎 URL：
-- 在 Vercel 等雲環境中，會使用相對路徑（例如 `/api/endpoint`）避免 localhost 問題
-- 在本地開發環境中，會使用完整的 URL（例如 `http://localhost:3000/api/endpoint`）
+- 在 Vercel 等雲環境中，會使用 Vercel 提供的域名構建完整 URL（例如 `https://your-project.vercel.app/api/endpoint`）
+- 在本地開發環境中，會使用 localhost 作為基礎 URL（例如 `http://localhost:3000/api/endpoint`）
 
 ### getApiUrl 實現細節
 
@@ -48,9 +48,18 @@ export function getApiUrl(path: string): string {
   // 確保路徑以/開頭
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   
-  // 在Vercel環境中，優先使用相對路徑，避免localhost問題
+  // 在Vercel環境中使用Vercel URL
   if (process.env.VERCEL) {
-    return normalizedPath;
+    // 使用VERCEL_URL環境變量構建完整URL
+    const vercelUrl = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_VERCEL_URL;
+    if (vercelUrl) {
+      return `https://${vercelUrl}${normalizedPath}`;
+    }
+    
+    // 如果沒有VERCEL_URL，則使用NEXT_PUBLIC_APP_URL
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      return `${process.env.NEXT_PUBLIC_APP_URL}${normalizedPath}`;
+    }
   }
   
   // 優先使用環境變數中的基礎URL
@@ -62,7 +71,10 @@ export function getApiUrl(path: string): string {
 }
 ```
 
-這個實現確保了 API URL 在不同環境中的正確構建，特別是在 Vercel 部署環境中不會嘗試連接到 localhost。
+這個實現確保了 API URL 在不同環境中的正確構建：
+1. 在 Vercel 環境中，使用 Vercel 提供的域名構建完整 URL，避免使用 localhost
+2. 在其他環境中，會根據環境變量或瀏覽器 origin 構建完整 URL
+3. 保證在服務器端和客戶端代碼中都能正確處理 API 請求
 
 ## 實施規則
 
@@ -92,8 +104,10 @@ API URL 在不同環境中的構建方式：
 
 1. **本地開發**：在 `.env.local` 中設置 `NEXT_PUBLIC_APP_URL=http://localhost:3000`
 
-2. **Vercel 生產環境**：在 Vercel 項目設置中添加:
-   - `NEXT_PUBLIC_APP_URL=https://your-project.vercel.app`
+2. **Vercel 生產環境**：通常不需要額外設置，因為 Vercel 會自動提供 `VERCEL_URL` 環境變量
+   - 如果需要自定義域名，可以在 Vercel 項目設置中添加: `NEXT_PUBLIC_APP_URL=https://your-custom-domain.com`
+   
+> **注意**：`VERCEL_URL` 是 Vercel 環境中的保留變量，會自動設置為您的部署 URL。我們的 `getApiUrl` 函數會優先使用這個變量來構建 API URL。
 
 ## 注意事項
 

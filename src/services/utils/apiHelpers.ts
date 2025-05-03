@@ -35,9 +35,18 @@ export function getApiUrl(path: string): string {
   // 確保路徑以/開頭
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   
-  // 在Vercel環境中，優先使用相對路徑，避免localhost問題
+  // 在Vercel環境中使用Vercel URL
   if (process.env.VERCEL) {
-    return normalizedPath;
+    // 使用VERCEL_URL環境變量構建完整URL
+    const vercelUrl = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_VERCEL_URL;
+    if (vercelUrl) {
+      return `https://${vercelUrl}${normalizedPath}`;
+    }
+    
+    // 如果沒有VERCEL_URL，則使用NEXT_PUBLIC_APP_URL
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      return `${process.env.NEXT_PUBLIC_APP_URL}${normalizedPath}`;
+    }
   }
   
   // 優先使用環境變數中的基礎URL（與原邏輯保持一致）
