@@ -260,10 +260,14 @@ export default function FileUploadSection() {
     
     setIsUploading(true);
     setUploadError(null);
+    setProcessSuccess(false); // 重置處理成功狀態
+    setMarkdownUrl(null); // 重置Markdown URL
     
     try {
       // 初始化URL處理進度
       startUrlProcessing(linkUrl, linkType);
+      
+      // 第一階段：URL 解析/上傳 (0-25%)
       updateStageProgress('upload', 30, '正在處理URL...');
       
       const response = await fetch('/api/parse-url', {
@@ -285,25 +289,89 @@ export default function FileUploadSection() {
       console.log('連結處理成功:', data);
       setUploadSuccess(true);
       
-      // 完成上傳階段
+      // 完成第一階段：URL 解析/上傳
       completeStage('upload', 'URL解析完成');
       moveToNextStage();
       
-      // 繼續處理後續階段 (這裡通常會有爬蟲提取內容的操作)
-      // 目前URL處理功能尚未完全實現，先模擬進度
-      updateStageProgress('extract', 50, '提取網頁內容...');
-      setTimeout(() => {
+      // 第二階段：內容提取 (25-50%)
+      updateStageProgress('extract', 30, '正在提取網頁內容...');
+      
+      // 調用 process-url API 進行實際提取
+      try {
+        // 啟動提取處理
+        const processResponse = await fetch('/api/process-url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            urlId: data.urlId 
+          }),
+        });
+        
+        if (!processResponse.ok) {
+          const errorData = await processResponse.json();
+          throw new Error(errorData.error || '提取內容失敗');
+        }
+        
+        const processResult = await processResponse.json();
+        console.log('URL處理結果:', processResult);
+        
+        // 完成第二階段：內容提取
+        updateStageProgress('extract', 100, '網頁內容提取完成');
         completeStage('extract', '網頁內容提取完成');
         moveToNextStage();
         
-        updateStageProgress('process', 50, '處理內容中...');
+        // 第三階段：AI 處理自動進行(50-75%)
+        // 這裡的關鍵是：後端已經自動執行了AI處理，我們只需顯示進度即可
+        updateStageProgress('process', 30, '開始AI處理內容...');
+        
+        // 給進度條一些視覺上的遞增，讓用戶感知到處理正在進行
+        let currentAiProgress = 30;
+        const interval = setInterval(() => {
+          currentAiProgress = Math.min(currentAiProgress + 5, 95);
+          const message = currentAiProgress < 30 ? '開始AI處理內容...' : 
+                       currentAiProgress < 60 ? 'AI正在處理文本內容...' : 
+                       'AI處理接近完成...';
+          updateStageProgress('process', currentAiProgress, message);
+        }, 500);
+        
+        // 設置超時，確保處理時間足夠
         setTimeout(() => {
-          completeStage('process', '內容處理完成');
+          clearInterval(interval);
+          
+          // 完成第三階段：AI 處理
+          updateStageProgress('process', 100, 'AI內容處理完成');
+          completeStage('process', 'AI內容處理完成');
           moveToNextStage();
           
+          // 完成第四階段：處理完成 (75-100%)
+          updateStageProgress('complete', 100, '所有處理完成');
           completeStage('complete', '所有處理完成');
-        }, 1500);
-      }, 1500);
+          
+          // 判斷處理是否成功，設置對應的URL
+          const hasResult = !!(processResult.publicUrl || processResult.markdownKey);
+          
+          // 設置處理成功和查看鏈接
+          if (hasResult) {
+            if (processResult.publicUrl) {
+              setMarkdownUrl(`/viewer/${encodeURIComponent(processResult.publicUrl)}`);
+            } else if (processResult.markdownKey) {
+              const key = processResult.markdownKey.split('/').pop() || '';
+              setMarkdownUrl(`/viewer/processed/${key}`);
+            }
+            
+            setProcessSuccess(true);
+          } else {
+            console.error('處理結果中缺少必要的Markdown資訊:', processResult);
+            setStageError('complete', '處理完成但缺少Markdown資訊');
+          }
+        }, 3000); // 給足夠的時間展示處理過程
+        
+      } catch (processError) {
+        console.error('URL提取錯誤:', processError);
+        setStageError('extract', processError instanceof Error ? processError.message : 'URL提取失敗');
+      }
       
     } catch (error) {
       console.error('連結處理錯誤:', error);
@@ -618,12 +686,37 @@ export default function FileUploadSection() {
               
               {uploadSuccess && selectedTab === 'link' && (
                 <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800/30">
-                  <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    連結處理成功，準備進行下一步操作
-                  </p>
+                  {!processSuccess ? (
+                    <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      連結處理中，請稍等...
+                    </p>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        連結處理完成，已生成Markdown檔案
+                      </p>
+                      {markdownUrl && (
+                        <a 
+                          href={markdownUrl.startsWith('/viewer/') ? markdownUrl : `/viewer/${encodeURIComponent(markdownUrl)}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-primary-600 dark:text-primary-400 flex items-center gap-1 hover:underline"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          查看
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               

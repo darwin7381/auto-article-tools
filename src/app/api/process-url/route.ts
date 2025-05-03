@@ -12,6 +12,10 @@ interface ScrapedMetadata {
   wordCount: number;
   author?: string;
   publishDate?: string;
+  documentId?: string;
+  markdownKey?: string;
+  publicUrl?: string;
+  processingStatus?: string;
 }
 
 interface ScrapedData {
@@ -42,26 +46,68 @@ interface UrlInfo {
 
 // FireScrawl 爬取功能模擬
 // 注意：實際項目中應該使用真實的FireScrawl API，這裡僅為示例
-async function scrapeWithFireScrawl(url: string, type: string): Promise<ScrapedData> {
-  // 這裡應該是調用FireScrawl API的實際實現
-  // 當前僅模擬返回數據
-  console.log(`模擬爬取URL: ${url}, 類型: ${type}`);
+async function scrapeWithFireScrawl(url: string, type: string, metadata?: Record<string, unknown>): Promise<ScrapedData> {
+  console.log(`處理URL: ${url}, 類型: ${type}`, metadata);
   
-  // 根據不同類型返回不同的模擬數據
+  // 針對Google Docs，使用專門的處理API
   if (type === 'gdocs') {
-    return {
-      title: 'Google Docs樣本文件',
-      content: '# Google Docs樣本內容\n\n這是從Google Docs提取的內容示例。\n\n## 第二級標題\n\n這是第二段落內容。',
-      images: [
-        { url: 'https://example.com/placeholder1.jpg', alt: '示例圖片1' }
-      ],
-      metadata: {
-        language: 'zh-TW',
-        wordCount: 150,
-        author: '示例作者',
-        publishDate: new Date().toISOString()
+    try {
+      // 獲取文檔ID
+      const docId = (metadata?.documentId as string) || extractGoogleDocId(url);
+      if (!docId) {
+        throw new Error('無法獲取Google文檔ID');
       }
-    };
+      
+      console.log(`調用Google Docs專門處理API，文檔ID: ${docId}`);
+      
+      // 調用專門的Google Docs處理API
+      const urlId = metadata?.urlId as string;
+      if (!urlId) {
+        throw new Error('缺少URL ID參數');
+      }
+      
+      // 調用API - 使用絕對URL
+      const apiUrl = new URL('/api/processors/process-gdocs', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').toString();
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentId: docId,
+          urlId: urlId,
+          originalUrl: url
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Google Docs處理失敗');
+      }
+      
+      const result = await response.json();
+      console.log('Google Docs 專門處理API返回結果:', result);
+      
+      // 從處理結果構建ScrapedData
+      return {
+        title: result.title || `Google Docs: ${docId}`,
+        content: `# ${result.title || 'Google Docs內容'}\n\n正在從Google Docs獲取內容，請查看最終生成的Markdown文件。`,
+        images: [],
+        metadata: {
+          language: 'zh-TW',
+          wordCount: result.metadata?.wordCount || 0,
+          author: 'Google Docs用戶',
+          publishDate: new Date().toISOString(),
+          documentId: docId,
+          markdownKey: result.markdownKey,
+          publicUrl: result.publicUrl,
+          processingStatus: result.status || 'content-extracted'
+        }
+      };
+    } catch (error) {
+      console.error('Google Docs處理失敗:', error);
+      throw error;
+    }
   } else if (type === 'medium') {
     return {
       title: 'Medium文章標題',
@@ -109,6 +155,31 @@ async function scrapeWithFireScrawl(url: string, type: string): Promise<ScrapedD
       }
     };
   }
+}
+
+// 從Google Docs URL提取文檔ID
+function extractGoogleDocId(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    if (url.includes('/document/d/')) {
+      // 標準Google Docs URL格式: https://docs.google.com/document/d/DOC_ID/edit
+      const pathParts = urlObj.pathname.split('/');
+      for (let i = 0; i < pathParts.length; i++) {
+        if (pathParts[i] === 'd' && i + 1 < pathParts.length) {
+          return pathParts[i + 1];
+        }
+      }
+    } else {
+      // 其他可能的Google Docs URL格式
+      const id = urlObj.searchParams.get('id');
+      if (id) return id;
+    }
+  } catch (error) {
+    console.error('解析Google Docs URL錯誤:', error);
+  }
+  
+  // 如果無法提取，返回一個預設值
+  return 'unknown-doc-id';
 }
 
 // 將爬取的圖片上傳到R2
@@ -228,8 +299,76 @@ export async function POST(request: Request) {
       );
     }
     
-    // 使用FireScrawl爬取內容
-    const scrapedData = await scrapeWithFireScrawl(urlInfo.url, urlInfo.type);
+    // 獲取元數據
+    const metadata = urlInfo.processResult?.metadata || {};
+    // 確保urlId包含在metadata中
+    metadata.urlId = urlId;
+    
+    // 使用FireScrawl或專門API爬取內容
+    const scrapedData = await scrapeWithFireScrawl(urlInfo.url, urlInfo.type, metadata);
+    
+    // 如果是Google Docs等已經處理過的內容，使用處理結果直接進入AI處理階段
+    if (scrapedData.metadata.markdownKey) {
+      console.log('使用已處理內容進入AI處理階段，markdownKey:', scrapedData.metadata.markdownKey);
+      
+      try {
+        // 調用AI處理API
+        const aiResponse = await fetch(new URL('/api/process-openai', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').toString(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            markdownKey: scrapedData.metadata.markdownKey,
+            fileId: urlId
+          }),
+        });
+        
+        if (!aiResponse.ok) {
+          console.error('AI處理失敗:', await aiResponse.text());
+          throw new Error('AI處理失敗');
+        }
+        
+        const aiResult = await aiResponse.json();
+        console.log('AI處理成功:', aiResult);
+        
+        // 返回結果，包含AI處理的信息
+        return NextResponse.json({
+          success: true,
+          urlId,
+          markdownKey: aiResult.markdownKey || scrapedData.metadata.markdownKey,
+          publicUrl: aiResult.publicUrl || scrapedData.metadata.publicUrl,
+          status: 'processed-by-ai',
+          metadata: {
+            title: scrapedData.title,
+            language: scrapedData.metadata.language,
+            wordCount: scrapedData.metadata.wordCount,
+            imageCount: 0
+          }
+        });
+      } catch (aiError) {
+        console.error('AI處理階段出錯:', aiError);
+        
+        // 如果有標記某些處理已完成，返回相應的狀態
+        const processingStatus = scrapedData.metadata.processingStatus || 'content-extracted';
+        
+        // 即使AI處理失敗，仍返回基本處理結果
+        return NextResponse.json({
+          success: true,
+          urlId,
+          markdownKey: scrapedData.metadata.markdownKey,
+          publicUrl: scrapedData.metadata.publicUrl,
+          status: processingStatus, // 使用processingStatus
+          error: 'AI處理失敗，但基本內容已提取',
+          metadata: {
+            title: scrapedData.title,
+            language: scrapedData.metadata.language,
+            wordCount: scrapedData.metadata.wordCount,
+            imageCount: 0
+          }
+        });
+      }
+    }
     
     // 處理爬取的圖片（上傳到R2）
     const processedImages = await uploadScrapedImagesToR2(scrapedData.images, urlId);
@@ -246,19 +385,64 @@ export async function POST(request: Request) {
     // 保存Markdown到R2
     const markdownKey = await saveMarkdownToR2(markdown, urlId);
     
-    return NextResponse.json({
-      success: true,
-      urlId,
-      markdownKey,
-      status: 'processed',
-      metadata: {
-        title: scrapedData.title,
-        language: scrapedData.metadata.language,
-        wordCount: scrapedData.metadata.wordCount,
-        imageCount: processedImages.length
-      }
-    });
+    // 使用R2公共URL
+    const baseUrl = process.env.R2_PUBLIC_URL || '';
+    const publicUrl = baseUrl ? `${baseUrl}/${markdownKey}` : markdownKey;
     
+    try {
+      // 調用AI處理API
+      const aiResponse = await fetch(new URL('/api/process-openai', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          markdownKey: markdownKey,
+          fileId: urlId
+        }),
+      });
+      
+      if (!aiResponse.ok) {
+        console.error('AI處理失敗:', await aiResponse.text());
+        throw new Error('AI處理失敗');
+      }
+      
+      const aiResult = await aiResponse.json();
+      console.log('AI處理成功:', aiResult);
+      
+      // 返回結果，包含AI處理的信息
+      return NextResponse.json({
+        success: true,
+        urlId,
+        markdownKey: aiResult.markdownKey || markdownKey,
+        publicUrl: aiResult.publicUrl || publicUrl,
+        status: 'processed-by-ai',
+        metadata: {
+          title: scrapedData.title,
+          language: scrapedData.metadata.language,
+          wordCount: scrapedData.metadata.wordCount,
+          imageCount: processedImages.length
+        }
+      });
+    } catch (aiError) {
+      console.error('AI處理階段出錯:', aiError);
+      
+      // 即使AI處理失敗，仍返回基本處理結果
+      return NextResponse.json({
+        success: true,
+        urlId,
+        markdownKey: markdownKey,
+        publicUrl: publicUrl,
+        status: 'content-extracted', // 只完成了提取，未完成AI處理
+        error: 'AI處理失敗，但基本內容已提取',
+        metadata: {
+          title: scrapedData.title,
+          language: scrapedData.metadata.language,
+          wordCount: scrapedData.metadata.wordCount,
+          imageCount: processedImages.length
+        }
+      });
+    }
   } catch (error) {
     console.error('URL處理錯誤:', error);
     return NextResponse.json(
