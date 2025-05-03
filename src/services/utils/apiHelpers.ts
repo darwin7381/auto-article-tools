@@ -32,25 +32,11 @@ export function getBaseUrl() {
  * @returns 完整的API URL
  */
 export function getApiUrl(path: string): string {
+  // 優先使用環境變數中的基礎URL
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+  
   // 確保路徑以/開頭
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  
-  // 在Vercel環境中使用Vercel URL
-  if (process.env.VERCEL) {
-    // 使用VERCEL_URL環境變量構建完整URL
-    const vercelUrl = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_VERCEL_URL;
-    if (vercelUrl) {
-      return `https://${vercelUrl}${normalizedPath}`;
-    }
-    
-    // 如果沒有VERCEL_URL，則使用NEXT_PUBLIC_APP_URL
-    if (process.env.NEXT_PUBLIC_APP_URL) {
-      return `${process.env.NEXT_PUBLIC_APP_URL}${normalizedPath}`;
-    }
-  }
-  
-  // 優先使用環境變數中的基礎URL（與原邏輯保持一致）
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   
   // 返回完整URL
   return `${baseUrl}${normalizedPath}`;
