@@ -16,6 +16,8 @@ interface ScrapedMetadata {
   markdownKey?: string;
   publicUrl?: string;
   processingStatus?: string;
+  aiProcessed?: boolean;
+  processingComplete?: boolean;
 }
 
 interface ScrapedData {
@@ -88,6 +90,10 @@ async function scrapeWithFireScrawl(url: string, type: string, metadata?: Record
       const result = await response.json();
       console.log('Google Docs 專門處理API返回結果:', result);
       
+      // 判斷處理階段，從狀態值確定目前是內容提取還是AI處理階段
+      const processingStatus = result.status || 'content-extracted';
+      const isAiProcessed = processingStatus === 'processed-by-ai';
+      
       // 從處理結果構建ScrapedData
       return {
         title: result.title || `Google Docs: ${docId}`,
@@ -101,7 +107,9 @@ async function scrapeWithFireScrawl(url: string, type: string, metadata?: Record
           documentId: docId,
           markdownKey: result.markdownKey,
           publicUrl: result.publicUrl,
-          processingStatus: result.status || 'content-extracted'
+          processingStatus: processingStatus,
+          aiProcessed: isAiProcessed, // 標記是否已經完成AI處理
+          processingComplete: isAiProcessed // 標記處理是否完成
         }
       };
     } catch (error) {
@@ -311,6 +319,25 @@ export async function POST(request: Request) {
     if (scrapedData.metadata.markdownKey) {
       console.log('使用已處理內容進入AI處理階段，markdownKey:', scrapedData.metadata.markdownKey);
       
+      // 檢查是否已經完成處理了
+      if (scrapedData.metadata.processingComplete) {
+        console.log('內容已完成全部處理，直接返回結果');
+        return NextResponse.json({
+          success: true,
+          urlId,
+          markdownKey: scrapedData.metadata.markdownKey,
+          publicUrl: scrapedData.metadata.publicUrl,
+          status: 'processed-by-ai',
+          metadata: {
+            title: scrapedData.title,
+            language: scrapedData.metadata.language,
+            wordCount: scrapedData.metadata.wordCount,
+            imageCount: 0,
+            processingComplete: true
+          }
+        });
+      }
+      
       try {
         // 調用AI處理API
         const aiResponse = await fetch(new URL('/api/process-openai', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').toString(), {
@@ -343,7 +370,8 @@ export async function POST(request: Request) {
             title: scrapedData.title,
             language: scrapedData.metadata.language,
             wordCount: scrapedData.metadata.wordCount,
-            imageCount: 0
+            imageCount: 0,
+            processingComplete: true
           }
         });
       } catch (aiError) {
@@ -364,7 +392,8 @@ export async function POST(request: Request) {
             title: scrapedData.title,
             language: scrapedData.metadata.language,
             wordCount: scrapedData.metadata.wordCount,
-            imageCount: 0
+            imageCount: 0,
+            processingComplete: false
           }
         });
       }
