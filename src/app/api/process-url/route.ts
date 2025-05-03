@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getApiUrl } from '@/services/utils/apiHelpers';
 
 // 定義類型
 interface ScrapedImage {
@@ -68,8 +69,8 @@ async function scrapeWithFireScrawl(url: string, type: string, metadata?: Record
         throw new Error('缺少URL ID參數');
       }
       
-      // 調用API - 使用絕對URL
-      const apiUrl = new URL('/api/processors/process-gdocs', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').toString();
+      // 調用API - 使用apiHelpers獲取正確URL
+      const apiUrl = getApiUrl('/api/processors/process-gdocs');
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -340,7 +341,7 @@ export async function POST(request: Request) {
       
       try {
         // 調用AI處理API
-        const aiResponse = await fetch(new URL('/api/process-openai', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').toString(), {
+        const aiResponse = await fetch(getApiUrl('/api/process-openai'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -420,7 +421,7 @@ export async function POST(request: Request) {
     
     try {
       // 調用AI處理API
-      const aiResponse = await fetch(new URL('/api/process-openai', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').toString(), {
+      const aiResponse = await fetch(getApiUrl('/api/process-openai'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -32,11 +32,16 @@ export function getBaseUrl() {
  * @returns 完整的API URL
  */
 export function getApiUrl(path: string): string {
-  // 優先使用環境變數中的基礎URL
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
-  
   // 確保路徑以/開頭
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  
+  // 在Vercel環境中，優先使用相對路徑，避免localhost問題
+  if (process.env.VERCEL) {
+    return normalizedPath;
+  }
+  
+  // 優先使用環境變數中的基礎URL（與原邏輯保持一致）
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   
   // 返回完整URL
   return `${baseUrl}${normalizedPath}`;
