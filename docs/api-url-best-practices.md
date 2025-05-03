@@ -2,117 +2,192 @@
 
 ## 問題背景
 
-在部署到 Vercel 等雲平台時，我們發現了一個常見問題：某些 API 調用在本地環境運行正常，但在生產環境會出現以下錯誤：
+在構建同時支持前端和後端API調用的Next.js應用時，我們經常遇到API URL構建相關的問題。特別是在以下情況下:
+
+1. 後端API路由之間的調用 (如`/api/route-a`調用`/api/route-b`)
+2. 部署到Vercel等雲平台時的服務器端代碼
+3. 在不同環境(開發、生產)中保持一致的行為
+
+最常見的錯誤是在**服務器端**使用相對路徑進行API調用，這會導致錯誤：
 
 ```
-Error: connect ECONNREFUSED 127.0.0.1:3000
-```
-
-這是因為代碼中使用了不適合生產環境的 URL 構建方式，試圖連接到 `localhost:3000`，而這在雲環境中是不可用的。
-
-## 錯誤的做法
-
-以下是不應該使用的 URL 構建方法：
-
-```typescript
-// ❌ 不要這樣做！
-const apiUrl = new URL('/api/some-endpoint', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').toString();
-const response = await fetch(apiUrl, {...});
-```
-
-問題在於：
-1. 當 `NEXT_PUBLIC_APP_URL` 環境變量未設置時，默認使用 `http://localhost:3000`
-2. 在雲環境（如 Vercel）中，這會導致 API 請求嘗試連接不存在的本地服務器
-3. 結果是出現 `ECONNREFUSED` 錯誤
-
-## 正確的做法
-
-我們已在專案中實現了統一的 API URL 構建方法：
-
-```typescript
-// ✅ 正確的做法
-import { getApiUrl } from '@/services/utils/apiHelpers';
-
-const apiUrl = getApiUrl('/api/some-endpoint');
-const response = await fetch(apiUrl, {...});
-```
-
-`getApiUrl` 函數會根據運行環境自動選擇正確的基礎 URL：
-- 在 Vercel 等雲環境中，會使用 Vercel 提供的域名構建完整 URL（例如 `https://your-project.vercel.app/api/endpoint`）
-- 在本地開發環境中，會使用 localhost 作為基礎 URL（例如 `http://localhost:3000/api/endpoint`）
-
-### getApiUrl 實現細節
-
-```typescript
-export function getApiUrl(path: string): string {
-  // 確保路徑以/開頭
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  
-  // 在Vercel環境中使用Vercel URL
-  if (process.env.VERCEL) {
-    // 使用VERCEL_URL環境變量構建完整URL
-    const vercelUrl = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_VERCEL_URL;
-    if (vercelUrl) {
-      return `https://${vercelUrl}${normalizedPath}`;
-    }
-    
-    // 如果沒有VERCEL_URL，則使用NEXT_PUBLIC_APP_URL
-    if (process.env.NEXT_PUBLIC_APP_URL) {
-      return `${process.env.NEXT_PUBLIC_APP_URL}${normalizedPath}`;
-    }
-  }
-  
-  // 優先使用環境變數中的基礎URL
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                 (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
-  
-  // 返回完整URL
-  return `${baseUrl}${normalizedPath}`;
+TypeError: Failed to parse URL from /api/endpoint
+[cause]: [TypeError: Invalid URL] {
+  code: 'ERR_INVALID_URL',
+  input: '/api/endpoint'
 }
 ```
 
-這個實現確保了 API URL 在不同環境中的正確構建：
-1. 在 Vercel 環境中，使用 Vercel 提供的域名構建完整 URL，避免使用 localhost
-2. 在其他環境中，會根據環境變量或瀏覽器 origin 構建完整 URL
-3. 保證在服務器端和客戶端代碼中都能正確處理 API 請求
+## 正確的解決方案
 
-## 實施規則
+我們項目中實現了一套完整的API URL處理方案，核心是兩個關鍵函數：`getBaseUrl()`和`getApiUrl()`。
 
-1. **始終使用 `getApiUrl`**：對於所有 API 請求，無論是相對路徑還是絕對路徑，都應使用 `getApiUrl` 函數
+### 函數實現
 
-2. **確保導入正確**：
+```typescript
+/**
+ * 获取API基础URL
+ */
+export function getBaseUrl() {
+  // 优先使用自定义API基础URL
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  
+  // 其次使用Vercel自动分配的URL
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // 本地开发环境 - 使用相对URL
+  if (process.env.NODE_ENV === 'development') {
+    return ''; // 返回空字符串，这会使fetch使用相对URL
+  }
+  
+  // 兜底方案
+  return 'http://localhost:3000';
+}
+
+/**
+ * 构建完整的API URL
+ */
+export function getApiUrl(path: string): string {
+  const baseUrl = getBaseUrl();
+  
+  // 确保path以/开头
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  
+  // 确保在服务器端API路由中总是使用完整URL
+  if (typeof window === 'undefined') {
+    // 服务器端 - 总是使用完整URL
+    if (baseUrl) {
+      // 确保baseUrl包含协议前缀
+      const urlWithProtocol = baseUrl.startsWith('http') 
+        ? baseUrl 
+        : `https://${baseUrl}`;
+      
+      return `${urlWithProtocol}${normalizedPath}`;
+    }
+    return `http://localhost:3000${normalizedPath}`;
+  }
+  
+  // 客户端 - 可以使用相对URL
+  return baseUrl ? (baseUrl.startsWith('http') ? `${baseUrl}${normalizedPath}` : `https://${baseUrl}${normalizedPath}`) : normalizedPath;
+}
+```
+
+### 關鍵設計原則
+
+1. **區分服務器端和客戶端環境**
+   - 服務器端(`typeof window === 'undefined'`)：必須使用完整URL，包含域名和協議
+   - 客戶端：可以使用相對URL，瀏覽器會基於當前域名解析
+
+2. **優先級順序處理基礎URL**
+   - 優先使用環境變量(`NEXT_PUBLIC_API_BASE_URL`)設置的自定義URL
+   - 其次使用Vercel提供的自動部署URL(`VERCEL_URL`)
+   - 在開發環境可以使用相對URL，讓瀏覽器自動處理
+   - 最後才使用本地開發服務器地址(`http://localhost:3000`)作為兜底
+
+3. **確保URL格式正確**
+   - 路徑始終以`/`開頭
+   - 域名部分確保包含協議前綴(`http://`或`https://`)
+
+## 常見錯誤及避坑指南
+
+### 錯誤1：在服務器端使用相對URL
+
+```typescript
+// ❌ 錯誤示例：在服務器端API路由中使用相對路徑
+async function serverSideFunction() {
+  const response = await fetch('/api/some-endpoint'); // 在服務器端會失敗!
+}
+```
+
+**解決方法**：在服務器端始終使用完整URL
+
+```typescript
+// ✅ 正確做法
+import { getApiUrl } from '@/services/utils/apiHelpers';
+
+async function serverSideFunction() {
+  const response = await fetch(getApiUrl('/api/some-endpoint'));
+}
+```
+
+### 錯誤2：硬編碼localhost地址
+
+```typescript
+// ❌ 錯誤示例：直接使用localhost地址
+const response = await fetch('http://localhost:3000/api/endpoint');
+```
+
+這在本地開發可能工作，但部署到生產環境後將失敗。
+
+**解決方法**：使用`getApiUrl`函數，它會根據環境選擇正確的基礎URL。
+
+### 錯誤3：誤用環境變量
+
+```typescript
+// ❌ 錯誤示例：直接依賴環境變量，沒有適當的後備方案
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const response = await fetch(`${baseUrl}/api/endpoint`);
+```
+
+**解決方法**：使用`getBaseUrl`函數，它實現了完整的環境檢測和後備邏輯。
+
+### 錯誤4：忽略服務器端/客戶端差異
+
+```typescript
+// ❌ 錯誤示例：不區分服務器端和客戶端環境
+function getUrl(path) {
+  return `/api/${path}`; // 在服務器端會失敗，缺少完整URL
+}
+```
+
+**解決方法**：明確區分服務器端和客戶端環境的處理邏輯：
+
+```typescript
+// ✅ 正確做法
+function getUrl(path) {
+  const isServer = typeof window === 'undefined';
+  if (isServer) {
+    return `https://your-domain.com/api/${path}`;
+  }
+  return `/api/${path}`;
+}
+```
+
+## 實施指南
+
+在整個專案中，應遵循以下規則：
+
+1. **始終使用`getApiUrl`**：對於任何API請求，統一使用`getApiUrl`函數構建URL
+
    ```typescript
    import { getApiUrl } from '@/services/utils/apiHelpers';
+   
+   // 前端頁面
+   const response = await fetch(getApiUrl('/api/data'));
+   
+   // API路由中
+   const internalResponse = await fetch(getApiUrl('/api/another-route'));
    ```
 
-3. **路徑格式**：傳給 `getApiUrl` 的路徑應該以 `/` 開頭，例如 `/api/some-endpoint`
+2. **設置正確的環境變量**：
+   - 開發環境：可以不設置，默認會正確處理
+   - 生產環境：如需自定義域名，設置`NEXT_PUBLIC_API_BASE_URL`環境變量
 
-4. **避免手動構建**：不要直接使用 `new URL()` 或字符串拼接來構建 API URL
+3. **避免手動構建URL**：不要使用`new URL()`、模板字符串或字符串拼接來構建API URL
 
-## 常見問題
+## 經驗教訓總結
 
-### 在開發環境和生產環境的行為不同
+1. **環境差異至關重要**：服務器端和客戶端在URL處理上有根本差異，服務器端需要完整URL
+2. **不要假設環境變量存在**：總是提供合理的後備值，尤其是在不同的部署環境中
+3. **避免過度簡化**：URL構建邏輯比看起來複雜，依賴工具函數而非自行處理
+4. **統一標準很重要**：整個專案統一使用相同的URL構建方法，避免不一致
+5. **徹底測試不同環境**：開發環境可能工作良好，但生產環境可能失敗，需要在實際部署環境中測試
 
-API URL 在不同環境中的構建方式：
-
-- **開發環境**：`getApiUrl('/api/example')` → `http://localhost:3000/api/example`
-- **生產環境**：`getApiUrl('/api/example')` → `/api/example` 或 `https://your-domain.com/api/example`
-
-### 環境變量設置
-
-為確保 URL 構建在所有環境中正常工作：
-
-1. **本地開發**：在 `.env.local` 中設置 `NEXT_PUBLIC_APP_URL=http://localhost:3000`
-
-2. **Vercel 生產環境**：通常不需要額外設置，因為 Vercel 會自動提供 `VERCEL_URL` 環境變量
-   - 如果需要自定義域名，可以在 Vercel 項目設置中添加: `NEXT_PUBLIC_APP_URL=https://your-custom-domain.com`
-   
-> **注意**：`VERCEL_URL` 是 Vercel 環境中的保留變量，會自動設置為您的部署 URL。我們的 `getApiUrl` 函數會優先使用這個變量來構建 API URL。
-
-## 注意事項
-
-- API 路由之間的調用不應依賴於絕對 URL，應優先考慮直接導入和調用函數
-- 僅在無法直接導入時才使用 `fetch` 和 API URL
+通過遵循這些最佳實踐，可以避免在不同環境中遇到API URL相關的問題，確保應用在本地開發和生產部署中都能正常工作。
 
 ## 文檔修訂
 
