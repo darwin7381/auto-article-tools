@@ -251,7 +251,7 @@ export default function FileUploadSection() {
     }
   };
 
-  // 處理連結提交
+  // 修改處理連結提交的方法
   const handleLinkSubmit = async () => {
     if (!linkUrl || !validateUrl(linkUrl)) {
       setUrlError('請輸入有效的URL');
@@ -263,7 +263,7 @@ export default function FileUploadSection() {
     setProcessSuccess(false); // 重置處理成功狀態
     setMarkdownUrl(null); // 重置Markdown URL
     
-    // 用於存儲interval引用，以便後續清除
+    // 用於存儲interval引用，以便後續清除 - 保留這些變量但將使用不同邏輯
     let extractInterval: NodeJS.Timeout | null = null;
     let aiInterval: NodeJS.Timeout | null = null;
     
@@ -271,7 +271,7 @@ export default function FileUploadSection() {
       // 初始化URL處理進度
       startUrlProcessing(linkUrl, linkType);
       
-      // 第一階段：URL 解析/上傳 (0-25%)
+      // 第一階段：URL 解析/上傳
       updateStageProgress('upload', 30, '正在處理URL...');
       
       const response = await fetch('/api/parse-url', {
@@ -294,17 +294,22 @@ export default function FileUploadSection() {
       setUploadSuccess(true);
       
       // 完成第一階段：URL 解析/上傳
+      updateStageProgress('upload', 100, 'URL解析完成');
       completeStage('upload', 'URL解析完成');
       moveToNextStage();
       
-      // 第二階段：內容提取 (25-50%)，開始顯示
+      // 第二階段：內容提取 - 顯示進度動畫
       updateStageProgress('extract', 30, '正在提取網頁內容...');
       
-      // 對於Google Docs，使用不同的顯示策略
-      const isGoogleDocs = linkType === 'gdocs';
+      // 保留進度動畫，但不再基於預設時間切換階段
+      let extractProgress = 30;
+      extractInterval = setInterval(() => {
+        extractProgress = Math.min(extractProgress + 10, 90);
+        updateStageProgress('extract', extractProgress, '正在提取網頁內容...');
+      }, 800);
       
-      // 這是API調用的Promise，但我們不立即等待它
-      const processPromise = fetch('/api/process-url', {
+      // 調用內容提取API - 已不包含AI處理流程
+      const processResponse = await fetch('/api/process-url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -314,121 +319,97 @@ export default function FileUploadSection() {
         }),
       });
       
-      // 提前顯示提取進度 - 模擬進度遞增
-      let extractProgress = 30;
-      extractInterval = setInterval(() => {
-        extractProgress = Math.min(extractProgress + 10, 90);
-        updateStageProgress('extract', extractProgress, '正在提取網頁內容...');
-        
-        // Google Docs處理通常較快進入AI階段
-        if (isGoogleDocs && extractProgress >= 70) {
-          if (extractInterval) clearInterval(extractInterval);
-          extractInterval = null;
-          
-          // 完成提取階段，進入AI處理階段
-          updateStageProgress('extract', 100, '網頁內容提取完成');
-          completeStage('extract', '網頁內容提取完成');
-          moveToNextStage();
-          
-          // 立即開始顯示AI處理階段
-          aiInterval = startAiProcessingDisplay();
-        }
-      }, isGoogleDocs ? 400 : 800); // Google Docs處理更快
+      // 清理提取進度interval
+      if (extractInterval) clearInterval(extractInterval);
+      extractInterval = null;
       
-      // 如果不是Google Docs，等待更長時間後顯示完成提取
-      if (!isGoogleDocs) {
-        setTimeout(() => {
-          if (extractInterval) clearInterval(extractInterval);
-          extractInterval = null;
-          
-          updateStageProgress('extract', 100, '網頁內容提取完成');
-          completeStage('extract', '網頁內容提取完成');
-          moveToNextStage();
-          
-          // 開始AI處理階段顯示
-          aiInterval = startAiProcessingDisplay();
-        }, 2500);
+      if (!processResponse.ok) {
+        const errorData = await processResponse.json();
+        throw new Error(errorData.error || '內容提取失敗');
       }
       
-      // AI處理階段顯示函數
-      const startAiProcessingDisplay = (): NodeJS.Timeout => {
-        let aiProgress = 30;
-        const interval = setInterval(() => {
-          aiProgress = Math.min(aiProgress + 5, 95);
-          const message = aiProgress < 30 ? '開始AI處理內容...' : 
-                         aiProgress < 60 ? 'AI正在處理文本內容...' : 
-                         'AI處理接近完成...';
-          updateStageProgress('process', aiProgress, message);
-        }, 500);
-        
-        // 返回interval引用以便後續清除
-        return interval;
-      };
+      const extractResult = await processResponse.json();
+      console.log('URL內容提取結果:', extractResult);
       
-      // 等待實際處理結果
+      // 完成提取階段
+      updateStageProgress('extract', 100, '網頁內容提取完成');
+      completeStage('extract', '網頁內容提取完成');
+      moveToNextStage();
+      
+      // 第三階段：AI處理 - 與文件上傳流程一致
+      updateStageProgress('process', 10, '開始AI處理...');
+      
+      // 顯示AI處理進度
+      let aiProgress = 10;
+      aiInterval = setInterval(() => {
+        aiProgress = Math.min(aiProgress + 5, 90);
+        updateStageProgress('process', aiProgress, 'AI內容處理中...');
+      }, 500);
+      
+      // 調用AI處理API
       try {
-        const processResponse = await processPromise;
+        const aiResponse = await fetch('/api/process-openai', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            markdownKey: extractResult.markdownKey,
+            fileId: data.urlId
+          }),
+        });
         
-        if (!processResponse.ok) {
-          const errorData = await processResponse.json();
-          throw new Error(errorData.error || '提取內容失敗');
-        }
-        
-        const processResult = await processResponse.json();
-        console.log('URL處理結果:', processResult);
-        
-        // 清除所有可能的進度顯示interval
-        if (extractInterval) clearInterval(extractInterval);
-        extractInterval = null;
-        
+        // 清理AI進度interval
         if (aiInterval) clearInterval(aiInterval);
         aiInterval = null;
         
-        // 確保提取階段已完成
-        updateStageProgress('extract', 100, '網頁內容提取完成');
-        completeStage('extract', '網頁內容提取完成');
-        
-        // 確保已進入AI處理階段
-        if (processState?.currentStage !== 'process') {
-          moveToNextStage();
+        if (!aiResponse.ok) {
+          const errorData = await aiResponse.json();
+          throw new Error(errorData.error || 'AI處理失敗');
         }
         
+        const aiResult = await aiResponse.json();
+        console.log('AI處理結果:', aiResult);
+        
         // 完成AI處理階段
-        updateStageProgress('process', 100, 'AI內容處理完成');
-        completeStage('process', 'AI內容處理完成');
+        updateStageProgress('process', 100, 'AI處理完成');
+        completeStage('process', 'AI處理完成');
         moveToNextStage();
         
         // 完成最終階段
-        updateStageProgress('complete', 100, '所有處理完成');
-        completeStage('complete', '所有處理完成');
+        completeStage('complete', '處理全部完成');
         
-        // 判斷處理是否成功，設置對應的URL
-        const hasResult = !!(processResult.publicUrl || processResult.markdownKey);
+        // 設置處理成功和查看連結
+        setProcessSuccess(true);
         
-        // 設置處理成功和查看鏈接
-        if (hasResult) {
-          if (processResult.publicUrl) {
-            setMarkdownUrl(`/viewer/${encodeURIComponent(processResult.publicUrl)}`);
-          } else if (processResult.markdownKey) {
-            const key = processResult.markdownKey.split('/').pop() || '';
-            setMarkdownUrl(`/viewer/processed/${key}`);
-          }
-          
-          setProcessSuccess(true);
-        } else {
-          console.error('處理結果中缺少必要的Markdown資訊:', processResult);
-          setStageError('complete', '處理完成但缺少Markdown資訊');
+        // 使用公開的URL或Key作為查看路徑
+        if (aiResult.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(aiResult.publicUrl)}`);
+        } else if (aiResult.markdownKey) {
+          const key = aiResult.markdownKey.split('/').pop() || '';
+          setMarkdownUrl(`/viewer/processed/${key}`);
+        } else if (extractResult.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
         }
+      } catch (aiError) {
+        console.error('AI處理階段出錯:', aiError);
         
-      } catch (processError) {
-        // 清除所有可能的interval
-        if (extractInterval) clearInterval(extractInterval);
+        // 清理可能存在的計時器
         if (aiInterval) clearInterval(aiInterval);
         
-        console.error('URL提取錯誤:', processError);
-        setStageError('extract', processError instanceof Error ? processError.message : 'URL提取失敗');
+        // 設置處理錯誤
+        setStageError('process', aiError instanceof Error ? aiError.message : 'AI處理失敗');
+        
+        // 但仍然可以顯示提取的結果
+        setProcessSuccess(true);
+        
+        if (extractResult.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
+        } else if (extractResult.markdownKey) {
+          const key = extractResult.markdownKey.split('/').pop() || '';
+          setMarkdownUrl(`/viewer/processed/${key}`);
+        }
       }
-      
     } catch (error) {
       // 清除所有可能的interval
       if (extractInterval) clearInterval(extractInterval);
@@ -437,7 +418,10 @@ export default function FileUploadSection() {
       console.error('連結處理錯誤:', error);
       setUploadError(error instanceof Error ? error.message : '連結處理失敗，請稍後再試');
       setUploadSuccess(false);
-      setStageError('upload', error instanceof Error ? error.message : '連結處理失敗，請稍後再試');
+      
+      // 根據當前階段設置錯誤
+      const currentStage = processState?.currentStage || 'upload';
+      setStageError(currentStage, error instanceof Error ? error.message : '處理失敗，請稍後再試');
     } finally {
       setIsUploading(false);
     }

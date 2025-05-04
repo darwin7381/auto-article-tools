@@ -286,6 +286,7 @@ async function saveMarkdownToR2(content: string, urlId: string): Promise<string>
   return key;
 }
 
+// 核心修改：不再自動調用AI處理，只負責內容提取
 export async function POST(request: Request) {
   try {
     const { urlId } = await request.json();
@@ -316,88 +317,27 @@ export async function POST(request: Request) {
     // 使用FireScrawl或專門API爬取內容
     const scrapedData = await scrapeWithFireScrawl(urlInfo.url, urlInfo.type, metadata);
     
-    // 如果是Google Docs等已經處理過的內容，使用處理結果直接進入AI處理階段
+    // 如果是Google Docs等已經處理過的內容，直接返回提取結果，不再自動調用AI處理
     if (scrapedData.metadata.markdownKey) {
-      console.log('使用已處理內容進入AI處理階段，markdownKey:', scrapedData.metadata.markdownKey);
+      console.log('提取內容完成，返回markdownKey:', scrapedData.metadata.markdownKey);
       
-      // 檢查是否已經完成處理了
-      if (scrapedData.metadata.processingComplete) {
-        console.log('內容已完成全部處理，直接返回結果');
-        return NextResponse.json({
-          success: true,
-          urlId,
-          markdownKey: scrapedData.metadata.markdownKey,
-          publicUrl: scrapedData.metadata.publicUrl,
-          status: 'processed-by-ai',
-          metadata: {
-            title: scrapedData.title,
-            language: scrapedData.metadata.language,
-            wordCount: scrapedData.metadata.wordCount,
-            imageCount: 0,
-            processingComplete: true
-          }
-        });
-      }
-      
-      try {
-        // 調用AI處理API
-        const aiResponse = await fetch(getApiUrl('/api/process-openai'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            markdownKey: scrapedData.metadata.markdownKey,
-            fileId: urlId
-          }),
-        });
-        
-        if (!aiResponse.ok) {
-          console.error('AI處理失敗:', await aiResponse.text());
-          throw new Error('AI處理失敗');
+      // 不再檢查是否已經完成AI處理，而是統一返回內容提取完成的狀態
+      return NextResponse.json({
+        success: true,
+        urlId,
+        markdownKey: scrapedData.metadata.markdownKey,
+        publicUrl: scrapedData.metadata.publicUrl,
+        status: 'content-extracted',
+        stage: 'extract',
+        stageComplete: true,
+        metadata: {
+          title: scrapedData.title,
+          language: scrapedData.metadata.language,
+          wordCount: scrapedData.metadata.wordCount,
+          imageCount: 0,
+          processingComplete: false // 標記整體流程未完成
         }
-        
-        const aiResult = await aiResponse.json();
-        console.log('AI處理成功:', aiResult);
-        
-        // 返回結果，包含AI處理的信息
-        return NextResponse.json({
-          success: true,
-          urlId,
-          markdownKey: aiResult.markdownKey || scrapedData.metadata.markdownKey,
-          publicUrl: aiResult.publicUrl || scrapedData.metadata.publicUrl,
-          status: 'processed-by-ai',
-          metadata: {
-            title: scrapedData.title,
-            language: scrapedData.metadata.language,
-            wordCount: scrapedData.metadata.wordCount,
-            imageCount: 0,
-            processingComplete: true
-          }
-        });
-      } catch (aiError) {
-        console.error('AI處理階段出錯:', aiError);
-        
-        // 如果有標記某些處理已完成，返回相應的狀態
-        const processingStatus = scrapedData.metadata.processingStatus || 'content-extracted';
-        
-        // 即使AI處理失敗，仍返回基本處理結果
-        return NextResponse.json({
-          success: true,
-          urlId,
-          markdownKey: scrapedData.metadata.markdownKey,
-          publicUrl: scrapedData.metadata.publicUrl,
-          status: processingStatus, // 使用processingStatus
-          error: 'AI處理失敗，但基本內容已提取',
-          metadata: {
-            title: scrapedData.title,
-            language: scrapedData.metadata.language,
-            wordCount: scrapedData.metadata.wordCount,
-            imageCount: 0,
-            processingComplete: false
-          }
-        });
-      }
+      });
     }
     
     // 處理爬取的圖片（上傳到R2）
@@ -419,60 +359,23 @@ export async function POST(request: Request) {
     const baseUrl = process.env.R2_PUBLIC_URL || '';
     const publicUrl = baseUrl ? `${baseUrl}/${markdownKey}` : markdownKey;
     
-    try {
-      // 調用AI處理API
-      const aiResponse = await fetch(getApiUrl('/api/process-openai'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          markdownKey: markdownKey,
-          fileId: urlId
-        }),
-      });
-      
-      if (!aiResponse.ok) {
-        console.error('AI處理失敗:', await aiResponse.text());
-        throw new Error('AI處理失敗');
+    // 不再自動調用AI處理API，只返回內容提取結果
+    return NextResponse.json({
+      success: true,
+      urlId,
+      markdownKey: markdownKey,
+      publicUrl: publicUrl,
+      status: 'content-extracted',
+      stage: 'extract',  // 標記為提取階段
+      stageComplete: true, // 標記階段已完成
+      metadata: {
+        title: scrapedData.title,
+        language: scrapedData.metadata.language,
+        wordCount: scrapedData.metadata.wordCount,
+        imageCount: processedImages.length,
+        processingComplete: false // 標記整體流程未完成
       }
-      
-      const aiResult = await aiResponse.json();
-      console.log('AI處理成功:', aiResult);
-      
-      // 返回結果，包含AI處理的信息
-      return NextResponse.json({
-        success: true,
-        urlId,
-        markdownKey: aiResult.markdownKey || markdownKey,
-        publicUrl: aiResult.publicUrl || publicUrl,
-        status: 'processed-by-ai',
-        metadata: {
-          title: scrapedData.title,
-          language: scrapedData.metadata.language,
-          wordCount: scrapedData.metadata.wordCount,
-          imageCount: processedImages.length
-        }
-      });
-    } catch (aiError) {
-      console.error('AI處理階段出錯:', aiError);
-      
-      // 即使AI處理失敗，仍返回基本處理結果
-      return NextResponse.json({
-        success: true,
-        urlId,
-        markdownKey: markdownKey,
-        publicUrl: publicUrl,
-        status: 'content-extracted', // 只完成了提取，未完成AI處理
-        error: 'AI處理失敗，但基本內容已提取',
-        metadata: {
-          title: scrapedData.title,
-          language: scrapedData.metadata.language,
-          wordCount: scrapedData.metadata.wordCount,
-          imageCount: processedImages.length
-        }
-      });
-    }
+    });
   } catch (error) {
     console.error('URL處理錯誤:', error);
     return NextResponse.json(

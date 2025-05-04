@@ -128,6 +128,8 @@ export async function POST(request: Request) {
       documentId,
       ...processResult,
       status: processResult.status || 'content-extracted',
+      stage: 'extract',
+      stageComplete: true,
       title: `Google Docs: ${documentId}`,
     }, {
       headers: {
