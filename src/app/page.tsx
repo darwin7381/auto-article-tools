@@ -1,5 +1,5 @@
-import FileUploadSection from "../components/FileUploadSection";
-import ProgressSection from "../components/ProgressSection";
+import { FileUploadSection } from "../components/ui/sections/FileUploadSection";
+import { ProgressSection } from "../components/ui/sections/ProgressSection";
 import PreviewSection from "../components/PreviewSection";
 import WordPressSection from "../components/WordPressSection";
 import FeaturesSection from "../components/FeaturesSection";
