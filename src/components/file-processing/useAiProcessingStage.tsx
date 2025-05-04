@@ -61,12 +61,18 @@ export default function useAiProcessingStage(
     // 開始AI處理階段
     updateStageProgress('process', 10, '開始AI處理...');
     
-    // 顯示AI處理進度
-    let aiProgress = 10;
+    // 給API調用預估一個合理的時間 (例如15秒)
+    const estimatedTime = 15000; // 15秒
+    const startTime = Date.now();
+    const interval = 200; // 每200ms更新一次
+    
+    // 使用更少次數的更新
     aiIntervalRef.current = setInterval(() => {
-      aiProgress = Math.min(aiProgress + 5, 90);
-      updateStageProgress('process', aiProgress, 'AI內容處理中...');
-    }, 500);
+      const elapsed = Date.now() - startTime;
+      // 基於經過時間計算進度，最高到90%
+      const progress = 10 + Math.min(80 * (elapsed / estimatedTime), 80);
+      updateStageProgress('process', progress, 'AI內容處理中...');
+    }, interval);
     
     try {
       // 調用AI處理API
