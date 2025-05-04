@@ -7,10 +7,8 @@ import { Button } from '@heroui/react';
 import { Tabs, Tab } from '@heroui/react';
 import { useProcessing } from '@/context/ProcessingContext';
 
-// 導入自定義hooks
-import useUploadStage from './file-processing/useUploadStage';
-import useExtractStage, { ExtractResult } from './file-processing/useExtractStage';
-import useAiProcessingStage, { ProcessingResult } from './file-processing/useAiProcessingStage';
+// 導入統一處理流程管理器
+import useProcessingFlow, { ExtractResult, ProcessingResult } from './file-processing/useProcessingFlow';
 
 export default function FileUploadSection() {
   const { setStageError, processState } = useProcessing();
@@ -28,126 +26,61 @@ export default function FileUploadSection() {
   const [markdownUrl, setMarkdownUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // 階段處理數據
-  const [uploadData, setUploadData] = useState<{
-    fileUrl?: string;
-    fileType?: string;
-    fileId?: string;
-    urlId?: string;
-  }>({});
+  // 階段處理結果回調
+  const handleProcessSuccess = (result: ProcessingResult) => {
+    setProcessSuccess(true);
+    
+    // 使用公開URL作為查看路徑
+    if (result.publicUrl) {
+      setMarkdownUrl(`/viewer/${encodeURIComponent(result.publicUrl)}`);
+    } else if (result.markdownKey) {
+      const key = result.markdownKey.split('/').pop() || '';
+      setMarkdownUrl(`/viewer/processed/${key}`);
+    }
+  };
   
-  const [extractResult, setExtractResult] = useState<ExtractResult | null>(null);
+  const handleProcessError = (error: string, stage: string) => {
+    console.error(`${stage}階段處理錯誤:`, error);
+    setUploadError(error);
+    
+    // 如果是AI處理階段錯誤，仍然標記為部分成功
+    if (stage === 'process') {
+      setProcessSuccess(true);
+    }
+  };
   
-  // 定時器清理引用
-  const extractCleanupRef = useRef<(() => void) | null>(null);
-  const aiCleanupRef = useRef<(() => void) | null>(null);
+  const handleStageComplete = (stage: string, result: ExtractResult | Record<string, unknown>) => {
+    console.log(`${stage}階段完成:`, result);
+    
+    // 如果是extract階段，且處理AI階段失敗，使用extract結果作為fallback
+    if (stage === 'extract' && 'publicUrl' in result) {
+      const extractResult = result as ExtractResult;
+      if (extractResult.publicUrl) {
+        setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
+      } else if (extractResult.markdownKey) {
+        const key = extractResult.markdownKey.split('/').pop() || '';
+        setMarkdownUrl(`/viewer/processed/${key}`);
+      }
+    }
+  };
+  
+  // 初始化統一處理流程管理器
+  const processingFlow = useProcessingFlow({
+    onProcessSuccess: handleProcessSuccess,
+    onProcessError: handleProcessError,
+    onStageComplete: handleStageComplete,
+    setIsProcessing,
+    setUploadSuccess,
+    setUploadError,
+    setIsUploading
+  });
   
   // 清理資源
   useEffect(() => {
     return () => {
-      if (extractCleanupRef.current) extractCleanupRef.current();
-      if (aiCleanupRef.current) aiCleanupRef.current();
+      processingFlow.cleanup();
     };
-  }, []);
-
-  // 初始化上傳階段Hook
-  const uploadStage = useUploadStage(
-    {
-      selectedFile,
-      linkUrl,
-      linkType,
-      inputType: selectedTab === 'file' ? 'file' : 'url',
-    },
-    {
-      setUploadSuccess,
-      setUploadError,
-      setIsUploading,
-      onFileUploadComplete: (fileUrl, fileType, fileId) => {
-        setUploadData({ fileUrl, fileType, fileId });
-      },
-      onUrlProcessComplete: (urlId) => {
-        setUploadData({ urlId });
-      }
-    }
-  );
-
-  // 初始化提取階段Hook (當uploadData變化時)
-  const extractStage = useExtractStage(
-    {
-      fileUrl: uploadData.fileUrl,
-      fileType: uploadData.fileType,
-      fileId: uploadData.fileId,
-      urlId: uploadData.urlId,
-      inputType: uploadData.fileUrl ? 'file' : 'url',
-    },
-    {
-      onExtractComplete: (result) => {
-        setExtractResult(result);
-      },
-      onError: (error) => {
-        setUploadError(error);
-      }
-    }
-  );
-  
-  // 保存提取階段清理函數
-  useEffect(() => {
-    extractCleanupRef.current = extractStage.cleanup;
-  }, [extractStage]);
-  
-  // 自動啟動提取階段 (當uploadData變化時)
-  useEffect(() => {
-    if (uploadData && Object.keys(uploadData).length > 0) {
-      extractStage.startExtraction();
-    }
-  }, [uploadData]);
-
-  // 初始化AI處理階段Hook (當extractResult變化時)
-  const aiProcessingStage = useAiProcessingStage(
-    {
-      extractResult: extractResult || {} as ExtractResult,
-    },
-    {
-      onProcessComplete: (result) => {
-        setProcessSuccess(true);
-        
-        // 使用公開URL作為查看路徑
-        if (result.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(result.publicUrl)}`);
-        } else if (result.markdownKey) {
-          const key = result.markdownKey.split('/').pop() || '';
-          setMarkdownUrl(`/viewer/processed/${key}`);
-        }
-      },
-      onProcessError: (error, originalExtractResult) => {
-        console.error('AI處理階段出錯:', error);
-        
-        // 設置處理錯誤，但仍然顯示提取結果
-        setStageError('process', error);
-        setProcessSuccess(true);
-        
-        // 使用原始提取結果作為回退
-        if (originalExtractResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(originalExtractResult.publicUrl)}`);
-        } else if (originalExtractResult.markdownKey) {
-          const key = originalExtractResult.markdownKey.split('/').pop() || '';
-          setMarkdownUrl(`/viewer/processed/${key}`);
-        }
-      }
-    }
-  );
-  
-  // 保存AI處理階段清理函數
-  useEffect(() => {
-    aiCleanupRef.current = aiProcessingStage.cleanup;
-  }, [aiProcessingStage]);
-  
-  // 自動啟動AI處理階段 (當extractResult變化時)
-  useEffect(() => {
-    if (extractResult) {
-      aiProcessingStage.startAiProcessing();
-    }
-  }, [extractResult]);
+  }, [processingFlow]);
 
   // 處理文件表單提交
   const handleUpload = async (): Promise<void> => {
@@ -157,11 +90,17 @@ export default function FileUploadSection() {
     setUploadError(null);
     setProcessSuccess(false);
     setMarkdownUrl(null);
-    setIsProcessing(true);
     
     try {
-      // 開始上傳階段處理
-      await uploadStage.startProcessing();
+      if (selectedTab === 'file' && selectedFile) {
+        // 使用統一流程處理文件
+        await processingFlow.processFile(selectedFile);
+      } else if (selectedTab === 'link' && linkUrl) {
+        // 使用統一流程處理URL
+        await processingFlow.processUrl(linkUrl, linkType);
+      } else {
+        setUploadError(selectedTab === 'file' ? '請選擇要上傳的文件' : '請輸入有效的連結');
+      }
     } catch (error) {
       console.error('處理錯誤:', error);
       setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
@@ -169,8 +108,6 @@ export default function FileUploadSection() {
       // 設置錯誤狀態
       const currentStage = processState?.currentStage || 'upload';
       setStageError(currentStage, error instanceof Error ? error.message : '處理失敗，請稍後重試');
-    } finally {
-      setIsProcessing(false);
     }
   };
 
