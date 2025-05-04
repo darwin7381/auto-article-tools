@@ -1,22 +1,19 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardBody, CardFooter } from '@heroui/react';
 import { Input } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Tabs, Tab } from '@heroui/react';
 import { useProcessing } from '@/context/ProcessingContext';
 
+// 導入自定義hooks
+import useUploadStage from './file-processing/useUploadStage';
+import useExtractStage, { ExtractResult } from './file-processing/useExtractStage';
+import useAiProcessingStage, { ProcessingResult } from './file-processing/useAiProcessingStage';
+
 export default function FileUploadSection() {
-  const { 
-    startFileProcessing, 
-    startUrlProcessing,
-    updateStageProgress, 
-    completeStage, 
-    moveToNextStage, 
-    setStageError, 
-    processState
-  } = useProcessing();
+  const { setStageError, processState } = useProcessing();
   
   const [selectedTab, setSelectedTab] = useState('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -31,6 +28,152 @@ export default function FileUploadSection() {
   const [markdownUrl, setMarkdownUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // 階段處理數據
+  const [uploadData, setUploadData] = useState<{
+    fileUrl?: string;
+    fileType?: string;
+    fileId?: string;
+    urlId?: string;
+  }>({});
+  
+  const [extractResult, setExtractResult] = useState<ExtractResult | null>(null);
+  
+  // 定時器清理引用
+  const extractCleanupRef = useRef<(() => void) | null>(null);
+  const aiCleanupRef = useRef<(() => void) | null>(null);
+  
+  // 清理資源
+  useEffect(() => {
+    return () => {
+      if (extractCleanupRef.current) extractCleanupRef.current();
+      if (aiCleanupRef.current) aiCleanupRef.current();
+    };
+  }, []);
+
+  // 初始化上傳階段Hook
+  const uploadStage = useUploadStage(
+    {
+      selectedFile,
+      linkUrl,
+      linkType,
+      inputType: selectedTab === 'file' ? 'file' : 'url',
+    },
+    {
+      setUploadSuccess,
+      setUploadError,
+      setIsUploading,
+      onFileUploadComplete: (fileUrl, fileType, fileId) => {
+        setUploadData({ fileUrl, fileType, fileId });
+      },
+      onUrlProcessComplete: (urlId) => {
+        setUploadData({ urlId });
+      }
+    }
+  );
+
+  // 初始化提取階段Hook (當uploadData變化時)
+  const extractStage = useExtractStage(
+    {
+      fileUrl: uploadData.fileUrl,
+      fileType: uploadData.fileType,
+      fileId: uploadData.fileId,
+      urlId: uploadData.urlId,
+      inputType: uploadData.fileUrl ? 'file' : 'url',
+    },
+    {
+      onExtractComplete: (result) => {
+        setExtractResult(result);
+      },
+      onError: (error) => {
+        setUploadError(error);
+      }
+    }
+  );
+  
+  // 保存提取階段清理函數
+  useEffect(() => {
+    extractCleanupRef.current = extractStage.cleanup;
+  }, [extractStage]);
+  
+  // 自動啟動提取階段 (當uploadData變化時)
+  useEffect(() => {
+    if (uploadData && Object.keys(uploadData).length > 0) {
+      extractStage.startExtraction();
+    }
+  }, [uploadData]);
+
+  // 初始化AI處理階段Hook (當extractResult變化時)
+  const aiProcessingStage = useAiProcessingStage(
+    {
+      extractResult: extractResult || {} as ExtractResult,
+    },
+    {
+      onProcessComplete: (result) => {
+        setProcessSuccess(true);
+        
+        // 使用公開URL作為查看路徑
+        if (result.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(result.publicUrl)}`);
+        } else if (result.markdownKey) {
+          const key = result.markdownKey.split('/').pop() || '';
+          setMarkdownUrl(`/viewer/processed/${key}`);
+        }
+      },
+      onProcessError: (error, originalExtractResult) => {
+        console.error('AI處理階段出錯:', error);
+        
+        // 設置處理錯誤，但仍然顯示提取結果
+        setStageError('process', error);
+        setProcessSuccess(true);
+        
+        // 使用原始提取結果作為回退
+        if (originalExtractResult.publicUrl) {
+          setMarkdownUrl(`/viewer/${encodeURIComponent(originalExtractResult.publicUrl)}`);
+        } else if (originalExtractResult.markdownKey) {
+          const key = originalExtractResult.markdownKey.split('/').pop() || '';
+          setMarkdownUrl(`/viewer/processed/${key}`);
+        }
+      }
+    }
+  );
+  
+  // 保存AI處理階段清理函數
+  useEffect(() => {
+    aiCleanupRef.current = aiProcessingStage.cleanup;
+  }, [aiProcessingStage]);
+  
+  // 自動啟動AI處理階段 (當extractResult變化時)
+  useEffect(() => {
+    if (extractResult) {
+      aiProcessingStage.startAiProcessing();
+    }
+  }, [extractResult]);
+
+  // 處理文件表單提交
+  const handleUpload = async (): Promise<void> => {
+    if (isUploading || isProcessing) return;
+    
+    // 重置處理狀態
+    setUploadError(null);
+    setProcessSuccess(false);
+    setMarkdownUrl(null);
+    setIsProcessing(true);
+    
+    try {
+      // 開始上傳階段處理
+      await uploadStage.startProcessing();
+    } catch (error) {
+      console.error('處理錯誤:', error);
+      setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
+      
+      // 設置錯誤狀態
+      const currentStage = processState?.currentStage || 'upload';
+      setStageError(currentStage, error instanceof Error ? error.message : '處理失敗，請稍後重試');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0]);
@@ -136,358 +279,6 @@ export default function FileUploadSection() {
     } catch (error) {
       // URL無效，不更改類型
       console.error('URL檢測失敗:', error);
-    }
-  };
-
-  /**
-   * 處理上傳成功後的文件處理邏輯
-   * @param fileUrl 上傳成功後的文件URL
-   * @param fileType 文件MIME類型
-   */
-  const handleUploadSuccess = async (fileUrl: string, fileType: string): Promise<void> => {
-    try {
-      setIsProcessing(true);
-      
-      // 獲取文件ID
-      const fileId = fileUrl.split('/').pop()?.split('.')[0] || Date.now().toString();
-      
-      console.log(`正在處理文件: ${fileUrl}, 文件類型: ${fileType}, 文件ID: ${fileId}`);
-      
-      // 1. 内容提取階段
-      updateStageProgress('extract', 10, '開始提取文件內容...');
-      
-      const extractResponse = await fetch('/api/extract-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileUrl: fileUrl,
-          fileType: fileType,
-          fileId: fileId
-        }),
-      });
-      
-      if (!extractResponse.ok) {
-        const errorData = await extractResponse.json();
-        throw new Error(errorData.error || '提取內容失敗');
-      }
-      
-      updateStageProgress('extract', 90, '文件內容提取完成...');
-      
-      const extractResult = await extractResponse.json();
-      console.log('內容提取結果:', extractResult);
-      
-      // 完成提取階段
-      completeStage('extract', '文件內容提取完成');
-      moveToNextStage();
-      
-      // 2. AI處理階段
-      updateStageProgress('process', 10, '開始AI處理...');
-      
-      try {
-        // 調用AI處理API
-        const openaiResponse = await fetch('/api/process-openai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            markdownKey: extractResult.markdownKey,  // 存储在R2的键值，用于服务器端获取内容
-            fileId: fileId
-          }),
-        });
-        
-        if (!openaiResponse.ok) {
-          throw new Error('AI處理失敗');
-        }
-        
-        updateStageProgress('process', 90, 'AI處理完成...');
-        
-        const processResult = await openaiResponse.json();
-        console.log('AI處理結果:', processResult);
-        
-        // 完成處理階段
-        completeStage('process', 'AI內容處理完成');
-        moveToNextStage();
-        
-        // 完成所有處理
-        completeStage('complete', '全部處理完成');
-        
-        setProcessSuccess(true);
-        
-        // 使用公开URL作为查看路径 - 仅使用publicUrl字段
-        if (processResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(processResult.publicUrl)}`);
-        } else if (extractResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
-        } else if (processResult.markdownKey || extractResult.markdownKey) {
-          // 如果只有Key，则构建基于Key的viewer路径
-          const markdownKey = processResult.markdownKey || extractResult.markdownKey;
-          setMarkdownUrl(`/viewer/processed/${markdownKey.split('/').pop() || ''}`);
-        }
-      } catch (aiError) {
-        console.error('AI處理錯誤:', aiError);
-        // 即使AI處理失敗，仍然標記為部分成功
-        setStageError('process', aiError instanceof Error ? aiError.message : 'AI處理失敗');
-        
-        // 仍然顯示提取結果
-        setProcessSuccess(true);
-        
-        // 使用公开URL作为查看路径 - 仅使用publicUrl字段
-        if (extractResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
-        } else if (extractResult.markdownKey) {
-          // 如果只有Key，则构建基于Key的viewer路径
-          const markdownKey = extractResult.markdownKey;
-          setMarkdownUrl(`/viewer/processed/${markdownKey.split('/').pop() || ''}`);
-        }
-      }
-    } catch (error) {
-      console.error('處理錯誤:', error);
-      setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
-      
-      // 設置錯誤狀態
-      const currentStage = processState?.currentStage || 'extract';
-      setStageError(currentStage, error instanceof Error ? error.message : '處理失敗，請稍後重試');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // 修改處理連結提交的方法
-  const handleLinkSubmit = async () => {
-    if (!linkUrl || !validateUrl(linkUrl)) {
-      setUrlError('請輸入有效的URL');
-      return;
-    }
-    
-    setIsUploading(true);
-    setUploadError(null);
-    setProcessSuccess(false); // 重置處理成功狀態
-    setMarkdownUrl(null); // 重置Markdown URL
-    
-    // 用於存儲interval引用，以便後續清除 - 保留這些變量但將使用不同邏輯
-    let extractInterval: NodeJS.Timeout | null = null;
-    let aiInterval: NodeJS.Timeout | null = null;
-    
-    try {
-      // 初始化URL處理進度
-      startUrlProcessing(linkUrl, linkType);
-      
-      // 第一階段：URL 解析/上傳
-      updateStageProgress('upload', 30, '正在處理URL...');
-      
-      const response = await fetch('/api/parse-url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: linkUrl, type: linkType }),
-      });
-      
-      updateStageProgress('upload', 70, '正在解析URL內容...');
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || '連結處理失敗');
-      }
-      
-      console.log('連結處理成功:', data);
-      setUploadSuccess(true);
-      
-      // 完成第一階段：URL 解析/上傳
-      updateStageProgress('upload', 100, 'URL解析完成');
-      completeStage('upload', 'URL解析完成');
-      moveToNextStage();
-      
-      // 第二階段：內容提取 - 顯示進度動畫
-      updateStageProgress('extract', 30, '正在提取網頁內容...');
-      
-      // 保留進度動畫，但不再基於預設時間切換階段
-      let extractProgress = 30;
-      extractInterval = setInterval(() => {
-        extractProgress = Math.min(extractProgress + 10, 90);
-        updateStageProgress('extract', extractProgress, '正在提取網頁內容...');
-      }, 800);
-      
-      // 調用內容提取API - 已不包含AI處理流程
-      const processResponse = await fetch('/api/process-url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          urlId: data.urlId 
-        }),
-      });
-      
-      // 清理提取進度interval
-      if (extractInterval) clearInterval(extractInterval);
-      extractInterval = null;
-      
-      if (!processResponse.ok) {
-        const errorData = await processResponse.json();
-        throw new Error(errorData.error || '內容提取失敗');
-      }
-      
-      const extractResult = await processResponse.json();
-      console.log('URL內容提取結果:', extractResult);
-      
-      // 完成提取階段
-      updateStageProgress('extract', 100, '網頁內容提取完成');
-      completeStage('extract', '網頁內容提取完成');
-      moveToNextStage();
-      
-      // 第三階段：AI處理 - 與文件上傳流程一致
-      updateStageProgress('process', 10, '開始AI處理...');
-      
-      // 顯示AI處理進度
-      let aiProgress = 10;
-      aiInterval = setInterval(() => {
-        aiProgress = Math.min(aiProgress + 5, 90);
-        updateStageProgress('process', aiProgress, 'AI內容處理中...');
-      }, 500);
-      
-      // 調用AI處理API
-      try {
-        const aiResponse = await fetch('/api/process-openai', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            markdownKey: extractResult.markdownKey,
-            fileId: data.urlId
-          }),
-        });
-        
-        // 清理AI進度interval
-        if (aiInterval) clearInterval(aiInterval);
-        aiInterval = null;
-        
-        if (!aiResponse.ok) {
-          const errorData = await aiResponse.json();
-          throw new Error(errorData.error || 'AI處理失敗');
-        }
-        
-        const aiResult = await aiResponse.json();
-        console.log('AI處理結果:', aiResult);
-        
-        // 完成AI處理階段
-        updateStageProgress('process', 100, 'AI處理完成');
-        completeStage('process', 'AI處理完成');
-        moveToNextStage();
-        
-        // 完成最終階段
-        completeStage('complete', '處理全部完成');
-        
-        // 設置處理成功和查看連結
-        setProcessSuccess(true);
-        
-        // 使用公開的URL或Key作為查看路徑
-        if (aiResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(aiResult.publicUrl)}`);
-        } else if (aiResult.markdownKey) {
-          const key = aiResult.markdownKey.split('/').pop() || '';
-          setMarkdownUrl(`/viewer/processed/${key}`);
-        } else if (extractResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
-        }
-      } catch (aiError) {
-        console.error('AI處理階段出錯:', aiError);
-        
-        // 清理可能存在的計時器
-        if (aiInterval) clearInterval(aiInterval);
-        
-        // 設置處理錯誤
-        setStageError('process', aiError instanceof Error ? aiError.message : 'AI處理失敗');
-        
-        // 但仍然可以顯示提取的結果
-        setProcessSuccess(true);
-        
-        if (extractResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
-        } else if (extractResult.markdownKey) {
-          const key = extractResult.markdownKey.split('/').pop() || '';
-          setMarkdownUrl(`/viewer/processed/${key}`);
-        }
-      }
-    } catch (error) {
-      // 清除所有可能的interval
-      if (extractInterval) clearInterval(extractInterval);
-      if (aiInterval) clearInterval(aiInterval);
-      
-      console.error('連結處理錯誤:', error);
-      setUploadError(error instanceof Error ? error.message : '連結處理失敗，請稍後再試');
-      setUploadSuccess(false);
-      
-      // 根據當前階段設置錯誤
-      const currentStage = processState?.currentStage || 'upload';
-      setStageError(currentStage, error instanceof Error ? error.message : '處理失敗，請稍後再試');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleUpload = async (): Promise<void> => {
-    if (isUploading || isProcessing) return;
-    setUploadError(null);
-
-    if (selectedTab === 'file') {
-      if (!selectedFile) {
-        setUploadError('請選擇要上傳的文件');
-        return;
-      }
-
-      setIsUploading(true);
-      
-      try {
-        // 初始化處理進度追蹤
-        const fileId = `file-${Date.now()}`;
-        startFileProcessing(fileId, selectedFile.name, selectedFile.type, selectedFile.size);
-        
-        // 更新上傳階段進度
-        updateStageProgress('upload', 20, '準備上傳文件...');
-        
-        // 使用FormData發送文件
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        
-        updateStageProgress('upload', 50, '正在上傳文件...');
-        
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || '上傳失敗');
-        }
-        
-        const data = await response.json();
-        setUploadSuccess(true);
-        
-        // 完成上傳階段，進入提取階段
-        updateStageProgress('upload', 100, '文件上傳完成');
-        completeStage('upload', '文件上傳成功');
-        moveToNextStage();
-        
-        // 傳遞文件URL、文件類型以及原始文件名
-        await handleUploadSuccess(data.fileUrl, selectedFile.type);
-      } catch (error) {
-        console.error('上傳錯誤:', error);
-        setUploadError(error instanceof Error ? error.message : '上傳失敗，請稍後重試');
-        setUploadSuccess(false);
-        setStageError('upload', error instanceof Error ? error.message : '上傳失敗，請稍後重試');
-      } finally {
-        setIsUploading(false);
-      }
-    } else if (selectedTab === 'link') {
-      if (!linkUrl) {
-        setUploadError('請輸入有效的連結');
-        return;
-      }
-      
-      await handleLinkSubmit();
     }
   };
 
