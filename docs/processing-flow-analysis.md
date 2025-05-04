@@ -238,215 +238,13 @@ flowchart TD
    - 添加大文件分塊處理
    - 背景處理和通知機制
 
-## 9. 極簡方案改進建議
+## 9. 階段性流水線混合模式的實現
 
-### 當前進度顯示機制的問題
+### 當前系統存在的核心問題
 
-當前進度顯示機制存在的主要問題：
+系統實現分析後，發現存在核心架構不一致問題：
 
-1. **基於假設的階段切換**：前端基於預設時間而非實際處理狀態切換階段
-2. **沒有與後端狀態同步**：前端進度顯示與後端實際處理進度脫節
-3. **針對不同類型的特殊處理**：需要為Google Docs等不同類型設置不同的計時器邏輯
-4. **階段顯示不準確**：用戶看到的階段與實際處理階段可能不一致
-
-關鍵問題範例(從 `FileUploadSection.tsx` 中提取)：
-
-```javascript
-// 提前顯示提取進度 - 模擬進度遞增
-let extractProgress = 30;
-extractInterval = setInterval(() => {
-  extractProgress = Math.min(extractProgress + 10, 90);
-  updateStageProgress('extract', extractProgress, '正在提取網頁內容...');
-  
-  // Google Docs處理通常較快進入AI階段
-  if (isGoogleDocs && extractProgress >= 70) {
-    // 根據預設時間判斷階段切換，而非真實處理狀態
-    completeStage('extract', '網頁內容提取完成');
-    moveToNextStage();
-  }
-}, isGoogleDocs ? 400 : 800); // 不同文件類型有不同計時器
-```
-
-### 極簡解決方案
-
-極簡方案的核心思想：**讓API返回階段完成信息**，前端根據這些信息准確切換階段。
-
-#### 主要差異對比
-
-| 特性 | 當前方案 | 極簡方案 |
-|------|---------|---------|
-| **階段切換依據** | 基於預設時間 | 基於API返回的實際階段信息 |
-| **前端/後端同步** | 無關聯 | 緊密同步 |
-| **特殊類型處理** | 需要為不同類型設置不同計時器 | 統一處理，無需特殊邏輯 |
-| **實施複雜度** | 前端簡單，但不准確 | 簡單修改API，保證準確性 |
-
-### 需要修改的API
-
-1. **`/api/process-url` 添加階段信息**：
-   ```typescript
-   // 修改前
-   return NextResponse.json({
-     success: true,
-     urlId,
-     markdownKey: markdownKey,
-     publicUrl: publicUrl,
-   });
-   
-   // 修改後
-   return NextResponse.json({
-     success: true,
-     urlId,
-     markdownKey: markdownKey,
-     publicUrl: publicUrl,
-     stage: 'extract',      // 添加：當前完成的階段
-     stageComplete: true    // 添加：標記階段完成
-   });
-   ```
-
-2. **`/api/process-openai` 添加階段信息**：
-   ```typescript
-   // 修改前
-   return NextResponse.json({
-     success: true,
-     content: enhancedContent.substring(0, 200) + '...',
-     markdownKey: r2Key,
-     markdownUrl: localPath,
-     publicUrl: publicUrl,
-     fileId
-   });
-   
-   // 修改後
-   return NextResponse.json({
-     success: true,
-     content: enhancedContent.substring(0, 200) + '...',
-     markdownKey: r2Key,
-     markdownUrl: localPath,
-     publicUrl: publicUrl,
-     fileId,
-     stage: 'process',      // 添加：當前完成的階段
-     stageComplete: true    // 添加：標記階段完成
-   });
-   ```
-
-### 前端修改
-
-需要修改 `FileUploadSection.tsx` 的 `handleLinkSubmit` 方法：
-
-```javascript
-// 處理連結提交
-const handleLinkSubmit = async () => {
-  // 初始化設置保持不變
-  startUrlProcessing(linkUrl, linkType);
-  updateStageProgress('upload', 30, '正在處理URL...');
-  
-  const response = await fetch('/api/parse-url', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: linkUrl, type: linkType }),
-  });
-  
-  const data = await response.json();
-  
-  // 完成第一階段
-  completeStage('upload', 'URL解析完成');
-  moveToNextStage();
-  
-  // 第二階段：可以保留進度動畫，但不再預設階段切換時機
-  updateStageProgress('extract', 30, '正在提取網頁內容...');
-  
-  // 可以保留動畫進度，但不要提前切換階段
-  let extractProgress = 30;
-  extractInterval = setInterval(() => {
-    extractProgress = Math.min(extractProgress + 10, 90);
-    updateStageProgress('extract', extractProgress, '正在提取網頁內容...');
-    // 移除基於時間的階段切換邏輯
-  }, 800);
-  
-  // 等待API處理完成
-  const processResponse = await fetch('/api/process-url', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ urlId: data.urlId }),
-  });
-  
-  // 清理提取進度計時器
-  if (extractInterval) clearInterval(extractInterval);
-  extractInterval = null;
-  
-  const processResult = await processResponse.json();
-  
-  // 根據API返回的階段信息決定階段切換
-  if (processResult.stageComplete && processResult.stage === 'extract') {
-    updateStageProgress('extract', 100, '提取完成');
-    completeStage('extract', '提取完成');
-    moveToNextStage();
-  }
-  
-  // AI處理階段
-  updateStageProgress('process', 30, 'AI處理中...');
-  
-  // 類似的進度動畫
-  let aiProgress = 30;
-  aiInterval = setInterval(() => {
-    aiProgress = Math.min(aiProgress + 5, 90);
-    updateStageProgress('process', aiProgress, 'AI內容處理中...');
-  }, 500);
-  
-  // 調用AI處理API
-  const aiResponse = await fetch('/api/process-openai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      markdownKey: processResult.markdownKey,
-      fileId: data.urlId 
-    }),
-  });
-  
-  // 清理AI進度計時器
-  if (aiInterval) clearInterval(aiInterval);
-  aiInterval = null;
-  
-  const aiResult = await aiResponse.json();
-  
-  // 根據API返回的階段信息決定階段切換
-  if (aiResult.stageComplete && aiResult.stage === 'process') {
-    updateStageProgress('process', 100, 'AI處理完成');
-    completeStage('process', 'AI處理完成');
-    moveToNextStage();
-    
-    // 完成最終階段
-    completeStage('complete', '處理全部完成');
-  }
-};
-```
-
-### 實施步驟
-
-1. **階段一：修改API返回值**
-   - 修改 `/api/process-url` 添加階段信息
-   - 修改 `/api/process-openai` 添加階段信息
-   - 修改 `/api/processors/process-gdocs` 確保正確傳遞階段信息
-
-2. **階段二：更新前端處理邏輯**
-   - 修改 `FileUploadSection.tsx` 中的 `handleLinkSubmit` 函數
-   - 移除基於時間的階段切換邏輯
-   - 添加基於API返回值的階段切換邏輯
-
-3. **階段三：統一其他流程**
-   - 對檔案上傳流程進行類似修改
-   - 確保所有處理流程使用相同的階段同步機制
-
-### 結論
-
-這種極簡方案只需最少的代碼修改，就能解決階段顯示不同步的問題。核心理念是讓前端UI基於實際的API響應來更新階段，而不是基於假設的時間間隔。這將大幅提高用戶體驗，特別是在處理複雜文檔和網頁時，用戶能看到真實的處理進度和階段。
-
-## 10. 混合模式架構與當前系統問題分析
-
-### 當前架構的核心問題
-
-在分析系統實現後，發現存在核心架構不一致問題：
-
-1. **文件上傳流程**：已經實現了良好的階段性流水線模式
+1. **文件上傳流程**：已經實現良好的階段性流水線模式
    ```
    上傳文件 → [前端控制] → 提取內容 → [前端控制] → AI處理 → [前端控制] → 完成
    ```
@@ -456,15 +254,15 @@ const handleLinkSubmit = async () => {
    提交URL → [前端控制] → 處理URL(內容提取+AI處理的後端自動流水線) → [輪詢] → 完成
    ```
 
-主要問題在於：**URL處理中將內容提取(extract)和AI處理(process)兩個獨立階段錯誤地合併成一個流水線**，導致：
+最大的問題在於：**URL處理中將內容提取(extract)和AI處理(process)兩個獨立階段錯誤地合併成一個流水線**，導致：
 - 階段切換不清晰，前端無法準確知道當前處理階段
 - 被迫實現複雜的輪詢機制查詢狀態
 - 處理邏輯與文件上傳流程不一致，維護困難
 - 無法實現用戶在階段間的干預（如在AI處理前調整內容）
 
-### 正確的混合模式架構
+### 正確的階段性流水線混合模式
 
-應採用**階段性流水線混合模式**，在整個系統中統一實現：
+系統應統一採用**階段性流水線混合模式**：
 
 ```
 輸入(文件/URL) → [階段完成，前端控制] → 內容提取 → [階段完成，前端控制] → AI處理 → [階段完成，前端控制] → 完成
@@ -477,34 +275,26 @@ const handleLinkSubmit = async () => {
 4. **簡化的前端邏輯**：不需要複雜的輪詢機制，前端可以主動控制流程
 5. **更好的錯誤恢復**：每個階段可以獨立處理和恢復
 
-### URL處理流程修正方案
+### URL處理流程的正確實現
 
-具體修正Google Docs和其他URL處理流程的方法：
+我們對URL處理流程進行了如下關鍵修改：
 
-1. **APIs修改**:
-   - **分離階段處理**：`/api/process-url`只處理內容提取，不自動觸發AI處理
-   - **清晰的狀態返回**：每個API明確返回階段完成狀態(`stage`, `stageComplete`)
-   - **保持處理中間狀態**：階段間保存處理狀態，允許前端控制流程進展
+1. **API階段分離**:
+   - `/api/process-url`只負責內容提取，不再自動觸發AI處理
+   - 每個API返回明確的階段完成狀態(`stage`, `stageComplete`)
+   - 保持處理中間狀態，保證前端掌握流程控制權
 
-2. **處理流程修改**：
+2. **處理流程修改示例**：
    ```javascript
-   // Google Docs URL處理修正邏輯
-   // 1. process-url/route.ts修改
-   // 將這段代碼：
+   // 修改前：流水線式處理
    const scrapedData = await scrapeWithFireScrawl(urlInfo.url, urlInfo.type, metadata);
    if (scrapedData.metadata.markdownKey) {
-     // 直接調用AI處理API
-     const aiResponse = await fetch(getApiUrl('/api/process-openai'), {
-       method: 'POST',
-       body: JSON.stringify({
-         markdownKey: scrapedData.metadata.markdownKey,
-         fileId: urlId
-       }),
-     });
+     // 直接調用AI處理API，自動進入下一階段
+     const aiResponse = await fetch(getApiUrl('/api/process-openai'), {...});
      // 返回AI處理結果
    }
    
-   // 修改為：
+   // 修改後：階段性混合模式
    const scrapedData = await scrapeWithFireScrawl(urlInfo.url, urlInfo.type, metadata);
    if (scrapedData.metadata.markdownKey) {
      // 僅返回內容提取結果，不自動調用AI處理
@@ -516,37 +306,129 @@ const handleLinkSubmit = async () => {
        status: 'content-extracted',
        stage: 'extract',
        stageComplete: true,
-       metadata: {
-         title: scrapedData.title,
-         language: scrapedData.metadata.language,
-         wordCount: scrapedData.metadata.wordCount,
-         // 其他元數據...
-       }
+       metadata: {...}
      });
    }
    ```
 
 3. **前端流程統一**:
    - 移除URL處理中的輪詢機制
-   - 使用與文件上傳相同的階段控制模式
-   - 為所有流程使用相同的階段轉換邏輯
+   - 對所有處理流程採用相同的階段控制模式：
+     ```javascript
+     // 文件上傳和URL處理使用相同的階段控制模式
+     // 1. 提交文件/URL
+     // 2. 等待第一階段完成
+     // 3. 主動發起內容提取請求
+     // 4. 等待內容提取完成
+     // 5. 主動發起AI處理請求
+     // 6. 等待AI處理完成
+     ```
 
-### 實施路線圖
+### 錯誤經驗教訓
 
-1. **階段一：API分離**
-   - 修改`/api/process-url`，移除自動AI處理流程
-   - 確保所有API返回統一的階段完成信息
+在實現過程中，我們發現的主要錯誤和教訓：
 
-2. **階段二：前端統一**
-   - 更新`FileUploadSection.tsx`的URL處理邏輯
-   - 移除輪詢機制，改為與文件上傳相同的前端控制流程
-   - 確保階段轉換邏輯一致
+1. **輪詢機制的缺陷**：
+   - 前端輪詢狀態容易與後端實際狀態不同步
+   - 增加系統複雜度和維護難度
+   - 對不同文件類型需要特殊處理，導致代碼臃腫
 
-3. **階段三：用戶干預能力（可選）**
-   - 添加階段間的用戶確認機制
-   - 實現內容提取後的編輯能力
-   - 添加取消或跳過特定階段的選項
+2. **模式不一致的危害**：
+   - 文件上傳和URL處理使用不同模式導致前端邏輯分裂
+   - 用戶體驗不一致，特別在處理Google Docs時流程混亂
+   - 無法統一擴展(如添加用戶確認步驟)
 
-### 結論
+3. **自動流水線的限制**：
+   - 看似方便的自動流水線處理實際上降低了系統靈活性
+   - 無法實現用戶在階段間的干預
+   - 排障困難，無法明確確定問題發生在哪個階段
 
-統一採用階段性流水線混合模式，將使系統架構更加清晰、一致，並為未來的功能擴展（如用戶干預）奠定基礎。這種改進不僅解決了當前的同步問題，還提高了系統的可維護性和擴展性。
+### 實施結果
+
+通過實施階段性流水線混合模式，我們成功解決了以下問題：
+
+1. **統一了處理流程**：文件上傳和URL處理(包括Google Docs)使用相同的階段控制邏輯
+2. **移除了複雜的輪詢機制**：前端直接控制流程，提高了穩定性
+3. **階段邊界明確**：每個處理階段有清晰的開始和結束點
+4. **為用戶干預奠定基礎**：未來可輕鬆添加階段間的用戶確認或編輯功能
+
+這些改進顯著提高了系統的可維護性、擴展性和用戶體驗的一致性。
+
+### 前端階段控制機制
+
+階段性流水線混合模式的核心是前端對處理階段的精確控制。這是通過以下核心函數實現的：
+
+1. **`completeStage(stageId, message)`**
+   - 作用：標記特定階段已完成
+   - 參數：
+     - `stageId`: 階段ID (例如 'upload', 'extract', 'process')
+     - `message`: 完成時的狀態消息
+   - 行為：將階段狀態更新為 `completed`，並設置完成消息
+
+2. **`moveToNextStage()`**
+   - 作用：將當前活動階段移動到下一個階段
+   - 行為：將下一個階段的狀態從 `pending` 改為 `processing`
+   - 時機：通常在 `completeStage()` 調用後立即調用
+
+3. **`updateStageProgress(stageId, percentage, message)`**
+   - 作用：更新特定階段的進度百分比
+   - 參數：
+     - `stageId`: 階段ID
+     - `percentage`: 完成百分比 (0-100)
+     - `message`: 進度描述消息
+   - 行為：更新階段進度顯示，但不改變階段狀態
+
+4. **`setStageError(stageId, errorMessage)`**
+   - 作用：將特定階段標記為錯誤狀態
+   - 參數：
+     - `stageId`: 階段ID
+     - `errorMessage`: 錯誤消息
+   - 行為：將階段狀態更新為 `error`，並記錄錯誤消息
+
+這些函數在前端代碼中的標準使用模式：
+
+```javascript
+// 1. 處理階段開始時
+updateStageProgress('extract', 10, '開始提取內容...');
+
+// 2. 處理過程中
+updateStageProgress('extract', 50, '內容提取中...');
+
+// 3. 處理完成時
+updateStageProgress('extract', 100, '內容提取完成');
+completeStage('extract', '內容提取完成');
+moveToNextStage(); // 自動切換到下一階段
+
+// 4. 發生錯誤時
+setStageError('extract', '內容提取失敗: ' + errorMessage);
+```
+
+通過這些函數的組合使用，前端能夠精確控制處理流程的每個階段，實現階段之間的明確邊界，並在需要時允許用戶干預。
+
+## 10. 混合模式架構的模組化實現
+
+為了更好地實現階段性流水線混合模式，系統採用模組化設計，將各處理階段邏輯封裝為獨立組件：
+
+1. **UploadStageProcessor**：處理上傳階段邏輯
+   - 負責文件上傳或URL解析
+   - 使用 `completeStage('upload')` 和 `moveToNextStage()` 完成階段切換
+   - 返回上傳/解析結果供後續階段使用
+
+2. **ExtractStageProcessor**：處理內容提取階段邏輯
+   - 負責從文件或URL提取內容
+   - 使用 `completeStage('extract')` 和 `moveToNextStage()` 完成階段切換
+   - 返回提取結果供AI處理階段使用
+
+3. **AiProcessingStageProcessor**：處理AI處理階段邏輯
+   - 負責AI增強內容
+   - 使用 `completeStage('process')` 和 `completeStage('complete')` 完成流程
+   - 返回最終處理結果
+
+這種模組化設計的優勢：
+- **關注點分離**：每個組件只負責特定階段的邏輯
+- **可測試性**：每個階段可以獨立測試
+- **可維護性**：修改特定階段邏輯不影響其他階段
+- **可重用性**：不同輸入類型可以重用相同的階段處理邏輯
+- **擴展性**：易於在階段之間添加用戶干預步驟
+
+透過這種模組化階段處理器的方式，系統實現了高度可維護和可擴展的階段性流水線混合模式。
