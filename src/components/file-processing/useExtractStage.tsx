@@ -120,12 +120,21 @@ export default function useExtractStage(
       // 第二階段：內容提取 - 顯示進度動畫
       updateStageProgress('extract', 30, '正在提取網頁內容...');
       
-      // 保留進度動畫，但不再基於預設時間切換階段
-      let extractProgress = 30;
+      // 給API調用預估一個合理的時間 (例如8秒)
+      const estimatedTime = 8000; // 8秒
+      const startTime = Date.now();
+      const interval = 200; // 每200ms更新一次
+      
+      // 初始進度
+      updateStageProgress('extract', 30, '正在提取網頁內容...');
+      
+      // 使用更少次數的更新
       extractIntervalRef.current = setInterval(() => {
-        extractProgress = Math.min(extractProgress + 10, 90);
-        updateStageProgress('extract', extractProgress, '正在提取網頁內容...');
-      }, 800);
+        const elapsed = Date.now() - startTime;
+        // 基於經過時間計算進度，最高到90%
+        const progress = 30 + Math.min(60 * (elapsed / estimatedTime), 60);
+        updateStageProgress('extract', progress, '正在提取網頁內容...');
+      }, interval);
       
       // 調用內容提取API
       const processResponse = await fetch('/api/process-url', {
