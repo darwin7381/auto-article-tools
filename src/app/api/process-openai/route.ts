@@ -55,14 +55,19 @@ export async function POST(request: Request) {
         markdownKey: r2Key,
         markdownUrl: localPath,
         publicUrl: publicUrl,
-        fileId
+        fileId,
+        stage: 'process',      // 添加：當前完成的階段
+        stageComplete: true,   // 添加：標記階段完成
+        processingComplete: true // 添加：標記整體處理已完成
       });
     } catch (aiError) {
       console.error("OpenAI處理失敗:", aiError);
       return NextResponse.json({
         success: false,
         error: 'OpenAI處理失敗',
-        message: aiError instanceof Error ? aiError.message : '未知錯誤'
+        message: aiError instanceof Error ? aiError.message : '未知錯誤',
+        stage: 'process',      // 添加：當前階段
+        stageComplete: false   // 添加：標記階段未完成
       }, { status: 500 });
     }
   } catch (error) {
@@ -70,7 +75,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: false, 
       error: '請求處理錯誤',
-      message: error instanceof Error ? error.message : '未知錯誤'
+      message: error instanceof Error ? error.message : '未知錯誤',
+      stage: 'process',       // 添加：當前階段
+      stageComplete: false    // 添加：標記階段未完成
     }, { status: 500 });
   }
 } 
