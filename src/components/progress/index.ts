@@ -1,1 +1,1 @@
-export { default as ProcessingProgress } from './ProcessingProgress'; 
+export { default as ProgressDisplay } from './ProgressDisplay'; 
