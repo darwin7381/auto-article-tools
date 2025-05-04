@@ -2,50 +2,19 @@
 
 ## 現狀分析
 
-1. 項目已有兩個進度顯示組件：
-   - `ProcessingProgress.tsx`：較簡單的進度顯示組件
-   - `ProgressDisplay.tsx`：更詳細的進度和狀態顯示組件
+1. 項目使用統一的進度顯示組件：
+   - `ProgressDisplay.tsx`：詳細的進度和狀態顯示組件，通過ProcessingContext獲取狀態
 
-2. 主頁面中有 `ProgressSection` 組件，但目前使用的是靜態數據，未與實際處理流程集成
+2. 主頁面中的 `ProgressSection` 組件集成了 `ProgressDisplay`，與實際處理流程完全集成
 
-3. 文件上傳、處理的 API 已實現，但未實現進度狀態的追蹤和反饋
+3. 文件上傳、處理的 API 已實現，並實現了統一的進度狀態的追蹤和反饋
 
-## 新API架構介紹
+## 處理流程架構
 
-最新的重構將處理流程分為多個獨立的API端點，每個端點負責特定階段的處理，架構如下：
+系統採用階段性流水線混合模式，通過統一處理流程管理器(useProcessingFlow)協調各階段：
 
 ```
-前端 ──> /api/upload ───────────────────┐
-                                        │
-                                        v
-                                 上傳完成，返回fileUrl
-                                        │
-                                        v
-前端 ──> /api/extract-content ──────────┐
-         │                              │
-         │                              v
-         │                        返回提取的內容結果
-         │                              │
-         v                              v
-    ┌────────────────┐           前端更新提取階段進度
-    │ 根據文件類型選擇 │              │
-    └────────────────┘              │
-         │                          v
-         ├──> /api/processors/process-pdf  ──> 如需轉換為DOCX
-         │          │                               │
-         │          │                               v
-         │          └──────────> /api/processors/process-docx
-         │                                          │
-         └──> /api/processors/process-docx <────────┘
-                                                    │
-                                                    v
-前端 <────────────────────────── 返回提取結果（文本+圖片）
-                                                    │
-                                                    v
-前端 ──> /api/process-openai ──────────────> 處理提取內容
-                                                    │
-                                                    v
-前端 <────────────────────────── 返回AI處理後的內容
+輸入(文件/URL) → [階段完成，前端控制] → 內容提取 → [階段完成，前端控制] → AI處理 → [階段完成，前端控制] → 完成
 ```
 
 ### API層級結構
@@ -56,12 +25,143 @@
 2. **處理器層API**
    - `/api/processors/process-pdf`: 專門處理PDF轉換為DOCX
    - `/api/processors/process-docx`: 專門處理DOCX提取內容
+   - `/api/processors/process-gdocs`: 專門處理Google Docs文檔
 
 3. **AI處理層API**
    - `/api/process-openai`: 處理內容增強，包括語言檢測、翻譯等任務
 
-4. **儲存層API**
-   - `/api/save-markdown`: 保存最終處理結果
+4. **上傳與URL處理API**
+   - `/api/upload`: 處理文件上傳
+   - `/api/parse-url`: 解析URL並初始化處理
+   - `/api/process-url`: 處理URL內容提取
+
+## 模組化實現架構
+
+系統組織為三層架構：
+
+### 1. 核心狀態管理層
+- `ProcessingContext`: 中央狀態管理器，提供處理狀態追蹤和更新方法
+- 提供狀態更新方法和階段管理API
+
+### 2. 業務邏輯層
+- `useProcessingFlow`: 統一處理流程管理器，作為協調器處理整體流程
+- 專門階段處理Hooks:
+  - `useUploadStage`: 處理上傳階段邏輯
+  - `useExtractStage`: 處理內容提取階段邏輯
+  - `useAiProcessingStage`: 處理AI增強階段邏輯
+
+### 3. 視圖層
+- `ProgressDisplay`: 進度和狀態的可視化組件
+- `ProgressSection`: 頁面中的進度區塊容器
+- `FileUploadSection`: 處理文件上傳和URL輸入的組件
+
+## 階段性流水線串聯機制
+
+系統使用直接回調串聯而非狀態監聽方式連接各處理階段：
+
+1. **上傳階段完成** → 回調觸發提取階段
+   ```typescript
+   onFileUploadComplete: async (fileUrl, fileType, fileId) => {
+     // 更新上傳階段狀態
+     // 直接開始提取階段
+     await extractStage.startExtraction({
+       inputType: 'file',
+       fileUrl,
+       fileType,
+       fileId
+     });
+   }
+   ```
+
+2. **提取階段完成** → 回調觸發AI處理階段
+   ```typescript
+   onExtractComplete: async (result) => {
+     // 更新提取階段狀態
+     // 直接開始AI處理階段
+     if (result.markdownKey) {
+       await aiProcessingStage.startAiProcessing(result);
+     }
+   }
+   ```
+
+3. **AI處理階段完成** → 回調更新完成狀態
+   ```typescript
+   onProcessComplete: (result) => {
+     // 更新AI處理階段狀態
+     // 標記整個處理完成
+   }
+   ```
+
+這種直接串聯方式相比狀態監聽有以下優勢：
+- 避免了循環渲染和狀態更新問題
+- 處理流程更直接、可讀性更高
+- 錯誤處理更精確
+- 性能更好，減少不必要的組件重渲染
+
+## 進度顯示實現
+
+`ProgressDisplay` 組件實現了以下功能：
+
+1. **總體進度顯示**
+   - 動畫進度條顯示總體完成百分比
+   - 當前處理狀態文本顯示
+
+2. **階段詳細進度**
+   - 各處理階段的狀態指示 (待處理/處理中/已完成/錯誤)
+   - 當前活躍階段的進度條
+   - 階段消息提示
+
+3. **處理元數據顯示**
+   - 顯示文件或URL相關信息
+   - 顯示處理結果元數據 (如語言、字數等)
+
+4. **進度動畫**
+   - 使用requestAnimationFrame實現流暢的進度動畫
+   - 階段狀態變化的視覺反饋
+
+## 錯誤處理機制
+
+系統實現了多層錯誤處理：
+
+1. **階段級錯誤處理**
+   - 每個階段Hook處理自己的錯誤，並清理資源
+   - 通過回調將錯誤向上傳遞
+
+2. **流程級錯誤處理**
+   - `useProcessingFlow` 捕獲和處理來自各階段的錯誤
+   - 根據錯誤發生的階段決定後續處理策略
+
+3. **UI錯誤顯示**
+   - 在進度顯示中清晰標記出錯的階段
+   - 顯示具體錯誤信息
+   - 提供操作建議 (如重試選項)
+
+## 性能優化
+
+系統實現了以下性能優化：
+
+1. **資源清理**
+   - 所有定時器在完成或錯誤時清理
+   - 所有Hook提供cleanup方法防止內存泄漏
+
+2. **渲染優化**
+   - 階段間直接調用，減少狀態變化和渲染循環
+   - 動畫使用requestAnimationFrame而非setTimeout
+
+3. **有限狀態更新**
+   - 進度更新使用預估進度減少服務器請求
+   - 使用memo和useCallback減少不必要的重新渲染
+
+## 各處理流程實現
+
+系統統一處理了不同類型的輸入：
+
+1. **PDF文件** → PDF轉DOCX → 內容提取 → AI處理
+2. **DOCX文件** → 直接內容提取 → AI處理
+3. **一般URL** → 網頁爬取 → 內容提取 → AI處理
+4. **Google Docs URL** → 專門爬取方法 → 內容提取 → AI處理
+
+統一處理流程使得用戶體驗一致，同時內部處理邏輯根據不同輸入自動調整。
 
 ## 執行計劃
 

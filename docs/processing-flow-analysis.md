@@ -5,7 +5,11 @@
 系統設計採用React Context進行狀態管理，通過統一處理流程管理器處理文件和URL，並實時顯示處理進度。核心組件包括:
 
 - **狀態管理**: `ProcessingContext` 管理所有處理階段的狀態
-- **流程管理**: `useProcessingFlow` Hook統一協調處理流程
+- **流程管理**: `useProcessingFlow` Hook作為協調器統一管理處理流程
+- **專門階段處理**: 三個專用Hook處理不同階段邏輯
+  - `useUploadStage` - 處理上傳階段邏輯
+  - `useExtractStage` - 處理內容提取階段邏輯
+  - `useAiProcessingStage` - 處理AI增強階段邏輯
 - **進度顯示**: `ProgressDisplay` 組件負責可視化處理進度
 - **處理流程協調**: 階段性流水線混合模式處理不同類型的輸入
 
@@ -36,16 +40,19 @@ graph TD
     end
     
     B --> G[useProcessingFlow Hook]
+    G --> H[useUploadStage]
+    G --> I[useExtractStage]
+    G --> J[useAiProcessingStage]
+    
     G --> D
     C --> D
     D --> E
     D --> F
     
-    subgraph 統一處理流程
-    G --> H[processFile 方法]
-    G --> I[processUrl 方法]
-    H --> J[階段性流水線處理]
-    I --> J
+    subgraph 直接回調串聯流程
+    H --> |"onComplete回調"| I
+    I --> |"onComplete回調"| J
+    J --> |"onComplete回調"| K[完成處理]
     end
 ```
 
@@ -55,6 +62,9 @@ graph TD
 sequenceDiagram
     participant UI as 前端UI
     participant PF as useProcessingFlow
+    participant US as useUploadStage
+    participant ES as useExtractStage
+    participant AP as useAiProcessingStage
     participant PC as ProcessingContext
     participant Upload as /api/upload
     participant Extract as /api/extract-content
@@ -63,14 +73,15 @@ sequenceDiagram
     
     UI->>PF: processFile(file)
     PF->>PC: startFileProcessing()
-    PF->>PC: updateStageProgress('upload', %)
-    PF->>Upload: 上傳文件
-    Upload-->>PF: 返回fileUrl
-    PF->>PC: completeStage('upload')
-    PF->>PC: moveToNextStage()
+    PF->>US: uploadFile(file)
+    US->>PC: updateStageProgress('upload', %)
+    US->>Upload: 上傳文件
+    Upload-->>US: 返回fileUrl
+    US->>PC: completeStage('upload')
+    US->>ES: onUploadComplete(fileUrl, fileType)
     
-    PF->>PC: updateStageProgress('extract', %)
-    PF->>Extract: 提交fileUrl
+    ES->>PC: updateStageProgress('extract', %)
+    ES->>Extract: 提交fileUrl
     Note over Extract,Processor: 根據文件類型選擇處理器
     alt PDF文件
         Extract->>Processor: /api/processors/process-pdf
@@ -80,17 +91,16 @@ sequenceDiagram
         Extract->>Processor: /api/processors/process-docx
     end
     Processor-->>Extract: 返回處理結果(Markdown)
-    Extract-->>PF: 返回提取結果
-    PF->>PC: completeStage('extract')
-    PF->>PC: moveToNextStage()
+    Extract-->>ES: 返回提取結果
+    ES->>PC: completeStage('extract')
+    ES->>AP: onExtractComplete(result)
     
-    PF->>PC: updateStageProgress('process', %)
-    PF->>OpenAI: 提交Markdown內容
-    OpenAI-->>PF: 返回AI處理結果
-    PF->>PC: completeStage('process')
-    PF->>PC: moveToNextStage()
-    
-    PF->>PC: completeStage('complete')
+    AP->>PC: updateStageProgress('process', %)
+    AP->>OpenAI: 提交Markdown內容
+    OpenAI-->>AP: 返回AI處理結果
+    AP->>PC: completeStage('process')
+    AP->>PC: completeStage('complete')
+    AP-->>PF: onProcessComplete(result)
     PF-->>UI: 返回處理完成結果
 ```
 
@@ -100,6 +110,9 @@ sequenceDiagram
 sequenceDiagram
     participant UI as 前端UI
     participant PF as useProcessingFlow
+    participant US as useUploadStage
+    participant ES as useExtractStage
+    participant AP as useAiProcessingStage
     participant PC as ProcessingContext
     participant ParseURL as /api/parse-url
     participant ProcessURL as /api/process-url
@@ -107,25 +120,25 @@ sequenceDiagram
     
     UI->>PF: processUrl(url, type)
     PF->>PC: startUrlProcessing()
-    PF->>PC: updateStageProgress('upload', %)
-    PF->>ParseURL: 提交URL
-    ParseURL-->>PF: 返回URL解析結果
-    PF->>PC: completeStage('upload')
-    PF->>PC: moveToNextStage()
+    PF->>US: submitUrl(url, type)
+    US->>PC: updateStageProgress('upload', %)
+    US->>ParseURL: 提交URL
+    ParseURL-->>US: 返回URL解析結果
+    US->>PC: completeStage('upload')
+    US->>ES: onUrlParseComplete(urlId, type)
     
-    PF->>PC: updateStageProgress('extract', %)
-    PF->>ProcessURL: 提交urlId
-    ProcessURL-->>PF: 返回網頁內容(Markdown)
-    PF->>PC: completeStage('extract')
-    PF->>PC: moveToNextStage()
+    ES->>PC: updateStageProgress('extract', %)
+    ES->>ProcessURL: 提交urlId
+    ProcessURL-->>ES: 返回網頁內容(Markdown)
+    ES->>PC: completeStage('extract')
+    ES->>AP: onExtractComplete(result)
     
-    PF->>PC: updateStageProgress('process', %)
-    PF->>OpenAI: 提交Markdown內容
-    OpenAI-->>PF: 返回AI處理結果
-    PF->>PC: completeStage('process')
-    PF->>PC: moveToNextStage()
-    
-    PF->>PC: completeStage('complete')
+    AP->>PC: updateStageProgress('process', %)
+    AP->>OpenAI: 提交Markdown內容
+    OpenAI-->>AP: 返回AI處理結果
+    AP->>PC: completeStage('process')
+    AP->>PC: completeStage('complete')
+    AP-->>PF: onProcessComplete(result)
     PF-->>UI: 返回處理完成結果
 ```
 
@@ -162,6 +175,7 @@ flowchart TD
 3. **處理器層**:
    - `/api/processors/process-pdf` - PDF文件處理
    - `/api/processors/process-docx` - DOCX文件處理
+   - `/api/processors/process-gdocs` - Google Docs文件處理
 4. **AI處理層**: `/api/process-openai` - 使用OpenAI進行AI Agent Editing
 
 ### URL處理API層級
@@ -190,19 +204,30 @@ flowchart TD
 
 ### 統一處理流程管理器
 
-`useProcessingFlow` Hook集中管理所有處理流程，提供以下功能:
+`useProcessingFlow` Hook作為協調器管理處理流程，提供以下功能:
 
 - **主要方法**:
   - `processFile`: 統一處理文件上傳流程
   - `processUrl`: 統一處理URL處理流程
   - `cleanup`: 清理資源和定時器
 
-- **內部處理方法**:
-  - `processFileUpload`: 處理文件上傳階段
-  - `processUrlSubmit`: 處理URL提交階段
-  - `processFileExtraction`: 處理文件內容提取階段
-  - `processUrlExtraction`: 處理URL內容提取階段
-  - `processAiEnhancement`: 處理AI增強階段
+- **專門階段處理Hooks**:
+  - `useUploadStage`: 處理上傳階段邏輯
+    - `uploadFile`: 處理文件上傳
+    - `submitUrl`: 處理URL提交
+    - `onFileUploadComplete`: 上傳完成回調
+    - `onUrlParseComplete`: URL解析完成回調
+  
+  - `useExtractStage`: 處理內容提取階段邏輯
+    - `startExtraction`: 開始內容提取
+    - `extractFromFile`: 從文件提取內容
+    - `extractFromUrl`: 從URL提取內容
+    - `onExtractComplete`: 提取完成回調
+  
+  - `useAiProcessingStage`: 處理AI增強階段邏輯
+    - `startAiProcessing`: 開始AI處理
+    - `processWithOpenAI`: 使用OpenAI處理內容
+    - `onProcessComplete`: 處理完成回調
 
 ### 進度顯示組件
 
@@ -211,7 +236,6 @@ flowchart TD
    - 顯示總體進度條
    - 顯示各階段狀態
    - 顯示處理元數據
-3. **ProcessingProgress**: 更簡化的進度顯示組件(目前未使用)
 
 ### 異常處理機制
 
@@ -233,72 +257,98 @@ flowchart TD
 
 ### 當前系統架構
 
-系統採用統一的**階段性流水線混合模式**：
+系統採用統一的**階段性流水線混合模式**，通過直接回調串聯流程：
 
 ```
-輸入(文件/URL) → [階段完成，前端控制] → 內容提取 → [階段完成，前端控制] → AI處理 → [階段完成，前端控制] → 完成
+輸入(文件/URL) → [階段完成，直接回調] → 內容提取 → [階段完成，直接回調] → AI處理 → [階段完成，直接回調] → 完成
 ```
 
-通過`useProcessingFlow` Hook統一管理所有處理流程，實現：
+核心架構改進：
 
-1. **明確的階段邊界**：每個處理階段有明確的開始和結束點
-2. **統一的用戶體驗**：文件和URL處理有一致的階段進展顯示
-3. **允許用戶干預**：在階段間可以添加用戶確認或編輯環節
-4. **簡化的前端邏輯**：不需要複雜的輪詢機制，前端可以主動控制流程
-5. **更好的錯誤恢復**：每個階段可以獨立處理和恢復
+1. **三層模組化實現**：
+   - `useProcessingFlow` - 頂層協調器，不再實現具體處理邏輯
+   - 專門階段處理Hooks - 各自處理特定階段邏輯
+   - `ProcessingContext` - 提供狀態管理和UI更新
 
-### 前端階段控制機制
+2. **直接回調串聯機制**：
+   - 不再使用狀態監聽觸發下一階段
+   - 使用直接回調串聯階段流轉
+   - 避免了因useEffect監聽狀態造成的無限循環問題
 
-階段性流水線混合模式的核心是前端對處理階段的精確控制。這是通過以下核心函數實現的：
+### 直接回調串聯機制
 
-1. **`completeStage(stageId, message)`**
-   - 作用：標記特定階段已完成
-   - 參數：
-     - `stageId`: 階段ID (例如 'upload', 'extract', 'process')
-     - `message`: 完成時的狀態消息
-   - 行為：將階段狀態更新為 `completed`，並設置完成消息
+階段性流水線混合模式的核心是直接回調串聯機制，通過以下方式實現：
 
-2. **`moveToNextStage()`**
-   - 作用：將當前活動階段移動到下一個階段
-   - 行為：將下一個階段的狀態從 `pending` 改為 `processing`
-   - 時機：通常在 `completeStage()` 調用後立即調用
+1. **上傳階段完成回調**:
+   ```typescript
+   onFileUploadComplete: async (fileUrl, fileType, fileId) => {
+     // 更新上傳階段狀態
+     completeStage('upload');
+     // 直接開始提取階段
+     await extractStage.startExtraction({
+       inputType: 'file',
+       fileUrl,
+       fileType,
+       fileId
+     });
+   }
+   ```
 
-3. **`updateStageProgress(stageId, percentage, message)`**
-   - 作用：更新特定階段的進度百分比
-   - 參數：
-     - `stageId`: 階段ID
-     - `percentage`: 完成百分比 (0-100)
-     - `message`: 進度描述消息
-   - 行為：更新階段進度顯示，但不改變階段狀態
+2. **提取階段完成回調**:
+   ```typescript
+   onExtractComplete: async (result) => {
+     // 更新提取階段狀態
+     completeStage('extract');
+     // 直接開始AI處理階段
+     if (result.markdownKey) {
+       await aiProcessingStage.startAiProcessing(result);
+     }
+   }
+   ```
 
-4. **`setStageError(stageId, errorMessage)`**
-   - 作用：將特定階段標記為錯誤狀態
-   - 參數：
-     - `stageId`: 階段ID
-     - `errorMessage`: 錯誤消息
-   - 行為：將階段狀態更新為 `error`，並記錄錯誤消息
+3. **AI處理階段完成回調**:
+   ```typescript
+   onProcessComplete: (result) => {
+     // 更新AI處理階段狀態
+     completeStage('process');
+     completeStage('complete');
+     // 返回最終結果
+     return result;
+   }
+   ```
+
+這種直接回調串聯方式相比狀態監聽有以下優勢：
+- 避免了循環渲染和狀態更新問題
+- 處理流程更直接、可讀性更高
+- 錯誤處理更精確
+- 性能更好，減少不必要的組件重渲染
 
 ## 10. 混合模式架構的模組化實現
 
-系統採用統一處理流程管理器`useProcessingFlow`，將各處理階段邏輯封裝為獨立函數：
+系統採用模組化實現，將處理邏輯拆分為多個專門的Hook：
 
-1. **processFileUpload/processUrlSubmit**：處理上傳階段邏輯
+1. **useUploadStage**: 處理上傳階段邏輯
    - 負責文件上傳或URL解析
-   - 使用 `completeStage('upload')` 和 `moveToNextStage()` 完成階段切換
-   - 返回上傳/解析結果供後續階段使用
+   - 通過`onFileUploadComplete`或`onUrlParseComplete`回調觸發下一階段
+   - 在錯誤時提供專門的錯誤處理和資源清理
 
-2. **processFileExtraction/processUrlExtraction**：處理內容提取階段邏輯
+2. **useExtractStage**: 處理內容提取階段邏輯
    - 負責從文件或URL提取內容
-   - 使用 `completeStage('extract')` 和 `moveToNextStage()` 完成階段切換
-   - 返回提取結果供AI處理階段使用
+   - 通過`onExtractComplete`回調觸發下一階段
+   - 處理不同輸入類型的提取策略
 
-3. **processAiEnhancement**：處理AI處理階段邏輯
+3. **useAiProcessingStage**: 處理AI處理階段邏輯
    - 負責AI增強內容
-   - 使用 `completeStage('process')` 和 `completeStage('complete')` 完成流程
-   - 返回最終處理結果
+   - 通過`onProcessComplete`回調完成整個處理流程
+   - 處理AI處理相關的錯誤和恢復
+
+4. **useProcessingFlow**: 統一流程協調器
+   - 協調各階段Hook的初始化和交互
+   - 提供統一的處理入口API
+   - 確保資源清理和錯誤處理
 
 這種模組化設計的優勢：
-- **關注點分離**：每個函數只負責特定階段的邏輯
+- **關注點分離**：每個Hook只負責特定階段的邏輯
 - **可測試性**：每個階段可以獨立測試
 - **可維護性**：修改特定階段邏輯不影響其他階段
 - **可重用性**：不同輸入類型可以重用相同的階段處理邏輯
@@ -306,46 +356,46 @@ flowchart TD
 
 ## 11. 性能優化與架構改進
 
-### 統一處理流程管理器的優化
+### 統一處理流程架構的優化
 
-`useProcessingFlow` Hook實現了以下性能優化：
+改進後的架構實現了以下性能優化：
 
-1. **減少狀態更新和渲染循環**：
-   - 移除了多餘的狀態存儲和更新
-   - 避免了通過狀態變化觸發useEffect造成的性能損失
-   - 使用更直接的函數調用流程替代狀態變化通知
+1. **避免渲染循環**：
+   - 移除了基於狀態監聽的階段觸發機制
+   - 使用直接回調串聯替代狀態變化和useEffect監聽
+   - 顯著減少了組件重渲染次數
 
 2. **優化函數引用穩定性**：
-   - 使用useCallback保證函數引用穩定
-   - 避免不必要的依賴項變化導致的效能問題
+   - 各階段Hook使用useCallback保證函數引用穩定
+   - 明確的依賴項管理，避免無必要的重新創建
    - 參數化所有回調函數，減少閉包引用
 
-3. **流程協調機制改進**：
-   - 使用串行直接調用替代輪詢機制
-   - 各處理階段可直接傳遞結果給下一階段
-   - 階段間界限清晰，同時減少了狀態存儲需求
+3. **資源優化**：
+   - 所有階段Hook提供cleanup方法，確保資源正確釋放
+   - 定時器和監聽器在完成或錯誤時自動清理
+   - 減少內存洩漏風險
 
 ### 實現對比
 
 | 原始實現 | 改進實現 |
 |---------|---------|
-| 使用多個獨立hooks | 使用單一統一管理器hook |
-| 通過狀態變化觸發階段切換 | 通過函數直接調用進行階段切換 |
-| 使用輪詢機制查詢處理狀態 | 使用串行同步處理流程 |
-| 組件代碼與流程邏輯混合 | 完全分離視圖邏輯和業務邏輯 |
+| 狀態監聽觸發階段流轉 | 直接回調串聯流程 |
+| 處理邏輯集中在useProcessingFlow | 處理邏輯分散至專門階段Hook |
+| 通過組件監聽處理流程 | 刪除處理組件，使用Hook直接處理 |
+| 複雜的狀態依賴和更新機制 | 簡化的狀態更新和依賴關係 |
 
 ### 效能提升
 
-1. **更快的響應速度**：由於避免了多餘的狀態更新和渲染循環，處理流程更加流暢
+1. **更快的處理速度**：通過直接回調串聯減少了狀態更新和渲染循環，使處理流程更加高效
 
-2. **更少的內存佔用**：減少了狀態存儲和組件重渲染次數
+2. **更少的內存佔用**：專門的階段Hook和更精確的資源管理減少了內存佔用
 
-3. **更清晰的錯誤處理**：統一的錯誤處理機制，錯誤可被準確定位到特定階段
+3. **更好的錯誤隔離**：每個階段Hook處理自己的錯誤，更容易定位和修復問題
 
-4. **更好的擴展性**：
-   - 可輕鬆插入新的處理階段
-   - 可在不同階段間添加用戶干預步驟
-   - 提供統一的回調機制便於外部整合
+4. **更好的可維護性**：
+   - 關注點分離使代碼更易於理解和維護
+   - 各階段邏輯獨立封裝，便於單獨測試
+   - 統一的協調器使整體流程清晰可控
 
 ### API兼容性
 重構實現完全保持了原有API的兼容性，所有後端API的接口和功能保持不變，確保：
