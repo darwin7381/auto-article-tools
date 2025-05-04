@@ -4,6 +4,10 @@ import useUploadStage from './useUploadStage';
 import useExtractStage, { ExtractResult } from './useExtractStage';
 import useAiProcessingStage, { ProcessingResult } from './useAiProcessingStage';
 
+// 重新導出類型以保持兼容性
+export type { ExtractResult } from './useExtractStage';
+export type { ProcessingResult } from './useAiProcessingStage';
+
 interface UseProcessingFlowProps {
   // 處理結果回調
   onProcessSuccess: (result: ProcessingResult) => void;
