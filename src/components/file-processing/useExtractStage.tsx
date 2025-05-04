@@ -26,6 +26,15 @@ interface UseExtractStageProps {
   inputType: 'file' | 'url';
 }
 
+// 執行時的參數
+interface StartExtractionParams {
+  fileUrl?: string;
+  fileType?: string;
+  fileId?: string;
+  urlId?: string;
+  inputType?: 'file' | 'url';
+}
+
 interface UseExtractStageCallbacks {
   onExtractComplete?: (result: ExtractResult) => void;
   onError?: (error: string) => void;
@@ -39,14 +48,6 @@ export default function useExtractStage(
   props: UseExtractStageProps,
   callbacks: UseExtractStageCallbacks
 ) {
-  const {
-    fileUrl,
-    fileType,
-    fileId,
-    urlId,
-    inputType
-  } = props;
-  
   const {
     onExtractComplete,
     onError
@@ -63,7 +64,7 @@ export default function useExtractStage(
   const extractIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 處理文件內容提取
-  const processFileExtraction = async () => {
+  const processFileExtraction = async (fileUrl: string, fileType: string, fileId: string) => {
     if (!fileUrl || !fileType || !fileId) {
       if (onError) onError('缺少必要的文件信息');
       return;
@@ -110,7 +111,7 @@ export default function useExtractStage(
   };
 
   // 處理URL內容提取
-  const processUrlExtraction = async () => {
+  const processUrlExtraction = async (urlId: string) => {
     if (!urlId) {
       if (onError) onError('缺少URL ID');
       return;
@@ -185,11 +186,33 @@ export default function useExtractStage(
   };
 
   // 啟動提取流程
-  const startExtraction = async () => {
+  const startExtraction = async (params?: StartExtractionParams) => {
+    // 合併默認參數和傳入的參數
+    const finalParams = {
+      ...props, // 使用初始化時的默認參數
+      ...params, // 覆蓋為調用時傳入的參數
+    };
+    
+    const inputType = finalParams.inputType || props.inputType;
+    
     if (inputType === 'file') {
-      await processFileExtraction();
+      const fileUrl = finalParams.fileUrl;
+      const fileType = finalParams.fileType;
+      const fileId = finalParams.fileId;
+      
+      if (fileUrl && fileType && fileId) {
+        await processFileExtraction(fileUrl, fileType, fileId);
+      } else {
+        if (onError) onError('缺少文件提取所需的參數');
+      }
     } else if (inputType === 'url') {
-      await processUrlExtraction();
+      const urlId = finalParams.urlId;
+      
+      if (urlId) {
+        await processUrlExtraction(urlId);
+      } else {
+        if (onError) onError('缺少URL提取所需的參數');
+      }
     }
   };
 

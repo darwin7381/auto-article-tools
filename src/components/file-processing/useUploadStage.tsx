@@ -1,13 +1,11 @@
 import { useProcessing } from '@/context/ProcessingContext';
 
 interface UseUploadStageProps {
-  // 文件上傳相關
+  // 默認參數，可在調用時動態替換
+  inputType: 'file' | 'url';
   selectedFile?: File | null;
-  // URL處理相關
   linkUrl?: string;
   linkType?: string;
-  // 共用屬性
-  inputType: 'file' | 'url';
 }
 
 interface UseUploadStageCallbacks {
@@ -16,6 +14,14 @@ interface UseUploadStageCallbacks {
   setIsUploading: (uploading: boolean) => void;
   onFileUploadComplete?: (fileUrl: string, fileType: string, fileId: string) => void;
   onUrlProcessComplete?: (urlId: string) => void;
+}
+
+// 執行時的參數
+interface StartProcessingParams {
+  selectedFile?: File;
+  linkUrl?: string;
+  linkType?: string;
+  inputType?: 'file' | 'url';
 }
 
 /**
@@ -27,13 +33,6 @@ export default function useUploadStage(
   callbacks: UseUploadStageCallbacks
 ) {
   const { 
-    selectedFile,
-    linkUrl,
-    linkType = 'website',
-    inputType
-  } = props;
-
-  const {
     setUploadSuccess,
     setUploadError,
     setIsUploading,
@@ -51,8 +50,8 @@ export default function useUploadStage(
   } = useProcessing();
 
   // 處理文件上傳
-  const processFileUpload = async () => {
-    if (!selectedFile) {
+  const processFileUpload = async (file: File) => {
+    if (!file) {
       setUploadError('請選擇要上傳的文件');
       return;
     }
@@ -62,14 +61,14 @@ export default function useUploadStage(
     try {
       // 初始化處理進度追蹤
       const fileId = `file-${Date.now()}`;
-      startFileProcessing(fileId, selectedFile.name, selectedFile.type, selectedFile.size);
+      startFileProcessing(fileId, file.name, file.type, file.size);
       
       // 更新上傳階段進度
       updateStageProgress('upload', 20, '準備上傳文件...');
       
       // 使用FormData發送文件
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      formData.append('file', file);
       
       updateStageProgress('upload', 50, '正在上傳文件...');
       
@@ -93,7 +92,7 @@ export default function useUploadStage(
       
       // 傳遞文件URL和類型給後續階段
       if (onFileUploadComplete) {
-        onFileUploadComplete(data.fileUrl, selectedFile.type, fileId);
+        onFileUploadComplete(data.fileUrl, file.type, fileId);
       }
     } catch (error) {
       console.error('上傳錯誤:', error);
@@ -106,8 +105,8 @@ export default function useUploadStage(
   };
 
   // 處理URL提交
-  const processUrlSubmit = async () => {
-    if (!linkUrl) {
+  const processUrlSubmit = async (url: string, type: string = 'website') => {
+    if (!url) {
       setUploadError('請輸入有效的連結');
       return;
     }
@@ -116,7 +115,7 @@ export default function useUploadStage(
     
     try {
       // 初始化URL處理進度
-      startUrlProcessing(linkUrl, linkType);
+      startUrlProcessing(url, type);
       
       // 第一階段：URL 解析/上傳
       updateStageProgress('upload', 30, '正在處理URL...');
@@ -126,7 +125,7 @@ export default function useUploadStage(
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: linkUrl, type: linkType }),
+        body: JSON.stringify({ url, type }),
       });
       
       updateStageProgress('upload', 70, '正在解析URL內容...');
@@ -160,12 +159,31 @@ export default function useUploadStage(
     }
   };
 
-  // 啟動處理流程
-  const startProcessing = async () => {
+  // 啟動處理流程 - 支持傳入動態參數
+  const startProcessing = async (params?: StartProcessingParams) => {
+    // 合併默認參數和傳入的參數
+    const finalParams = {
+      ...props, // 使用初始化時的默認參數
+      ...params, // 覆蓋為調用時傳入的參數
+    };
+    
+    const inputType = finalParams.inputType || props.inputType;
+    
     if (inputType === 'file') {
-      await processFileUpload();
+      const file = finalParams.selectedFile || props.selectedFile;
+      if (file) {
+        await processFileUpload(file);
+      } else {
+        setUploadError('請選擇要上傳的文件');
+      }
     } else if (inputType === 'url') {
-      await processUrlSubmit();
+      const url = finalParams.linkUrl || props.linkUrl || '';
+      const type = finalParams.linkType || props.linkType || 'website';
+      if (url) {
+        await processUrlSubmit(url, type);
+      } else {
+        setUploadError('請輸入有效的連結');
+      }
     }
   };
 
