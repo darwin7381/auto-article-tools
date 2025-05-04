@@ -33,7 +33,7 @@ export default function useAiProcessingStage(
   callbacks: UseAiProcessingStageCallbacks
 ) {
   const {
-    extractResult
+    extractResult: initialExtractResult
   } = props;
   
   const {
@@ -52,7 +52,10 @@ export default function useAiProcessingStage(
   const aiIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 處理AI內容增強
-  const startAiProcessing = async () => {
+  const startAiProcessing = async (customExtractResult?: ExtractResult) => {
+    // 使用傳入的extractResult或初始值
+    const extractResult = customExtractResult || initialExtractResult;
+    
     if (!extractResult.markdownKey) {
       if (onProcessError) onProcessError('缺少必要的Markdown數據', extractResult);
       return;
