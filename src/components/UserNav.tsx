@@ -1,12 +1,15 @@
 'use client';
 
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
+import { ThemeToggle } from "./ui/ThemeToggle";
 
 export default function UserNav() {
   const { isSignedIn } = useUser();
 
   return (
     <div className="flex items-center space-x-4">
+      <ThemeToggle />
+      
       {isSignedIn ? (
         <UserButton afterSignOutUrl="/" />
       ) : (

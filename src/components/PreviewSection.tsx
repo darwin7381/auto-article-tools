@@ -1,8 +1,8 @@
 'use client';
 
-import { Card, CardHeader, CardBody } from '@heroui/react';
-import { Tabs, Tab } from '@heroui/react';
-import { Divider } from '@heroui/react';
+import { Card, CardHeader, CardBody } from '@heroui/card';
+import { Tabs, Tab } from '@heroui/tabs';
+import { Divider } from '@heroui/divider';
 
 export default function PreviewSection() {
   // 模擬預覽數據
@@ -34,7 +34,7 @@ export default function PreviewSection() {
               tab: "data-[selected=true]:text-primary-600 dark:data-[selected=true]:text-primary-400"
             }}
           >
-            <Tab key="content" title="內容預覽">
+            <Tab key="content" title="內容預覽" textValue="內容預覽">
               <div className="p-4 space-y-4 mt-4 bg-gray-50 dark:bg-gray-900/30 rounded-large">
                 <h3 className="text-xl font-semibold text-primary-600 dark:text-primary-400">{previewData.title}</h3>
                 <Divider className="bg-gray-200 dark:bg-gray-700" />
@@ -43,7 +43,7 @@ export default function PreviewSection() {
                 </div>
               </div>
             </Tab>
-            <Tab key="metadata" title="元數據">
+            <Tab key="metadata" title="元數據" textValue="元數據">
               <div className="p-4 mt-4 bg-gray-50 dark:bg-gray-900/30 rounded-large">
                 <ul className="space-y-3 divide-y divide-gray-200 dark:divide-gray-700">
                   <li className="flex items-center pt-2">
@@ -61,7 +61,7 @@ export default function PreviewSection() {
                 </ul>
               </div>
             </Tab>
-            <Tab key="html" title="HTML">
+            <Tab key="html" title="HTML" textValue="HTML">
               <div className="p-4 mt-4">
                 <div className="bg-gray-800 p-4 rounded-large overflow-auto text-sm">
                   <code className="text-sm whitespace-pre-wrap text-gray-100 font-mono">

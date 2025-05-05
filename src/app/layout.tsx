@@ -16,10 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-TW">
-      <body className={inter.className}>
+    <html lang="zh-TW" suppressHydrationWarning>
+      <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
         <Providers>
-          <main className="min-h-screen bg-app-bg dark:bg-dark-app-bg text-foreground flex flex-col items-center py-6 md:py-10">
+          <main className="min-h-screen flex flex-col items-center py-6 md:py-10">
             {children}
           </main>
         </Providers>

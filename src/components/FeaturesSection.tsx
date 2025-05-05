@@ -1,7 +1,7 @@
 'use client';
 
-import { Card, CardHeader, CardBody } from '@heroui/react';
-import { Accordion, AccordionItem } from '@heroui/react';
+import { Card, CardHeader, CardBody } from '@heroui/card';
+import { Accordion, AccordionItem } from '@heroui/accordion';
 
 export default function FeaturesSection() {
   const features = [
@@ -44,6 +44,7 @@ export default function FeaturesSection() {
               {features.map((feature, index) => (
                 <AccordionItem 
                   key={index} 
+                  textValue={feature.title}
                   title={
                     <div className="flex items-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 mr-3">
