@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardHeader, CardBody, CardFooter } from '@heroui/react';
-import { Input } from '@heroui/react';
-import { Button } from '@heroui/react';
-import { Checkbox } from '@heroui/react';
-import { Select, SelectItem } from '@heroui/react';
-import { Chip } from '@heroui/react';
+import { Card, CardHeader, CardBody, CardFooter } from '@heroui/card';
+import { Input } from '@heroui/input';
+import { Button } from '@heroui/button';
+import { Checkbox } from '@heroui/checkbox';
+import { Select, SelectItem } from '@heroui/select';
+import { Chip } from '@heroui/chip';
 
 export default function WordPressSection() {
   const [wpUrl, setWpUrl] = useState('');
