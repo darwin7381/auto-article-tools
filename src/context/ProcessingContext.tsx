@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { ProcessState, ProcessStage } from '@/components/progress/ProgressDisplay';
 
 interface ProcessingContextType {
@@ -13,6 +13,7 @@ interface ProcessingContextType {
   completeStage: (stageId: string, message?: string) => void;
   setStageError: (stageId: string, message: string) => void;
   moveToNextStage: () => void;
+  subscribeToProcessState: (callback: (state: ProcessState | null) => void) => () => void;
 }
 
 // 簡化為實際流程的階段
@@ -35,26 +36,72 @@ const initialState: ProcessState = {
   metadata: {},
 };
 
+type ProcessStatusType = 'idle' | 'processing' | 'completed' | 'error';
+
 const ProcessingContext = createContext<ProcessingContextType | undefined>(undefined);
 
 export function ProcessingProvider({ children }: { children: React.ReactNode }) {
   const [processState, setProcessState] = useState<ProcessState | null>(null);
+  const [subscribers, setSubscribers] = useState<Map<string, (state: ProcessState | null) => void>>(new Map());
+
+  // 通知所有訂閱者
+  const notifySubscribers = useCallback((state: ProcessState | null) => {
+    subscribers.forEach(callback => {
+      callback(state);
+    });
+  }, [subscribers]);
+
+  // 訂閱處理狀態變化
+  const subscribeToProcessState = useCallback((callback: (state: ProcessState | null) => void) => {
+    const id = Math.random().toString(36).substring(2, 15);
+    setSubscribers(prev => {
+      const newMap = new Map(prev);
+      newMap.set(id, callback);
+      return newMap;
+    });
+    
+    // 立即執行一次回調，獲取當前狀態
+    if (processState) {
+      callback(processState);
+    }
+    
+    // 返回取消訂閱的函數
+    return () => {
+      setSubscribers(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(id);
+        return newMap;
+      });
+    };
+  }, [processState]);
 
   // 更新進度狀態
-  const updateProcessState = (newState: Partial<ProcessState>) => {
-    setProcessState(prev => {
-      if (!prev) return null;
-      return { ...prev, ...newState };
+  const updateProcessState = useCallback((newState: Partial<ProcessState>) => {
+    setProcessState(prevState => {
+      if (!prevState) return null;
+      const updated = { ...prevState, ...newState };
+      
+      // 確保在後台通知後再返回
+      setTimeout(() => {
+        notifySubscribers(updated);
+      }, 0);
+      
+      return updated;
     });
-  };
+  }, [notifySubscribers]);
 
   // 重置狀態
-  const resetProcessState = () => {
+  const resetProcessState = useCallback(() => {
     setProcessState(null);
-  };
+    
+    // 通知所有訂閱者狀態已重置
+    setTimeout(() => {
+      notifySubscribers(null);
+    }, 0);
+  }, [notifySubscribers]);
 
   // 開始文件處理
-  const startFileProcessing = (fileId: string, fileName: string, fileType: string, fileSize: number) => {
+  const startFileProcessing = useCallback((fileId: string, fileName: string, fileType: string, fileSize: number) => {
     const newState: ProcessState = {
       ...JSON.parse(JSON.stringify(initialState)), // 深拷貝避免引用問題
       id: fileId,
@@ -76,11 +123,17 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
       ...newState.stages[0],
       status: 'processing'
     };
+    
     setProcessState(newState);
-  };
+    
+    // 通知所有訂閱者
+    setTimeout(() => {
+      notifySubscribers(newState);
+    }, 0);
+  }, [notifySubscribers]);
 
   // 開始URL處理
-  const startUrlProcessing = (url: string, urlType: string) => {
+  const startUrlProcessing = useCallback((url: string, urlType: string) => {
     const newState: ProcessState = {
       ...JSON.parse(JSON.stringify(initialState)), // 深拷貝避免引用問題
       id: `url-${Date.now()}`,
@@ -101,15 +154,21 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
       ...newState.stages[0],
       status: 'processing'
     };
+    
     setProcessState(newState);
-  };
+    
+    // 通知所有訂閱者
+    setTimeout(() => {
+      notifySubscribers(newState);
+    }, 0);
+  }, [notifySubscribers]);
 
   // 更新階段進度
-  const updateStageProgress = (stageId: string, progress: number, message?: string) => {
-    setProcessState(prev => {
-      if (!prev) return null;
+  const updateStageProgress = useCallback((stageId: string, progress: number, message?: string) => {
+    setProcessState(prevState => {
+      if (!prevState) return null;
       
-      const newStages = prev.stages.map(stage => 
+      const newStages = prevState.stages.map(stage => 
         stage.id === stageId 
           ? { ...stage, progress, message, status: 'processing' as const } 
           : stage
@@ -124,104 +183,133 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
       
       // 加上當前階段的進度比例
       const currentStageIndex = newStages.findIndex(s => s.id === stageId);
-      if (currentStageIndex === -1) return prev;
+      if (currentStageIndex === -1) return prevState;
       
       const currentStageProgress = (progress / 100) * (1 / totalStages) * 100;
       const overallProgress = baseProgress + currentStageProgress;
       
-      return {
-        ...prev,
+      const updated = {
+        ...prevState,
         stages: newStages,
         overall: {
-          ...prev.overall,
+          ...prevState.overall,
           progress: Math.min(overallProgress, 99), // 最多99%，保留完成階段設置100%
         }
       };
+      
+      // 通知所有訂閱者
+      setTimeout(() => {
+        notifySubscribers(updated);
+      }, 0);
+      
+      return updated;
     });
-  };
+  }, [notifySubscribers]);
 
   // 完成階段
-  const completeStage = (stageId: string, message?: string) => {
-    setProcessState(prev => {
-      if (!prev) return null;
+  const completeStage = useCallback((stageId: string, message?: string) => {
+    setProcessState(prevState => {
+      if (!prevState) return null;
       
-      const newStages = prev.stages.map(stage => 
+      const newStages = prevState.stages.map(stage => 
         stage.id === stageId 
           ? { ...stage, progress: 100, status: 'completed' as const, message } 
           : stage
       );
       
       // 檢查是否是最後一個階段，如果是則設置整體狀態為完成
+      let updated;
       if (stageId === 'complete') {
-        return {
-          ...prev,
+        updated = {
+          ...prevState,
           stages: newStages,
           overall: {
-            ...prev.overall,
+            ...prevState.overall,
             progress: 100,
-            status: 'completed'
+            status: 'completed' as ProcessStatusType,
           }
+        };
+      } else {
+        updated = {
+          ...prevState,
+          stages: newStages,
         };
       }
       
-      return {
-        ...prev,
-        stages: newStages,
-      };
+      // 通知所有訂閱者
+      setTimeout(() => {
+        notifySubscribers(updated);
+      }, 0);
+      
+      return updated;
     });
-  };
+  }, [notifySubscribers]);
 
   // 設置階段錯誤
-  const setStageError = (stageId: string, message: string) => {
-    setProcessState(prev => {
-      if (!prev) return null;
+  const setStageError = useCallback((stageId: string, message: string) => {
+    setProcessState(prevState => {
+      if (!prevState) return null;
       
-      const newStages = prev.stages.map(stage => 
+      const newStages = prevState.stages.map(stage => 
         stage.id === stageId 
           ? { ...stage, status: 'error' as const, message } 
           : stage
       );
       
-      return {
-        ...prev,
+      const updated = {
+        ...prevState,
         stages: newStages,
         overall: {
-          ...prev.overall,
-          status: 'error',
+          ...prevState.overall,
+          status: 'error' as ProcessStatusType,
         }
       };
+      
+      // 通知所有訂閱者
+      setTimeout(() => {
+        notifySubscribers(updated);
+      }, 0);
+      
+      return updated;
     });
-  };
+  }, [notifySubscribers]);
 
   // 移動到下一個階段
-  const moveToNextStage = () => {
-    setProcessState(prev => {
-      if (!prev) return null;
+  const moveToNextStage = useCallback(() => {
+    setProcessState(prevState => {
+      if (!prevState) return null;
       
-      const currentIndex = prev.stages.findIndex(stage => stage.id === prev.currentStage);
-      if (currentIndex === -1 || currentIndex >= prev.stages.length - 1) {
+      const currentIndex = prevState.stages.findIndex(stage => stage.id === prevState.currentStage);
+      if (currentIndex === -1 || currentIndex >= prevState.stages.length - 1) {
         // 已是最後階段，標記為完成
-        if (currentIndex === prev.stages.length - 1) {
-          const finalStages = prev.stages.map((stage, idx) => 
+        if (currentIndex === prevState.stages.length - 1) {
+          const finalStages = prevState.stages.map((stage, idx) => 
             idx === currentIndex 
               ? { ...stage, status: 'completed' as const, progress: 100 } 
               : stage
           );
           
-          return {
-            ...prev,
+          const updated = {
+            ...prevState,
             stages: finalStages,
             overall: {
               progress: 100,
-              status: 'completed',
+              status: 'completed' as ProcessStatusType,
             }
           };
+          
+          // 通知所有訂閱者
+          setTimeout(() => {
+            notifySubscribers(updated);
+          }, 0);
+          
+          return updated;
         }
-        return prev;
+        return prevState;
       }
       
       // 當前階段標記為完成
-      const newStages = [...prev.stages];
+      const newStages = [...prevState.stages];
       newStages[currentIndex] = { 
         ...newStages[currentIndex], 
         status: 'completed' as const, 
@@ -229,7 +317,7 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
       };
       
       // 下一階段標記為處理中
-      const nextStage = prev.stages[currentIndex + 1].id;
+      const nextStage = prevState.stages[currentIndex + 1].id;
       newStages[currentIndex + 1] = { 
         ...newStages[currentIndex + 1], 
         status: 'processing' as const, 
@@ -252,17 +340,24 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
         overallProgress = baseProgress + currentProgress;
       }
       
-      return {
-        ...prev,
+      const updated = {
+        ...prevState,
         stages: newStages,
         currentStage: nextStage,
         overall: {
-          ...prev.overall,
+          ...prevState.overall,
           progress: overallProgress,
         }
       };
+      
+      // 通知所有訂閱者
+      setTimeout(() => {
+        notifySubscribers(updated);
+      }, 0);
+      
+      return updated;
     });
-  };
+  }, [notifySubscribers]);
 
   const value = {
     processState,
@@ -274,6 +369,7 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     completeStage,
     setStageError,
     moveToNextStage,
+    subscribeToProcessState
   };
 
   return (
