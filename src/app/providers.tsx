@@ -7,7 +7,7 @@ import { ReactNode } from "react";
 import { ProcessingProvider } from "@/context/ProcessingContext";
 import { ThemeProvider } from "next-themes";
 
-// 直接使用 HeroUIProvider，不再需要嵌套的主題感知包裝器
+// 使用 HeroUIProvider 提供全局配置
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider appearance={{ baseTheme: dark }}>

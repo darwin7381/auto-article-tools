@@ -22,15 +22,15 @@ export function ThemeToggle() {
   return (
     <Button
       isIconOnly
-      variant="bordered"
+      variant="light"
+      size="sm"
       aria-label={isDark ? "切換到亮色模式" : "切換到暗色模式"}
-      className="bg-transparent text-primary-500 border-primary-300 dark:border-primary-600"
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
     >
       {isDark ? (
-        <SunIcon className="h-5 w-5" />
+        <SunIcon className="h-[1.2rem] w-[1.2rem] text-default-500" />
       ) : (
-        <MoonIcon className="h-5 w-5" />
+        <MoonIcon className="h-[1.2rem] w-[1.2rem] text-default-500" />
       )}
     </Button>
   );

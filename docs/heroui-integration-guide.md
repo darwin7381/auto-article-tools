@@ -318,3 +318,177 @@ npx heroui-cli@latest add @heroui/react
 - [HeroUI Provider API](https://www.heroui.com/docs/api-references/heroui-provider)
 - [Tailwind CSS 主題定制](https://www.heroui.com/docs/customization/theme) 
 - [HeroUI CLI 工具](https://www.heroui.com/docs/api-references/cli-api) 
+
+## 最新發現問題與優化建議
+
+在深入比對 HeroUI 官方文件及現有實現後，我們識別出以下仍需調整的問題：
+
+### 1. Tailwind 配置文件格式問題 - ✅ 已解決
+
+**問題**：現有的 `tailwind.config.js` 使用 CommonJS 格式 (`require`/`module.exports`)，導致 ESLint 顯示警告。
+
+**解決方案**：
+- 添加 ESLint 忽略註釋 `// eslint-disable-next-line @typescript-eslint/no-require-imports`
+- 確認官方文檔中也使用了 CommonJS 風格，這是適當的實踐
+
+**官方示例**：官方文檔中 Tailwind 配置的示例實際上也使用了 CommonJS 風格：
+```js
+// tailwind.config.js
+const { heroui } = require("@heroui/theme");
+
+module.exports = {
+  content: ["./node_modules/@heroui/theme/dist/components/*.js"],
+  theme: {
+    extend: {},
+  },
+  darkMode: "class",
+  plugins: [heroui()],
+};
+```
+
+### 2. HeroUIProvider 導入方式 - ✅ 已確認
+
+**問題**：`providers.tsx` 仍從 `@heroui/react` 導入 `HeroUIProvider`
+
+**官方標準**：根據 HeroUI 官方文檔，Provider 確實應從主包導入：
+```jsx
+import { HeroUIProvider } from "@heroui/react";
+```
+
+**結論**：這部分我們的實現是正確的，Provider 不需要從獨立包導入。
+
+### 3. 仍有部分 UI 組件庫使用 @heroui/react - ✅ 已修正
+
+**問題**：根據搜索結果，有 6 個文件使用 `@heroui/react` 導入組件
+- src/components/ui/tabs/Tabs.tsx
+- src/components/ui/card/Card.tsx
+- src/components/ui/progress/Progress.tsx
+- src/components/ui/input/Input.tsx
+- src/components/ui/button/Button.tsx
+- src/components/progress/ProgressDisplay.tsx
+
+**官方明確警告**：
+> "**Important 🚨**: Note that you need to import the component from the individual package, not from `@heroui/react`."
+
+**已完成的修改**：
+- 所有 UI 組件文件已更新，改為從對應的獨立包導入，例如：
+  ```jsx
+  // 修改前
+  import { Button as HeroButton } from '@heroui/react';
+  
+  // 修改後
+  import { Button as HeroButton } from '@heroui/button';
+  ```
+
+### 4. Next.js 18/19 兼容性考慮 - ⚠️ 持續關注
+
+**問題**：HeroUI 官方文檔提到對完整的 React 19 支持正在進行中
+
+**官方規劃**：
+> "Complete React 19 support and codebase migration"
+
+**建議**：密切關注 HeroUI 更新，確保在未來 React 19 版本發布時能順利過渡
+
+### 5. Tailwind CSS v4 支持 - ⚠️ 持續關注
+
+**問題**：官方提到準備支持 Tailwind CSS v4，當前項目已使用 v4
+
+**官方規劃**：
+> "Tailwind CSS v4 support"
+
+**優化建議**：
+- 保持當前使用的 Tailwind CSS v4
+- 持續關注 HeroUI 對 Tailwind CSS v4 的官方支持更新，可能需要調整配置
+
+### 6. ESM 與 CommonJS 混用問題 - ✅ 部分解決
+
+**問題**：項目中同時存在 ESM (import/export) 和 CommonJS (require/module.exports) 模式，可能導致構建與開發環境不一致
+
+**解決進展**：
+- 確認 Tailwind 配置使用 CommonJS 是符合官方示例的做法
+- 使用 ESLint 忽略註釋處理特定文件中的 require 導入警告
+
+### 7. HeroUI CLI 工具完整利用 - ✅ 已確認
+
+**問題**：我們可能未完全利用 HeroUI CLI 的全部功能來管理組件
+
+**處理方式**：
+- 確認所用 HeroUI 組件已是最新版本
+- 測試使用 `npx heroui-cli@latest upgrade` 命令確認組件版本狀態
+ˇˇ
+### 8. HeroUIProvider 全局動畫控制 - ⚠️ 新發現
+
+**問題**：HeroUI v2.4.0 引入了新的 Provider 選項，用於全局控制動畫
+
+**官方說明**：
+> "Disable Animations Globally - Allows users to disable animation globally via HeroUIProvider"
+
+**建議實現**：
+```jsx
+<HeroUIProvider disableAnimation>
+  {children}
+</HeroUIProvider>
+```
+
+**優化建議**：
+- 考慮在性能受限設備上使用此選項提高應用性能
+- 可在開發環境中使用此選項減少視覺干擾
+
+### 9. 其他新增 API 屬性 - ⚠️ 新發現
+
+**問題**：HeroUI v2.4.0 引入了新的通用屬性
+
+**官方提及的新屬性**：
+- `disableRipple` - 禁用漣漪動畫效果
+- `skipFramerMotionAnimations` - 跳過 Framer Motion 動畫
+- `validationBehavior` - 表單驗證行為設置
+
+**建議**：
+- 在適當的組件中考慮使用這些屬性以提高用戶體驗
+- 設計系統時考慮這些屬性提供的靈活性
+
+## 已完成修改摘要
+
+以下是我們針對 HeroUI 整合的具體修改：
+
+1. **ESLint 警告解決**：
+   - 在 `tailwind.config.js` 添加適當的 ESLint 忽略註釋
+   - 確認使用 CommonJS 格式符合官方示例
+
+2. **正確的組件導入方式**：
+   - 將 6 個使用 `@heroui/react` 導入的文件更新為使用對應獨立包
+   - 保留 Provider 從主包導入的方式，符合官方建議
+
+3. **組件版本管理**：
+   - 使用 HeroUI CLI 的 `upgrade` 命令確認組件版本狀態
+   - 確認所有組件均為最新版本
+
+## 後續監控要點
+
+1. **React 19 兼容性**：
+   - 持續關注 HeroUI 對 React 19 的官方支持進展
+   - 準備好在適當時機進行相應更新
+
+2. **Tailwind CSS v4 整合**：
+   - 監控 HeroUI 關於 Tailwind CSS v4 的正式支持通知
+   - 準備好調整配置以適應官方的 Tailwind CSS v4 支持方式
+
+3. **模塊系統一致性**：
+   - 在未來的組件開發中保持導入方式的一致性
+   - 優先使用官方建議的獨立包導入方式
+   - 在添加新組件時始終使用 CLI 工具
+
+```bash
+# 添加單個組件
+npx heroui-cli@latest add button
+
+# 添加多個組件
+npx heroui-cli@latest add button card input
+
+# 更新組件版本
+npx heroui-cli@latest upgrade
+```
+
+4. **全局選項**：
+   - 評估是否需要使用新的全局設置，如 `disableAnimation`
+   - 考慮性能與用戶體驗的平衡，為不同設備類型優化

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Card as HeroCard, CardHeader as HeroCardHeader, CardBody as HeroCardBody, CardFooter as HeroCardFooter } from '@heroui/react';
+import { Card as HeroCard, CardHeader as HeroCardHeader, CardBody as HeroCardBody, CardFooter as HeroCardFooter } from '@heroui/card';
 
 export type CardProps = {
   children: React.ReactNode;
@@ -25,7 +25,14 @@ export type CardFooterProps = {
 
 export function Card({ children, className = '' }: CardProps) {
   return (
-    <HeroCard className={`border-none shadow-none ${className}`}>
+    <HeroCard 
+      className={`${className}`}
+      shadow="sm"
+      radius="md"
+      classNames={{
+        base: "bg-background border-divider",
+      }}
+    >
       {children}
     </HeroCard>
   );
@@ -33,7 +40,7 @@ export function Card({ children, className = '' }: CardProps) {
 
 export function CardHeader({ children, className = '' }: CardHeaderProps) {
   return (
-    <HeroCardHeader className={className}>
+    <HeroCardHeader className={`pb-0 pt-5 px-5 ${className}`}>
       {children}
     </HeroCardHeader>
   );
@@ -41,7 +48,7 @@ export function CardHeader({ children, className = '' }: CardHeaderProps) {
 
 export function CardBody({ children, className = '' }: CardBodyProps) {
   return (
-    <HeroCardBody className={className}>
+    <HeroCardBody className={`py-5 px-5 ${className}`}>
       {children}
     </HeroCardBody>
   );
@@ -49,7 +56,7 @@ export function CardBody({ children, className = '' }: CardBodyProps) {
 
 export function CardFooter({ children, className = '' }: CardFooterProps) {
   return (
-    <HeroCardFooter className={className}>
+    <HeroCardFooter className={`pt-0 pb-5 px-5 ${className}`}>
       {children}
     </HeroCardFooter>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Button as HeroButton, ButtonProps as HeroButtonProps } from '@heroui/react';
+import { Button as HeroButton, ButtonProps as HeroButtonProps } from '@heroui/button';
 
 export interface ButtonProps extends Omit<HeroButtonProps, 'fullWidth'> {
   children: React.ReactNode;
@@ -17,13 +17,19 @@ export function Button({
   isFullWidth = false, 
   startIcon,
   endIcon,
+  radius,
+  variant,
+  color,
   ...props 
 }: ButtonProps) {
   return (
     <HeroButton 
-      className={`font-medium inline-flex items-center justify-center whitespace-nowrap ${isFullWidth ? 'w-full' : ''} ${className}`}
+      className={`${isFullWidth ? 'w-full' : ''} ${className}`}
       startContent={startIcon}
       endContent={endIcon}
+      radius={radius}
+      variant={variant}
+      color={color}
       {...props}
     >
       {children}

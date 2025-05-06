@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Progress as HeroProgress, ProgressProps as HeroProgressProps } from '@heroui/react';
+import { Progress as HeroProgress, ProgressProps as HeroProgressProps } from '@heroui/progress';
 
 export interface ProgressProps extends HeroProgressProps {
   className?: string;

@@ -2,15 +2,15 @@
 
 /* 確保與 HeroUI 的主題系統兼容 */
 :root {
-  --foreground-default: #171717;
-  --background-default: #ffffff;
+  --text-foreground: var(--heroui-foreground);
+  --bg-background: var(--heroui-background);
 }
 
 .dark {
-  --foreground-default: #ededed;
-  --background-default: #0a0a0a;
+  --text-foreground: var(--heroui-foreground);
+  --bg-background: var(--heroui-background);
 }
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans, system-ui, sans-serif);
 }
