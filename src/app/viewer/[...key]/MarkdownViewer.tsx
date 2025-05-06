@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import DOMPurify from 'isomorphic-dompurify';
+import { Marked } from 'marked';
 
 interface MarkdownViewerProps {
   content: string;
@@ -18,26 +19,25 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
   const [articleHtml, setArticleHtml] = useState('');
   
   // 使用useCallback優化函數，防止不必要的重複創建
-  const convertToArticleHtml = useCallback((markdownContent: string) => {
+  const convertToArticleHtml = useCallback(async (markdownContent: string) => {
     if (!markdownContent) return;
     
     // 將相對路徑的圖片轉換為絕對路徑
     let processedContent = markdownContent;
     const baseUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://files.blocktempo.ai';
     
-    // 替換標準Markdown圖片語法 ![alt](url)
+    // 替換標準Markdown圖片語法中的相對路徑為絕對路徑
     processedContent = processedContent.replace(
       /!\[(.*?)\]\((?!http)(.*?)\)/g, 
-      (match, alt, url) => {
+      (match: string, alt: string, url: string) => {
         return `![${alt}](${baseUrl}/${url})`;
       }
     );
     
-    // 使用臨時DOM元素將ReactMarkdown轉換的內容保存為HTML字符串
-    const tempElement = document.createElement('div');
-    tempElement.className = 'markdown-body';
+    // 移除可能存在的 ```markdown 起始標記（非標準Markdown語法）
+    processedContent = processedContent.replace(/```markdown\n/g, '');
+    processedContent = processedContent.replace(/```\n$/g, '');
     
-    // 這裡我們手動將Markdown轉換為HTML
     // 頭部標題處理
     const titleMatch = processedContent.match(/^#\s+(.+)$/m);
     let articleTitle = title;
@@ -46,42 +46,24 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
       processedContent = processedContent.replace(/^#\s+(.+)$/m, '');
     }
     
+    // 使用marked庫解析Markdown為HTML，啟用GitHub風格Markdown支持
+    const marked = new Marked({
+      gfm: true,
+      breaks: true,
+      pedantic: false
+    });
+    
+    // 解析Markdown為HTML
+    const parsedHtml = await marked.parse(processedContent);
+    
     // 處理圖片，確保圖片正常顯示
-    processedContent = processedContent.replace(/!\[(.*?)\]\((.*?)\)/g, 
-      (match, alt, url) => {
+    const enhancedHtml = (parsedHtml as string).replace(/<img src="(.*?)"(.+?)>/g, 
+      (match: string, src: string, attrs: string) => {
         return `<figure class="article-image">
-          <img src="${url}" alt="${alt || ''}" loading="lazy" />
-          ${alt ? `<figcaption>${alt}</figcaption>` : ''}
+          <img src="${src}" ${attrs} loading="lazy" />
         </figure>`;
       }
     );
-    
-    // 處理標題
-    processedContent = processedContent.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
-    processedContent = processedContent.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
-    
-    // 處理段落
-    processedContent = processedContent.replace(/^(?![<#])(.*)\n$/gm, '<p>$1</p>');
-    
-    // 處理列表
-    processedContent = processedContent.replace(/^-\s+(.+)$/gm, '<li>$1</li>');
-    processedContent = processedContent.replace(/(<li>.*<\/li>\n)+/g, '<ul>$&</ul>');
-    
-    // 處理代碼塊
-    processedContent = processedContent.replace(/```(.*)\n([\s\S]*?)\n```/g, 
-      (match, lang, code) => {
-        return `<pre><code class="language-${lang}">${code}</code></pre>`;
-      }
-    );
-    
-    // 處理鏈接
-    processedContent = processedContent.replace(/\[(.*?)\]\((.*?)\)/g, 
-      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-    );
-    
-    // 處理強調
-    processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
     
     // 清理HTML並設置
     const sanitizedHtml = DOMPurify.sanitize(`
@@ -90,7 +72,7 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
           <h1>${articleTitle}</h1>
         </header>
         <div class="article-content">
-          ${processedContent}
+          ${enhancedHtml}
         </div>
       </article>
     `);
@@ -233,6 +215,33 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
           font-weight: 600;
           margin-top: 2rem;
           margin-bottom: 1rem;
+        }
+        
+        .article-content h4 {
+          font-size: 1.15rem;
+          font-weight: 600;
+          margin-top: 1.75rem;
+          margin-bottom: 0.75rem;
+        }
+        
+        .article-content h5 {
+          font-size: 1rem;
+          font-weight: 600;
+          margin-top: 1.5rem;
+          margin-bottom: 0.5rem;
+        }
+        
+        .article-content h6 {
+          font-size: 0.95rem;
+          font-weight: 600;
+          margin-top: 1.5rem;
+          margin-bottom: 0.5rem;
+        }
+        
+        .article-content hr {
+          margin: 2rem 0;
+          border: 0;
+          border-top: 1px solid rgba(0,0,0,0.1);
         }
         
         .article-content p {
