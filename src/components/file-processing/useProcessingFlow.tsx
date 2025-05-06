@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useProcessing } from '@/context/ProcessingContext';
 import useUploadStage from './useUploadStage';
 import useExtractStage, { ExtractResult } from './useExtractStage';
@@ -38,13 +38,74 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     setIsUploading
   } = props;
 
+  // 使用引用存储回调函数，避免不必要的重新渲染
+  const callbacksRef = useRef({
+    onProcessSuccess,
+    onProcessError,
+    onStageComplete,
+    onFileUploadComplete
+  });
+  
+  // 更新引用中的回调值
+  callbacksRef.current = {
+    onProcessSuccess,
+    onProcessError,
+    onStageComplete,
+    onFileUploadComplete
+  };
+
   // 獲取ProcessingContext函數
   const { 
     startFileProcessing,
     startUrlProcessing
   } = useProcessing();
 
-  // 1. 上傳階段Hook
+  // 提前初始化所有阶段，但优化其内部处理逻辑
+  const extractStage = useExtractStage(
+    { 
+      inputType: 'file'
+    },
+    {
+      onExtractComplete: async (result) => {
+        console.log('提取階段完成:', result);
+        
+        callbacksRef.current.onStageComplete('extract', result);
+        
+        // 直接開始AI處理階段
+        if (result.markdownKey) {
+          try {
+            await aiProcessingStage.startAiProcessing(result);
+          } catch (error) {
+            console.error('AI處理階段錯誤:', error);
+            const errorMessage = error instanceof Error ? error.message : 'AI處理階段失敗';
+            callbacksRef.current.onProcessError(errorMessage, 'process');
+          }
+        }
+      },
+      onError: (error) => {
+        callbacksRef.current.onProcessError(error, 'extract');
+      }
+    }
+  );
+
+  // AI处理阶段
+  const aiProcessingStage = useAiProcessingStage(
+    { 
+      extractResult: {} as ExtractResult
+    },
+    {
+      onProcessComplete: (result) => {
+        console.log('AI處理階段完成:', result);
+        callbacksRef.current.onProcessSuccess(result);
+        callbacksRef.current.onStageComplete('process', result);
+      },
+      onProcessError: (error) => {
+        callbacksRef.current.onProcessError(error, 'process');
+      }
+    }
+  );
+
+  // 上传阶段
   const uploadStage = useUploadStage(
     { 
       inputType: 'file'
@@ -57,11 +118,11 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         console.log('上傳階段完成:', { fileUrl, fileType, fileId });
         
         // 傳遞外部回調
-        if (onFileUploadComplete) {
-          onFileUploadComplete(fileUrl, fileId);
+        if (callbacksRef.current.onFileUploadComplete) {
+          callbacksRef.current.onFileUploadComplete(fileUrl, fileId);
         }
         
-        onStageComplete('upload', { fileUrl, fileType, fileId });
+        callbacksRef.current.onStageComplete('upload', { fileUrl, fileType, fileId });
         
         // 直接開始提取階段
         try {
@@ -74,13 +135,13 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         } catch (error) {
           console.error('提取階段錯誤:', error);
           const errorMessage = error instanceof Error ? error.message : '提取階段處理失敗';
-          onProcessError(errorMessage, 'extract');
+          callbacksRef.current.onProcessError(errorMessage, 'extract');
         }
       },
       onUrlProcessComplete: async (urlId) => {
         console.log('URL處理階段完成:', { urlId });
         
-        onStageComplete('upload', { urlId });
+        callbacksRef.current.onStageComplete('upload', { urlId });
         
         // 直接開始提取階段
         try {
@@ -91,53 +152,8 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         } catch (error) {
           console.error('提取階段錯誤:', error);
           const errorMessage = error instanceof Error ? error.message : '提取階段處理失敗';
-          onProcessError(errorMessage, 'extract');
+          callbacksRef.current.onProcessError(errorMessage, 'extract');
         }
-      }
-    }
-  );
-
-  // 2. 內容提取階段Hook
-  const extractStage = useExtractStage(
-    { 
-      inputType: 'file'
-    },
-    {
-      onExtractComplete: async (result) => {
-        console.log('提取階段完成:', result);
-        
-        onStageComplete('extract', result);
-        
-        // 直接開始AI處理階段
-        if (result.markdownKey) {
-          try {
-            await aiProcessingStage.startAiProcessing(result);
-          } catch (error) {
-            console.error('AI處理階段錯誤:', error);
-            const errorMessage = error instanceof Error ? error.message : 'AI處理階段失敗';
-            onProcessError(errorMessage, 'process');
-          }
-        }
-      },
-      onError: (error) => {
-        onProcessError(error, 'extract');
-      }
-    }
-  );
-
-  // 3. AI處理階段Hook
-  const aiProcessingStage = useAiProcessingStage(
-    { 
-      extractResult: {} as ExtractResult
-    },
-    {
-      onProcessComplete: (result) => {
-        console.log('AI處理階段完成:', result);
-        onProcessSuccess(result);
-        onStageComplete('process', result);
-      },
-      onProcessError: (error) => {
-        onProcessError(error, 'process');
       }
     }
   );
@@ -158,6 +174,9 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
       const fileId = `file-${Date.now()}`;
       startFileProcessing(fileId, file.name, file.type, file.size);
       
+      // 延时处理，减轻UI卡顿
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       // 執行文件上傳階段 - 後續階段通過回調串聯
       await uploadStage.startProcessing({
         inputType: 'file',
@@ -168,7 +187,7 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
       // 處理未被子hook捕獲的錯誤
       console.error('處理文件整體錯誤:', error);
       const errorMessage = error instanceof Error ? error.message : '文件處理失敗';
-      onProcessError(errorMessage, 'general');
+      callbacksRef.current.onProcessError(errorMessage, 'general');
     } finally {
       setIsProcessing(false);
     }
@@ -176,7 +195,6 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     startFileProcessing, 
     uploadStage, 
     setIsProcessing,
-    onProcessError
   ]);
   
   // 處理URL和處理流程 - 協調器
@@ -186,6 +204,9 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     try {
       // 初始化URL處理進度
       startUrlProcessing(url, type);
+      
+      // 延时处理，减轻UI卡顿
+      await new Promise(resolve => setTimeout(resolve, 0));
       
       // 執行URL處理階段 - 後續階段通過回調串聯
       await uploadStage.startProcessing({
@@ -198,7 +219,7 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
       // 處理未被子hook捕獲的錯誤
       console.error('處理URL整體錯誤:', error);
       const errorMessage = error instanceof Error ? error.message : 'URL處理失敗';
-      onProcessError(errorMessage, 'general');
+      callbacksRef.current.onProcessError(errorMessage, 'general');
     } finally {
       setIsProcessing(false);
     }
@@ -206,7 +227,6 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     startUrlProcessing, 
     uploadStage, 
     setIsProcessing,
-    onProcessError
   ]);
 
   return {
