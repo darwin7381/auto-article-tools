@@ -2,6 +2,7 @@
 
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
 import { ThemeToggle } from "./ui/ThemeToggle";
+import { Button } from "@/components/ui/button/Button";
 
 export default function UserNav() {
   const { isSignedIn } = useUser();
@@ -15,14 +16,26 @@ export default function UserNav() {
       ) : (
         <>
           <SignInButton mode="modal">
-            <button className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md shadow-sm dark:bg-primary-500 dark:hover:bg-primary-600">
+            <Button 
+              color="primary"
+              variant="solid"
+              size="sm"
+              radius="md"
+              className="font-medium"
+            >
               登入
-            </button>
+            </Button>
           </SignInButton>
           <SignUpButton mode="modal">
-            <button className="px-4 py-2 text-sm font-medium text-white bg-secondary-600 hover:bg-secondary-700 rounded-md shadow-sm dark:bg-secondary-500 dark:hover:bg-secondary-600">
+            <Button 
+              color="secondary"
+              variant="solid"
+              size="sm"
+              radius="md"
+              className="font-medium"
+            >
               註冊
-            </button>
+            </Button>
           </SignUpButton>
         </>
       )}
