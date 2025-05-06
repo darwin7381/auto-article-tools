@@ -8,7 +8,7 @@ import UserNav from "../components/UserNav";
 export default function HomePage() {
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 p-4 shadow border-b border-divider">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-primary-100 to-secondary-100 dark:from-primary-900 dark:to-secondary-900 p-4 shadow border-b border-divider backdrop-blur-sm">
         <div className="container mx-auto max-w-5xl">
           <div className="flex justify-between items-center">
           <div>

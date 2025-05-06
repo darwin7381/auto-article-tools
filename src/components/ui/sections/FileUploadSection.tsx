@@ -93,24 +93,27 @@ export function FileUploadSection({ className = '' }: FileUploadSectionProps) {
     setProcessSuccess(false);
     setMarkdownUrl(null);
     
-    try {
-      if (selectedTab === 'file' && selectedFile) {
-        // 使用統一流程處理文件
-        await processingFlow.processFile(selectedFile);
-      } else if (selectedTab === 'link' && linkUrl) {
-        // 使用統一流程處理URL
-        await processingFlow.processUrl(linkUrl, linkType);
-      } else {
-        setUploadError(selectedTab === 'file' ? '請選擇要上傳的文件' : '請輸入有效的連結');
+    // 延迟执行后续处理以减轻点击按钮时的负担
+    setTimeout(async () => {
+      try {
+        if (selectedTab === 'file' && selectedFile) {
+          // 使用統一流程處理文件
+          await processingFlow.processFile(selectedFile);
+        } else if (selectedTab === 'link' && linkUrl) {
+          // 使用統一流程處理URL
+          await processingFlow.processUrl(linkUrl, linkType);
+        } else {
+          setUploadError(selectedTab === 'file' ? '請選擇要上傳的文件' : '請輸入有效的連結');
+        }
+      } catch (error) {
+        console.error('處理錯誤:', error);
+        setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
+        
+        // 設置錯誤狀態
+        const currentStage = processState?.currentStage || 'upload';
+        setStageError(currentStage, error instanceof Error ? error.message : '處理失敗，請稍後重試');
       }
-    } catch (error) {
-      console.error('處理錯誤:', error);
-      setUploadError(error instanceof Error ? error.message : '處理失敗，請稍後重試');
-      
-      // 設置錯誤狀態
-      const currentStage = processState?.currentStage || 'upload';
-      setStageError(currentStage, error instanceof Error ? error.message : '處理失敗，請稍後重試');
-    }
+    }, 0);
   };
 
   const handleFileChange = (file: File) => {
@@ -414,7 +417,7 @@ export function FileUploadSection({ className = '' }: FileUploadSectionProps) {
   ];
 
   const footerActions = (
-    <div className="flex justify-end gap-3">
+    <div className="flex justify-end gap-3 w-full">
       <Button 
         color="primary" 
         variant="flat"
@@ -452,6 +455,11 @@ export function FileUploadSection({ className = '' }: FileUploadSectionProps) {
         items={tabItems}
         selectedKey={selectedTab}
         onSelectionChange={(key) => setSelectedTab(key.toString())}
+        color="primary"
+        variant="solid"
+        radius="md"
+        size="md"
+        className="w-full"
       />
     </Section>
   );

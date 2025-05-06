@@ -35,7 +35,7 @@ export function Section({
         </CardBody>
         
         {footer && (
-          <CardFooter className="pt-5">
+          <CardFooter className="pt-5 flex justify-end">
             {footer}
           </CardFooter>
         )}

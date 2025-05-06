@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { Button } from '../button/Button';
 
 export interface FileUploadProps {
@@ -24,19 +24,17 @@ export function FileUpload({
 }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAreaClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
+  const handleAreaClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       onFileChange(e.target.files[0]);
     }
-  };
+  }, [onFileChange]);
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -46,17 +44,17 @@ export function FileUpload({
         onFileChange(file);
       }
     }
-  };
+  }, [onFileChange, accept]);
   
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-  };
+  }, []);
   
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-  };
+  }, []);
 
   const isValidFileType = (file: File, acceptTypes: string): boolean => {
     const types = acceptTypes.split(',').map(type => type.trim());
@@ -112,7 +110,10 @@ export function FileUpload({
             />
             <Button
               type="button" 
-              onClick={handleAreaClick}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAreaClick();
+              }}
               startIcon={
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
