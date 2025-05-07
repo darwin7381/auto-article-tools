@@ -7,7 +7,6 @@ import useProcessingFlow, { ExtractResult } from './useProcessingFlow';
 import { ProcessingResult as BaseProcessingResult } from './useAiProcessingStage';
 import { useProcessing } from '@/context/ProcessingContext';
 import { Button } from '../ui/button/Button';
-import { Input } from '../ui/input/Input';
 
 // 擴展ProcessingResult類型以包含markdownContent
 interface ExtendedProcessingResult extends BaseProcessingResult {
@@ -339,23 +338,45 @@ export default function IntegratedFileProcessor() {
             {selectedInputType === 'link' && (
               <div className="space-y-6">
                 <div className="max-w-full">
-                  <Input
-                    label="文章連結"
-                    type="url"
-                    placeholder="請輸入文章URL，例如：https://example.com/article"
-                    value={linkUrl}
-                    onChange={handleLinkChange}
-                    isInvalid={!!urlError}
-                    errorMessage={urlError}
-                    description="輸入包含文章內容的網頁連結"
-                    isClearable
-                    startContent={
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                      </svg>
-                    }
-                  />
+                  <div className="mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      文章連結
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3 text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                      </div>
+                      <input
+                        type="url"
+                        placeholder="輸入URL，例如：https://example.com/article"
+                        value={linkUrl}
+                        onChange={handleLinkChange}
+                        className={`w-full pl-10 pr-4 py-2.5 border ${urlError ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'} rounded-md bg-default-50 dark:bg-default-50/10 hover:bg-default-100 dark:hover:bg-default-100/10 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
+                      />
+                      {linkUrl && (
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setLinkUrl('');
+                            setUrlError(null);
+                          }}
+                          className="absolute right-3 text-gray-400 hover:text-gray-500"
+                          aria-label="清除輸入"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {urlError && (
+                      <p className="mt-1 text-xs text-red-500">{urlError}</p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">輸入包含文章內容的網頁連結</p>
+                  </div>
                 </div>
                 
                 <div className="space-y-3">

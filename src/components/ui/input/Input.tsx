@@ -16,15 +16,17 @@ export function Input({ className = '', ...props }: InputProps) {
       color="primary"
       labelPlacement="outside"
       classNames={{
-        label: "text-foreground font-medium mb-1",
+        label: "text-foreground font-medium mb-1.5",
         inputWrapper: [
           "shadow-sm",
           "bg-default-50 dark:bg-default-50/10",
           "hover:bg-default-100 dark:hover:bg-default-100/10",
           "group-data-[focus=true]:bg-default-100 dark:group-data-[focus=true]:bg-default-100/10",
-          "border-divider"
+          "border border-gray-300 dark:border-gray-700",
+          "rounded-md"
         ],
         input: "placeholder:text-default-500",
+        base: "w-full",
         ...props.classNames
       }}
       {...props}
