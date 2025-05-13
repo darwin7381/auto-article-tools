@@ -9,6 +9,8 @@ export interface ProcessStage {
   status: 'pending' | 'processing' | 'completed' | 'error';
   progress: number;
   message?: string;
+  resultKey?: string;
+  viewUrl?: string;
 }
 
 export interface ProcessState {
@@ -31,13 +33,17 @@ export interface ProcessState {
     wordCount?: number;
     imageCount?: number;
   };
+  stageResults?: Record<string, any>;
 }
 
-interface ProgressDisplayProps {
+export interface ProgressDisplayProps {
   state: ProcessState;
+  stageGroups?: Record<string, { title: string, stages: string[] }>;
+  displayGroups?: string[];
+  onViewStage?: (stageId: string, result?: any) => void;
 }
 
-export default function ProgressDisplay({ state }: ProgressDisplayProps) {
+export default function ProgressDisplay({ state, stageGroups, displayGroups, onViewStage }: ProgressDisplayProps) {
   const [animatedProgress, setAnimatedProgress] = useState(0);
   
   useEffect(() => {
@@ -87,6 +93,135 @@ export default function ProgressDisplay({ state }: ProgressDisplayProps) {
   // 定義合法的Progress顏色類型
   type ProgressColorType = 'primary' | 'success' | 'danger' | 'warning' | 'default' | 'secondary';
   
+  // 根據stageGroups渲染階段組
+  const renderStageGroups = () => {
+    if (!stageGroups) {
+      // 如果沒有提供stageGroups，則使用傳統模式直接顯示所有階段
+      return (
+        <div className="space-y-4">
+          {state.stages.map((stage) => renderStage(stage))}
+        </div>
+      );
+    }
+    
+    // 使用stageGroups按組渲染
+    return (
+      <div className="space-y-6">
+        {Object.entries(stageGroups)
+          // 如果提供了displayGroups，則過濾顯示的群組
+          .filter(([groupId]) => !displayGroups || displayGroups.includes(groupId))
+          .map(([groupId, group]) => (
+            <div key={groupId} className="space-y-4">
+              <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 border-b pb-2 border-gray-200 dark:border-gray-700">
+                {group.title}
+              </h4>
+              
+              <div className="relative">
+                {/* 階段連接線 */}
+                <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+                
+                {/* 組內階段 */}
+                <div className="space-y-4">
+                  {group.stages.map(stageId => {
+                    const stage = state.stages.find(s => s.id === stageId);
+                    if (!stage) return null;
+                    return renderStage(stage);
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+      </div>
+    );
+  };
+  
+  // 渲染單個階段
+  const renderStage = (stage: ProcessStage) => {
+    const stageStatus = getStatusInfo(stage.status);
+    const isActive = stage.id === state.currentStage;
+    const canView = stage.status === 'completed' && 
+                   onViewStage && 
+                   (stage.viewUrl || stage.resultKey || (state.stageResults && state.stageResults[stage.id])) &&
+                   !['upload'].includes(stage.id);
+    
+    return (
+      <div key={stage.id} className="relative flex items-start gap-3 pl-9">
+        {/* 圓形指示器 */}
+        <div className={`absolute left-2 top-1 -translate-x-1/2 h-5 w-5 rounded-full border-2 ${
+          isActive 
+            ? 'border-primary-500 bg-primary-100 dark:bg-primary-900/40' 
+            : stage.status === 'completed'
+              ? 'border-success-500 bg-success-100 dark:bg-success-900/40'
+              : stage.status === 'error'
+                ? 'border-danger-500 bg-danger-100 dark:bg-danger-900/40'
+                : 'border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800'
+        } flex items-center justify-center`}>
+          {stage.status === 'completed' && (
+            <svg className="h-3 w-3 text-success-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+          {stage.status === 'error' && (
+            <svg className="h-3 w-3 text-danger-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          )}
+          {stage.status === 'processing' && (
+            <div className="h-2 w-2 rounded-full bg-primary-500 animate-pulse"></div>
+          )}
+        </div>
+        
+        <div className={`flex-1 ${
+          isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'
+        }`}>
+          <div className="flex justify-between items-center">
+            <h5 className={`text-sm font-medium ${
+              isActive ? 'text-primary-600 dark:text-primary-400' : ''
+            }`}>
+              {stage.name}
+            </h5>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium text-${stageStatus.color === 'default' ? 'gray' : stageStatus.color}-600 dark:text-${stageStatus.color === 'default' ? 'gray' : stageStatus.color}-400`}>
+                {stageStatus.text}
+              </span>
+              
+              {canView && (
+                <button
+                  onClick={() => onViewStage(stage.id, state.stageResults?.[stage.id])}
+                  className="text-xs font-medium text-primary-600 dark:text-primary-400 flex items-center gap-1 hover:underline"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  查看
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {stage.message && (
+            <p className="text-xs mt-1">
+              {stage.message}
+            </p>
+          )}
+          
+          {isActive && stage.status === 'processing' && (
+            <div className="mt-2">
+              <Progress 
+                value={stage.progress} 
+                color="primary"
+                size="sm"
+                className="h-1.5 bg-gray-200 dark:bg-gray-700"
+                showValueLabel={false}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full py-4 space-y-6">
       <div className="space-y-2">
@@ -117,85 +252,14 @@ export default function ProgressDisplay({ state }: ProgressDisplayProps) {
         </div>
       </div>
       
-      {/* 處理階段顯示 */}
+      {/* 處理階段顯示 - 更新為支持階段群組 */}
       <div className="space-y-4 pt-2">
         <h4 className="text-md font-medium text-gray-800 dark:text-gray-200">
           處理階段
         </h4>
         
         <div className="relative">
-          {/* 階段連接線 */}
-          <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-          
-          {/* 各處理階段 */}
-          <div className="space-y-4">
-            {state.stages.map((stage) => {
-              const stageStatus = getStatusInfo(stage.status);
-              const isActive = stage.id === state.currentStage;
-              
-              return (
-                <div key={stage.id} className="relative flex items-start gap-3 pl-9">
-                  {/* 圓形指示器 */}
-                  <div className={`absolute left-2 top-1 -translate-x-1/2 h-5 w-5 rounded-full border-2 ${
-                    isActive 
-                      ? 'border-primary-500 bg-primary-100 dark:bg-primary-900/40' 
-                      : stage.status === 'completed'
-                        ? 'border-success-500 bg-success-100 dark:bg-success-900/40'
-                        : stage.status === 'error'
-                          ? 'border-danger-500 bg-danger-100 dark:bg-danger-900/40'
-                          : 'border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800'
-                  } flex items-center justify-center`}>
-                    {stage.status === 'completed' && (
-                      <svg className="h-3 w-3 text-success-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    {stage.status === 'error' && (
-                      <svg className="h-3 w-3 text-danger-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    {stage.status === 'processing' && (
-                      <div className="h-2 w-2 rounded-full bg-primary-500 animate-pulse"></div>
-                    )}
-                  </div>
-                  
-                  <div className={`flex-1 ${
-                    isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'
-                  }`}>
-                    <div className="flex justify-between items-center">
-                      <h5 className={`text-sm font-medium ${
-                        isActive ? 'text-primary-600 dark:text-primary-400' : ''
-                      }`}>
-                        {stage.name}
-                      </h5>
-                      <span className={`text-xs font-medium text-${stageStatus.color === 'default' ? 'gray' : stageStatus.color}-600 dark:text-${stageStatus.color === 'default' ? 'gray' : stageStatus.color}-400`}>
-                        {stageStatus.text}
-                      </span>
-                    </div>
-                    
-                    {stage.message && (
-                      <p className="text-xs mt-1">
-                        {stage.message}
-                      </p>
-                    )}
-                    
-                    {isActive && stage.status === 'processing' && (
-                      <div className="mt-2">
-                        <Progress 
-                          value={stage.progress} 
-                          color="primary"
-                          size="sm"
-                          className="h-1.5 bg-gray-200 dark:bg-gray-700"
-                          showValueLabel={false}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {renderStageGroups()}
         </div>
       </div>
       

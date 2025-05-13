@@ -1,18 +1,28 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { useProcessing } from '@/context/ProcessingContext';
 import useUploadStage from './useUploadStage';
 import useExtractStage, { ExtractResult } from './useExtractStage';
 import useAiProcessingStage, { ProcessingResult } from './useAiProcessingStage';
+import useAdvancedAiStage, { AdvancedAiResult } from './useAdvancedAiStage';
+import useFormatConversionStage, { FormatConversionResult } from './useFormatConversionStage';
 
 // 重新導出類型以保持兼容性
 export type { ExtractResult } from './useExtractStage';
 export type { ProcessingResult } from './useAiProcessingStage';
+export type { AdvancedAiResult } from './useAdvancedAiStage';
+export type { FormatConversionResult } from './useFormatConversionStage';
+
+// 定義最終處理結果類型
+export interface FinalProcessingResult extends FormatConversionResult {
+  processingComplete?: boolean;
+  [key: string]: unknown; // 添加索引簽名
+}
 
 interface UseProcessingFlowProps {
   // 處理結果回調
-  onProcessSuccess: (result: ProcessingResult) => void;
+  onProcessSuccess: (result: FinalProcessingResult) => void;
   onProcessError: (error: string, stage: string) => void;
-  onStageComplete: (stage: string, result: ExtractResult | Record<string, unknown>) => void;
+  onStageComplete: (stage: string, result: Record<string, unknown>) => void;
   onFileUploadComplete?: (fileUrl: string, fileId: string) => void;
   
   // 狀態控制
@@ -20,6 +30,17 @@ interface UseProcessingFlowProps {
   setUploadSuccess: (success: boolean) => void;
   setUploadError: (error: string | null) => void;
   setIsUploading: (uploading: boolean) => void;
+}
+
+// 為階段處理器定義類型
+interface AdvancedAiStageHandler {
+  startAdvancedAiProcessing: (result: ProcessingResult) => Promise<any>;
+  cleanup: () => void;
+}
+
+interface FormatConversionStageHandler {
+  startFormatConversion: (result: AdvancedAiResult) => Promise<any>;
+  cleanup: () => void;
 }
 
 /**
@@ -60,7 +81,96 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     startUrlProcessing
   } = useProcessing();
 
-  // 提前初始化所有阶段，但优化其内部处理逻辑
+  // 建立階段引用
+  const advancedAiStageRef = useRef<AdvancedAiStageHandler | null>(null);
+  const formatConversionStageRef = useRef<FormatConversionStageHandler | null>(null);
+
+  // 格式轉換階段
+  const formatConversionStage = useFormatConversionStage(
+    { 
+      advancedAiResult: {} as AdvancedAiResult
+    },
+    {
+      onComplete: (result) => {
+        console.log('格式轉換階段完成:', result);
+        callbacksRef.current.onStageComplete('format-conversion', result as Record<string, unknown>);
+        
+        // 標記整個處理完成
+        const finalResult: FinalProcessingResult = {
+          ...result,
+          processingComplete: true
+        };
+        
+        // 通知處理成功
+        callbacksRef.current.onProcessSuccess(finalResult);
+        
+        // 完成處理
+        return finalResult;
+      },
+      onError: (error) => {
+        callbacksRef.current.onProcessError(error, 'format-conversion');
+      }
+    }
+  );
+
+  // 高級AI處理階段
+  const advancedAiStage = useAdvancedAiStage(
+    { 
+      processingResult: {} as ProcessingResult
+    },
+    {
+      onComplete: (result) => {
+        console.log('高級AI處理階段完成:', result);
+        callbacksRef.current.onStageComplete('advanced-ai', result as Record<string, unknown>);
+        
+        // 進入格式轉換階段
+        if (formatConversionStageRef.current) {
+          formatConversionStageRef.current.startFormatConversion(result);
+        }
+        
+        return result;
+      },
+      onError: (error) => {
+        callbacksRef.current.onProcessError(error, 'advanced-ai');
+      }
+    }
+  );
+
+  // 保存階段引用
+  useEffect(() => {
+    advancedAiStageRef.current = advancedAiStage;
+    formatConversionStageRef.current = formatConversionStage;
+    
+    return () => {
+      advancedAiStage.cleanup();
+      formatConversionStage.cleanup();
+    };
+  }, [advancedAiStage, formatConversionStage]);
+
+  // AI初步處理階段
+  const aiProcessingStage = useAiProcessingStage(
+    { 
+      extractResult: {} as ExtractResult
+    },
+    {
+      onProcessComplete: (result) => {
+        console.log('AI初步處理階段完成:', result);
+        callbacksRef.current.onStageComplete('process', result as Record<string, unknown>);
+        
+        // 進入高級AI處理階段
+        if (advancedAiStageRef.current) {
+          advancedAiStageRef.current.startAdvancedAiProcessing(result);
+        }
+        
+        return result;
+      },
+      onProcessError: (error) => {
+        callbacksRef.current.onProcessError(error, 'process');
+      }
+    }
+  );
+
+  // 提取階段
   const extractStage = useExtractStage(
     { 
       inputType: 'file'
@@ -69,7 +179,7 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
       onExtractComplete: async (result) => {
         console.log('提取階段完成:', result);
         
-        callbacksRef.current.onStageComplete('extract', result);
+        callbacksRef.current.onStageComplete('extract', result as Record<string, unknown>);
         
         // 直接開始AI處理階段
         if (result.markdownKey) {
@@ -88,24 +198,7 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     }
   );
 
-  // AI处理阶段
-  const aiProcessingStage = useAiProcessingStage(
-    { 
-      extractResult: {} as ExtractResult
-    },
-    {
-      onProcessComplete: (result) => {
-        console.log('AI處理階段完成:', result);
-        callbacksRef.current.onProcessSuccess(result);
-        callbacksRef.current.onStageComplete('process', result);
-      },
-      onProcessError: (error) => {
-        callbacksRef.current.onProcessError(error, 'process');
-      }
-    }
-  );
-
-  // 上传阶段
+  // 上傳階段
   const uploadStage = useUploadStage(
     { 
       inputType: 'file'
@@ -163,7 +256,9 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     console.log('清理處理資源');
     extractStage.cleanup();
     aiProcessingStage.cleanup();
-  }, [extractStage, aiProcessingStage]);
+    advancedAiStage.cleanup();
+    formatConversionStage.cleanup();
+  }, [extractStage, aiProcessingStage, advancedAiStage, formatConversionStage]);
 
   // 處理文件上傳和處理流程 - 協調器
   const processFile = useCallback(async (file: File) => {
@@ -188,7 +283,6 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
       console.error('處理文件整體錯誤:', error);
       const errorMessage = error instanceof Error ? error.message : '文件處理失敗';
       callbacksRef.current.onProcessError(errorMessage, 'general');
-    } finally {
       setIsProcessing(false);
     }
   }, [
@@ -220,7 +314,6 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
       console.error('處理URL整體錯誤:', error);
       const errorMessage = error instanceof Error ? error.message : 'URL處理失敗';
       callbacksRef.current.onProcessError(errorMessage, 'general');
-    } finally {
       setIsProcessing(false);
     }
   }, [
