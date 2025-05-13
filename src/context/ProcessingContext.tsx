@@ -3,6 +3,11 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { ProcessState, ProcessStage } from '@/components/progress/ProgressDisplay';
 
+// 定義階段結果的類型
+export interface StageResult {
+  [key: string]: unknown;
+}
+
 interface ProcessingContextType {
   processState: ProcessState | null;
   updateProcessState: (newState: Partial<ProcessState>) => void;
@@ -14,13 +19,35 @@ interface ProcessingContextType {
   setStageError: (stageId: string, message: string) => void;
   moveToNextStage: () => void;
   subscribeToProcessState: (callback: (state: ProcessState | null) => void) => () => void;
+  stageGroups: Record<string, { title: string, stages: string[] }>;
+  // 新增的方法
+  saveStageResult: (stageId: string, result: StageResult) => void;
+  getStageResult: (stageId: string) => StageResult | undefined;
 }
 
-// 簡化為實際流程的階段
+// 階段群組定義
+const stageGroups = {
+  initial: { 
+    title: "初步處理階段",
+    stages: ['upload', 'extract', 'process']
+  },
+  advanced: { 
+    title: "後期處理階段",
+    stages: ['advanced-ai', 'format-conversion']
+  },
+  final: {
+    title: "完成階段", 
+    stages: ['complete']
+  }
+};
+
+// 擴展後的階段定義
 const defaultStages: ProcessStage[] = [
   { id: 'upload', name: '上傳文件', status: 'pending', progress: 0 },
   { id: 'extract', name: '提取內容', status: 'pending', progress: 0 },
   { id: 'process', name: 'AI 初步內容處理', status: 'pending', progress: 0 },
+  { id: 'advanced-ai', name: 'PR writer處理', status: 'pending', progress: 0 },
+  { id: 'format-conversion', name: '格式轉換', status: 'pending', progress: 0 },
   { id: 'complete', name: '處理完成', status: 'pending', progress: 0 },
 ];
 
@@ -43,6 +70,8 @@ const ProcessingContext = createContext<ProcessingContextType | undefined>(undef
 export function ProcessingProvider({ children }: { children: React.ReactNode }) {
   const [processState, setProcessState] = useState<ProcessState | null>(null);
   const [subscribers, setSubscribers] = useState<Map<string, (state: ProcessState | null) => void>>(new Map());
+  // 階段結果存儲，key是處理ID+階段ID，如 "file-123-process"
+  const [stageResults, setStageResults] = useState<Map<string, StageResult>>(new Map());
 
   // 通知所有訂閱者
   const notifySubscribers = useCallback((state: ProcessState | null) => {
@@ -359,6 +388,46 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     });
   }, [notifySubscribers]);
 
+  // 保存階段結果
+  const saveStageResult = useCallback((stageId: string, result: StageResult) => {
+    setProcessState(prevState => {
+      if (!prevState) return null;
+      
+      // 構建階段結果鍵名
+      const resultKey = `${prevState.id}-${stageId}`;
+      
+      // 更新階段結果存儲
+      setStageResults(prev => {
+        const newMap = new Map(prev);
+        newMap.set(resultKey, result);
+        return newMap;
+      });
+      
+      // 更新處理狀態中的stageResults
+      const updatedState = {
+        ...prevState,
+        stageResults: {
+          ...(prevState.stageResults || {}),
+          [stageId]: result
+        }
+      };
+      
+      // 通知所有訂閱者
+      setTimeout(() => {
+        notifySubscribers(updatedState);
+      }, 0);
+      
+      return updatedState;
+    });
+  }, [notifySubscribers]);
+
+  // 獲取階段結果
+  const getStageResult = useCallback((stageId: string) => {
+    if (!processState) return undefined;
+    const resultKey = `${processState.id}-${stageId}`;
+    return stageResults.get(resultKey) || processState.stageResults?.[stageId];
+  }, [processState, stageResults]);
+
   const value = {
     processState,
     updateProcessState,
@@ -369,7 +438,11 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     completeStage,
     setStageError,
     moveToNextStage,
-    subscribeToProcessState
+    subscribeToProcessState,
+    stageGroups,
+    // 新增的方法
+    saveStageResult,
+    getStageResult
   };
 
   return (
