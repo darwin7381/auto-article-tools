@@ -422,10 +422,11 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
   }, [notifySubscribers]);
 
   // 獲取階段結果
-  const getStageResult = useCallback((stageId: string) => {
+  const getStageResult = useCallback((stageId: string): StageResult | undefined => {
     if (!processState) return undefined;
     const resultKey = `${processState.id}-${stageId}`;
-    return stageResults.get(resultKey) || processState.stageResults?.[stageId];
+    const result = stageResults.get(resultKey) || processState.stageResults?.[stageId];
+    return result as StageResult | undefined;
   }, [processState, stageResults]);
 
   const value = {

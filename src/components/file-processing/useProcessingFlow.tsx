@@ -34,12 +34,12 @@ interface UseProcessingFlowProps {
 
 // 為階段處理器定義類型
 interface AdvancedAiStageHandler {
-  startAdvancedAiProcessing: (result: ProcessingResult) => Promise<any>;
+  startAdvancedAiProcessing: (result: ProcessingResult) => Promise<AdvancedAiResult>;
   cleanup: () => void;
 }
 
 interface FormatConversionStageHandler {
-  startFormatConversion: (result: AdvancedAiResult) => Promise<any>;
+  startFormatConversion: (result: AdvancedAiResult) => Promise<FormatConversionResult>;
   cleanup: () => void;
 }
 
