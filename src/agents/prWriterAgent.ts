@@ -37,18 +37,17 @@ export async function processPRContent(markdownContent: string): Promise<string>
   // 系統提示詞 - 專注於PR新聞稿增強
   const systemPrompt = `你是一位擁有15年經驗的PR新聞稿專家，專門將普通內容轉換為專業的新聞稿。你的任務是：
 
-1. 將現有內容進一步優化為專業PR新聞稿格式
-2. 保留所有原始信息、結構和格式
-3. 增加新聞稿標準元素，如引言、聯絡資訊區塊（如果沒有）
-4. 添加PR關鍵要點摘要，包括目標受眾分析
-5. 優化標題和副標題使其更具吸引力
-6. 增強SEO表現，但不要過度堆砌關鍵字
-7. 維持專業的新聞稿語氣和風格
+1. 將來源內容統一轉換為正規的台灣繁體為主的內容
+2. 若是內容處理涉及翻譯，請確實考量實際語意表達，以免有些詞或標題在翻譯後失去語境含義
+3. 進行內容初步處理、整理，使其成為專業的 PR 新聞稿
+4. 但需注意，要保留原始文章的所有重要信息和細節，包括連結、圖片、表格...格式和位置相符等
+5. 不要遺漏任何重要資訊，或過度簡化格式，仍須遵正客戶所給的原始內容格式和佈局，僅有大錯誤或大問題時，才進行修正
+6. 輸出必須保持正確的 Markdown 格式，維持標題層級、段落和列表的格式
 
 輸出必須保持正確的Markdown格式，並包含原始內容的所有重要信息。`;
 
   // 用戶提示詞
-  const userPrompt = `請將以下內容增強為專業PR新聞稿格式，確保保留所有原始信息和格式結構：
+  const userPrompt = `請處理以下來源內容，你正在進行將客戶或合作公司給的稿件，統一處理為正規專業的新聞稿，但必須尊重原始內容，不要遺漏任何重要資訊或錯誤簡化格式或過度進行改寫：
 
 ${markdownContent}`;
 
@@ -78,8 +77,15 @@ ${markdownContent}`;
       return markdownContent;
     }
 
+    // 移除可能存在的Markdown程式碼區塊標記
+    let cleanedContent = content;
+    // 移除開頭的 ```markdown 標記
+    cleanedContent = cleanedContent.replace(/^```markdown\n/g, '');
+    // 移除結尾的 ``` 標記
+    cleanedContent = cleanedContent.replace(/```\s*$/g, '');
+
     console.log('PR Writer處理成功');
-    return content;
+    return cleanedContent;
   } catch (error) {
     console.error('PR Writer處理失敗:', error);
     // 發生任何錯誤，返回原始內容
@@ -99,7 +105,7 @@ export async function enhanceToPRRelease(fileId: string, markdownPath: string): 
   markdownKey: string;
   markdownUrl: string;
 }> {
-  try {
+  try {  
     // 從R2獲取已處理的Markdown內容
     const markdownBuffer = await getFileFromR2(markdownPath);
     const markdownContent = markdownBuffer.toString('utf-8');
@@ -108,7 +114,7 @@ export async function enhanceToPRRelease(fileId: string, markdownPath: string): 
       // 使用PR Writer Agent處理內容
       const enhancedContent = await processPRContent(markdownContent);
       
-      // 添加PR新聞稿元數據
+      // 添加PR新聞稿元數據，確保沒有包含```markdown標記
       const finalMarkdown = `---
 source: pr-writer-enhanced
 fileId: ${fileId}

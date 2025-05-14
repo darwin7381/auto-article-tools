@@ -97,7 +97,7 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
   const renderStageGroups = () => {
     if (!stageGroups) {
       // 如果沒有提供stageGroups，則使用傳統模式直接顯示所有階段
-      return (
+  return (
         <div className="space-y-4">
           {state.stages.map((stage) => renderStage(stage))}
         </div>
@@ -114,14 +114,14 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
             <div key={groupId} className="space-y-4">
               <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 border-b pb-2 border-gray-200 dark:border-gray-700">
                 {group.title}
-              </h4>
-              
-              <div className="relative">
-                {/* 階段連接線 */}
-                <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-                
+        </h4>
+        
+        <div className="relative">
+          {/* 階段連接線 */}
+          <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+          
                 {/* 組內階段 */}
-                <div className="space-y-4">
+          <div className="space-y-4">
                   {group.stages.map(stageId => {
                     const stage = state.stages.find(s => s.id === stageId);
                     if (!stage) return null;
@@ -137,53 +137,56 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
   
   // 渲染單個階段
   const renderStage = (stage: ProcessStage) => {
-    const stageStatus = getStatusInfo(stage.status);
-    const isActive = stage.id === state.currentStage;
+              const stageStatus = getStatusInfo(stage.status);
+              const isActive = stage.id === state.currentStage;
     const canView = stage.status === 'completed' && 
                    onViewStage && 
                    (stage.viewUrl || stage.resultKey || (state.stageResults && state.stageResults[stage.id])) &&
                    !['upload'].includes(stage.id);
-    
-    return (
-      <div key={stage.id} className="relative flex items-start gap-3 pl-9">
-        {/* 圓形指示器 */}
-        <div className={`absolute left-2 top-1 -translate-x-1/2 h-5 w-5 rounded-full border-2 ${
-          isActive 
-            ? 'border-primary-500 bg-primary-100 dark:bg-primary-900/40' 
-            : stage.status === 'completed'
-              ? 'border-success-500 bg-success-100 dark:bg-success-900/40'
-              : stage.status === 'error'
-                ? 'border-danger-500 bg-danger-100 dark:bg-danger-900/40'
-                : 'border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800'
-        } flex items-center justify-center`}>
-          {stage.status === 'completed' && (
-            <svg className="h-3 w-3 text-success-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          )}
-          {stage.status === 'error' && (
-            <svg className="h-3 w-3 text-danger-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          )}
-          {stage.status === 'processing' && (
-            <div className="h-2 w-2 rounded-full bg-primary-500 animate-pulse"></div>
-          )}
-        </div>
-        
-        <div className={`flex-1 ${
-          isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'
-        }`}>
-          <div className="flex justify-between items-center">
-            <h5 className={`text-sm font-medium ${
-              isActive ? 'text-primary-600 dark:text-primary-400' : ''
-            }`}>
-              {stage.name}
-            </h5>
+              
+              return (
+                <div key={stage.id} className="relative flex items-start gap-3 pl-9">
+                  {/* 圓形指示器 */}
+                  <div className={`absolute left-2 top-1 -translate-x-1/2 h-5 w-5 rounded-full border-2 ${
+                    isActive 
+                      ? 'border-primary-500 bg-primary-100 dark:bg-primary-900/40' 
+                      : stage.status === 'completed'
+                        ? 'border-success-500 bg-success-100 dark:bg-success-900/40'
+                        : stage.status === 'error'
+                          ? 'border-danger-500 bg-danger-100 dark:bg-danger-900/40'
+                          : 'border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800'
+                  } flex items-center justify-center`}>
+                    {stage.status === 'completed' && (
+                      <svg className="h-3 w-3 text-success-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    {stage.status === 'error' && (
+                      <svg className="h-3 w-3 text-danger-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    {stage.status === 'processing' && (
+                      <svg className="animate-spin h-3 w-3 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    )}
+                  </div>
+                  
+                  <div className={`flex-1 ${
+                    isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    <div className="flex justify-between items-center">
+                      <h5 className={`text-sm font-medium ${
+                        isActive ? 'text-primary-600 dark:text-primary-400' : ''
+                      }`}>
+                        {stage.name}
+                      </h5>
             <div className="flex items-center gap-2">
-              <span className={`text-xs font-medium text-${stageStatus.color === 'default' ? 'gray' : stageStatus.color}-600 dark:text-${stageStatus.color === 'default' ? 'gray' : stageStatus.color}-400`}>
-                {stageStatus.text}
-              </span>
+                      <span className={`text-xs font-medium text-${stageStatus.color === 'default' ? 'gray' : stageStatus.color}-600 dark:text-${stageStatus.color === 'default' ? 'gray' : stageStatus.color}-400`}>
+                        {stageStatus.text}
+                      </span>
               
               {canView && (
                 <button
@@ -198,28 +201,28 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
                 </button>
               )}
             </div>
-          </div>
-          
-          {stage.message && (
-            <p className="text-xs mt-1">
-              {stage.message}
-            </p>
-          )}
-          
-          {isActive && stage.status === 'processing' && (
-            <div className="mt-2">
-              <Progress 
-                value={stage.progress} 
-                color="primary"
-                size="sm"
-                className="h-1.5 bg-gray-200 dark:bg-gray-700"
-                showValueLabel={false}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    );
+                    </div>
+                    
+                    {stage.message && (
+                      <p className="text-xs mt-1">
+                        {stage.message}
+                      </p>
+                    )}
+                    
+                    {isActive && stage.status === 'processing' && (
+                      <div className="mt-2">
+                        <Progress 
+                          value={stage.progress} 
+                          color="primary"
+                          size="sm"
+                          className="h-1.5 bg-gray-200 dark:bg-gray-700"
+                          showValueLabel={false}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
   };
 
   return (

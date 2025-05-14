@@ -226,42 +226,42 @@ sequenceDiagram
 
 階段性流水線混合模式的核心是直接回調串聯機制，通過以下方式實現：
 - 上傳階段完成回調:
-  ```typescript
-  onFileUploadComplete: async (fileUrl, fileType, fileId) => {
-    // 更新上傳階段狀態
-    completeStage('upload');
-    // 直接開始提取階段
-    await extractStage.startExtraction({
-      inputType: 'file',
-      fileUrl,
-      fileType,
-      fileId
-    });
-  }
-  ```
+   ```typescript
+   onFileUploadComplete: async (fileUrl, fileType, fileId) => {
+     // 更新上傳階段狀態
+     completeStage('upload');
+     // 直接開始提取階段
+     await extractStage.startExtraction({
+       inputType: 'file',
+       fileUrl,
+       fileType,
+       fileId
+     });
+   }
+   ```
 
 - 提取階段完成回調:
-  ```typescript
-  onExtractComplete: async (result) => {
-    // 更新提取階段狀態
-    completeStage('extract');
-    // 直接開始AI處理階段
-    if (result.markdownKey) {
-      await aiProcessingStage.startAiProcessing(result);
-    }
-  }
-  ```
+   ```typescript
+   onExtractComplete: async (result) => {
+     // 更新提取階段狀態
+     completeStage('extract');
+     // 直接開始AI處理階段
+     if (result.markdownKey) {
+       await aiProcessingStage.startAiProcessing(result);
+     }
+   }
+   ```
 
 - AI處理階段完成回調:
-  ```typescript
-  onProcessComplete: (result) => {
-    // 更新AI處理階段狀態
-    completeStage('process');
-    completeStage('complete');
-    // 返回最終結果
-    return result;
-  }
-  ```
+   ```typescript
+   onProcessComplete: (result) => {
+     // 更新AI處理階段狀態
+     completeStage('process');
+     completeStage('complete');
+     // 返回最終結果
+     return result;
+   }
+   ```
 
 這種直接回調串聯方式相比狀態監聽有以下優勢：
 - 避免了循環渲染和狀態更新問題

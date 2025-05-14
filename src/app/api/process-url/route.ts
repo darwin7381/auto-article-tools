@@ -220,24 +220,33 @@ function generateMarkdown(scrapedData: ScrapedData, processedImages: ProcessedIm
     );
   });
   
-  // 生成Front Matter元數據
-  const frontMatter = `---
-source: url
-sourceType: ${type}
-urlId: ${urlId}
-originalUrl: ${sourceUrl}
-title: ${scrapedData.title}
-language: ${scrapedData.metadata.language || 'unknown'}
-wordCount: ${scrapedData.metadata.wordCount}
-author: ${scrapedData.metadata.author || 'unknown'}
-publishDate: ${scrapedData.metadata.publishDate || 'unknown'}
-processTime: ${new Date().toISOString()}
----
+  // 生成Front Matter元數據 - 保留為註釋而非frontmatter格式
+  // 這樣元數據不會影響Markdown渲染，但仍可作為參考
+  const metadata = {
+    source: 'url',
+    sourceType: type,
+    urlId: urlId,
+    originalUrl: sourceUrl,
+    title: scrapedData.title,
+    language: scrapedData.metadata.language || 'unknown',
+    wordCount: scrapedData.metadata.wordCount,
+    author: scrapedData.metadata.author || 'unknown',
+    publishDate: scrapedData.metadata.publishDate || 'unknown',
+    processTime: new Date().toISOString()
+  };
+  
+  // 將元數據作為JSON字符串保存到單獨的文件
+  // 實際項目中應調用相應的API來保存這些元數據
+  console.log('文章元數據:', metadata);
+  
+  // 將frontmatter格式改為標準Markdown標題
+  // 確保內容以標題開始，而不是以frontmatter開始
+  if (!content.trim().startsWith('#')) {
+    content = `# ${scrapedData.title}\n\n${content}`;
+  }
 
-`;
-
-  // 組合最終Markdown
-  return frontMatter + content;
+  // 返回純Markdown內容，不包含frontmatter
+  return content;
 }
 
 // R2 存儲客戶端配置
