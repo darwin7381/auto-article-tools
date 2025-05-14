@@ -9,7 +9,7 @@ const WP_API_BASE = process.env.WORDPRESS_API_URL || '';
 const WP_API_USER = process.env.WORDPRESS_API_USER || '';
 const WP_API_PASSWORD = process.env.WORDPRESS_API_PASSWORD || '';
 
-interface WordPressCredentials {
+export interface WordPressCredentials {
   username: string;
   password: string;
 }
