@@ -13,10 +13,24 @@ interface HTMLViewerProps {
 export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
   const [viewMode, setViewMode] = useState<'rendered' | 'source'>('rendered');
   const [sanitizedContent, setSanitizedContent] = useState<string>('');
+  const [extractedTitle, setExtractedTitle] = useState<string | null>(null);
   
   // 處理和清理 HTML 內容
   useEffect(() => {
     if (content) {
+      // 嘗試從 HTML 提取標題
+      const titleMatch = content.match(/<title[^>]*>(.*?)<\/title>/i) || 
+                          content.match(/<h1[^>]*>(.*?)<\/h1>/i);
+      
+      if (titleMatch && titleMatch[1]) {
+        // 移除任何 HTML 標籤
+        const cleanTitle = titleMatch[1].replace(/<\/?[^>]+(>|$)/g, "");
+        setExtractedTitle(cleanTitle);
+        console.log('已從HTML提取標題:', cleanTitle);
+      } else {
+        setExtractedTitle(null);
+      }
+      
       // 使用 DOMPurify 清理 HTML
       const cleaned = DOMPurify.sanitize(content, {
         ADD_TAGS: ['iframe', 'meta'],
@@ -28,19 +42,22 @@ export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
     }
   }, [content]);
   
+  // 使用內容提取的標題或傳入的標題
+  const displayTitle = extractedTitle || title;
+  
   return (
     <div className="container mx-auto p-4">
       <Card className="w-full max-w-6xl mx-auto">
-        <CardHeader className="flex flex-col gap-2">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">{title}</h1>
+        <CardHeader className="border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">{displayTitle}</h1>
             
-            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg self-end">
               <button
                 onClick={() => setViewMode('rendered')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   viewMode === 'rendered' 
-                    ? 'bg-white dark:bg-gray-700 shadow text-primary-600 dark:text-primary-400' 
+                    ? 'bg-primary-500 text-white' 
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700/50'
                 }`}
               >
@@ -48,9 +65,9 @@ export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
               </button>
               <button
                 onClick={() => setViewMode('source')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   viewMode === 'source' 
-                    ? 'bg-white dark:bg-gray-700 shadow text-primary-600 dark:text-primary-400' 
+                    ? 'bg-primary-500 text-white' 
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700/50'
                 }`}
               >
@@ -58,12 +75,9 @@ export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
               </button>
             </div>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {!content && !error ? '正在載入文件...' : '文件已載入'}
-          </p>
         </CardHeader>
         
-        <CardBody>
+        <CardBody className="p-0">
           {!content && !error && (
             <div className="flex justify-center items-center p-10">
               <div className="animate-spin h-10 w-10 border-4 border-primary-500 rounded-full border-t-transparent"></div>
@@ -71,7 +85,7 @@ export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
           )}
           
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800/30">
+            <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-b-xl border-t border-red-100 dark:border-red-800/30">
               <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
@@ -82,15 +96,15 @@ export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
           )}
           
           {content && !error && viewMode === 'rendered' && (
-            <div className="tiptap-content prose lg:prose-lg dark:prose-invert max-w-none">
+            <div className="tiptap-content prose lg:prose-lg dark:prose-invert max-w-none p-6">
               <div dangerouslySetInnerHTML={{ __html: sanitizedContent }} />
             </div>
           )}
           
           {content && !error && viewMode === 'source' && (
-            <div className="source-content">
-              <pre className="text-sm font-mono whitespace-pre-wrap bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-x-auto">
-                {content}
+            <div className="source-content p-6">
+              <pre className="text-sm font-mono bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-x-auto">
+                <code className="whitespace-pre-wrap break-all">{content}</code>
               </pre>
             </div>
           )}
@@ -99,6 +113,13 @@ export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
       
       {/* 樣式 */}
       <style jsx global>{`
+        /* 確保代碼換行 */
+        pre code.whitespace-pre-wrap {
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          word-break: break-all;
+        }
+        
         .tiptap-content {
           font-family: 'Noto Sans TC', 'Noto Sans', -apple-system, BlinkMacSystemFont, sans-serif;
           line-height: 1.8;
@@ -106,28 +127,28 @@ export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
         }
         
         .tiptap-content h1 {
-          font-size: 2.5rem;
+          font-size: 2rem;
           font-weight: 700;
-          margin: 2rem 0 1.5rem;
+          margin: 0.5rem 0 1.5rem;
           line-height: 1.3;
         }
         
         .tiptap-content h2 {
-          font-size: 1.875rem;
+          font-size: 1.75rem;
           font-weight: 600;
-          margin: 1.75rem 0 1.25rem;
-          padding-bottom: 0.25rem;
+          margin: 2.5rem 0 1.25rem;
+          padding-bottom: 0.5rem;
           border-bottom: 1px solid rgba(0,0,0,0.1);
         }
         
         .tiptap-content h3 {
-          font-size: 1.5rem;
+          font-size: 1.35rem;
           font-weight: 600;
           margin: 1.5rem 0 1rem;
         }
         
         .tiptap-content h4 {
-          font-size: 1.25rem;
+          font-size: 1.15rem;
           font-weight: 600;
           margin: 1.25rem 0 0.75rem;
         }
@@ -185,6 +206,8 @@ export default function HTMLViewer({ content, title, error }: HTMLViewerProps) {
           font-family: 'Courier New', Consolas, Monaco, monospace;
           font-size: 0.9em;
           color: #e5e7eb;
+          word-wrap: break-word;
+          word-break: break-all;
         }
         
         .tiptap-content hr {

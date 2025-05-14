@@ -18,12 +18,22 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
   const [viewMode, setViewMode] = useState<'markdown' | 'article'>('article');
   const [articleHtml, setArticleHtml] = useState('');
   const [processedMarkdown, setProcessedMarkdown] = useState('');
+  const [extractedTitle, setExtractedTitle] = useState<string | null>(null);
   
   // 處理 Markdown 內容，確保正確顯示
   useEffect(() => {
     if (!content) {
       setProcessedMarkdown('');
+      setExtractedTitle(null);
       return;
+    }
+    
+    // 嘗試提取標題
+    const titleMatch = content.match(/^#\s+(.+)$/m);
+    if (titleMatch && titleMatch[1]) {
+      setExtractedTitle(titleMatch[1]);
+    } else {
+      setExtractedTitle(null);
     }
     
     console.log('原始內容前60個字符:', content.substring(0, 60).replace(/\n/g, '\\n'));
@@ -70,11 +80,11 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
       }
     );
     
-    // 頭部標題處理
-    const titleMatch = processedContent.match(/^#\s+(.+)$/m);
-    let articleTitle = title;
-    if (titleMatch && titleMatch[1]) {
-      articleTitle = titleMatch[1];
+    // 使用extractedTitle或title作為articleTitle
+    const articleTitle = extractedTitle || title;
+    
+    // 如果在內容中找到標題，移除它以避免重複
+    if (extractedTitle) {
       processedContent = processedContent.replace(/^#\s+(.+)$/m, '');
     }
     
@@ -111,17 +121,15 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
     // 清理HTML並設置
     const sanitizedHtml = DOMPurify.sanitize(`
       <article class="article">
-        <header class="article-header">
-          <h1>${articleTitle}</h1>
-        </header>
         <div class="article-content">
+          <h1>${articleTitle}</h1>
           ${enhancedHtml}
         </div>
       </article>
     `);
     
     setArticleHtml(sanitizedHtml);
-  }, [title]);
+  }, [title, extractedTitle]);
   
   // 當內容或視圖模式更新時，處理HTML
   useEffect(() => {
@@ -130,20 +138,23 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
     }
   }, [processedMarkdown, viewMode, convertToArticleHtml]);
   
+  // 使用內容提取的標題或傳入的標題
+  const displayTitle = extractedTitle || title;
+  
   return (
     <div className="container mx-auto p-4">
       <Card className="w-full max-w-6xl mx-auto">
-        <CardHeader className="flex flex-col gap-2">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">{title}</h1>
+        <CardHeader className="border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">{displayTitle}</h1>
             
-            {/* 視圖切換按鈕 */}
-            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            {/* 視圖切換按鈕 - 新設計 */}
+            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg self-end">
               <button
                 onClick={() => setViewMode('article')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   viewMode === 'article' 
-                    ? 'bg-white dark:bg-gray-700 shadow text-primary-600 dark:text-primary-400' 
+                    ? 'bg-primary-500 text-white' 
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700/50'
                 }`}
               >
@@ -151,9 +162,9 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
               </button>
               <button
                 onClick={() => setViewMode('markdown')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   viewMode === 'markdown' 
-                    ? 'bg-white dark:bg-gray-700 shadow text-primary-600 dark:text-primary-400' 
+                    ? 'bg-primary-500 text-white' 
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700/50'
                 }`}
               >
@@ -161,12 +172,9 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
               </button>
             </div>
           </div>
-          <p className="text-sm text-gray-500">
-            {!content && !error ? '正在載入文件...' : '文件已載入'}
-          </p>
         </CardHeader>
         
-        <CardBody>
+        <CardBody className="p-0">
           {!content && !error && (
             <div className="flex justify-center items-center p-10">
               <div className="animate-spin h-10 w-10 border-4 border-primary-500 rounded-full border-t-transparent"></div>
@@ -174,7 +182,7 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
           )}
           
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800/30">
+            <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-b-xl border-t border-red-100 dark:border-red-800/30">
               <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
@@ -196,7 +204,7 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
           )}
           
           {content && !error && viewMode === 'markdown' && (
-            <div className="markdown-content prose lg:prose-lg dark:prose-invert max-w-none">
+            <div className="markdown-content prose lg:prose-lg dark:prose-invert max-w-none p-6">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
@@ -208,7 +216,7 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
           
           {content && !error && viewMode === 'article' && (
             <div 
-              className="article-view prose lg:prose-lg dark:prose-invert max-w-none"
+              className="article-view prose lg:prose-lg dark:prose-invert max-w-none p-6"
               dangerouslySetInnerHTML={{ __html: articleHtml }}
               style={{
                 '--article-spacing': '2rem',
@@ -224,24 +232,35 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
       
       {/* 文章視圖的樣式 */}
       <style jsx global>{`
+        /* 確保代碼換行 */
+        .markdown-content pre,
+        .markdown-content code {
+          white-space: pre-wrap !important;
+          word-wrap: break-word !important;
+          word-break: break-word !important;
+          max-width: 100%;
+        }
+        
+        /* 解決代碼塊水平滾動問題 */
+        .markdown-content pre {
+          overflow-x: auto;
+        }
+        
         .article {
           font-family: 'Noto Sans TC', 'Noto Sans', -apple-system, BlinkMacSystemFont, sans-serif;
           line-height: 1.8;
         }
         
-        .article-header {
-          margin-bottom: 2rem;
-        }
-        
-        .article-header h1 {
-          font-size: 2.5rem;
-          font-weight: 700;
-          margin-bottom: 0.5rem;
-          line-height: 1.3;
-        }
-        
         .article-content {
           font-size: 1.125rem;
+        }
+        
+        .article-content h1 {
+          font-size: 2rem;
+          font-weight: 700;
+          margin-top: 0.5rem;
+          margin-bottom: 1.5rem;
+          line-height: 1.3;
         }
         
         .article-content h2 {
@@ -344,8 +363,8 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
         }
         
         @media (max-width: 768px) {
-          .article-header h1 {
-            font-size: 1.875rem;
+          .article-content h1 {
+            font-size: 1.75rem;
           }
           
           .article-content {
