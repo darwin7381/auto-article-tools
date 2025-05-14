@@ -22,19 +22,8 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
   const convertToArticleHtml = useCallback(async (markdownContent: string) => {
     if (!markdownContent) return;
     
-    // 清理Markdown內容，移除frontmatter和程式碼區塊標記
-    let processedContent = markdownContent;
-    
-    // 移除YAML frontmatter (位於文件開頭的---之間的內容)
-    processedContent = processedContent.replace(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/, '');
-    
-    // 移除開頭的 ```markdown 標記（非標準Markdown語法）
-    processedContent = processedContent.replace(/^```markdown\r?\n/g, '');
-    
-    // 移除結尾的 ``` 標記
-    processedContent = processedContent.replace(/\r?\n```\s*$/g, '');
-    
     // 將相對路徑的圖片轉換為絕對路徑
+    let processedContent = markdownContent;
     const baseUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://files.blocktempo.ai';
     
     // 替換標準Markdown圖片語法中的相對路徑為絕對路徑
@@ -44,6 +33,10 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
         return `![${alt}](${baseUrl}/${url})`;
       }
     );
+    
+    // 移除可能存在的 ```markdown 起始標記（非標準Markdown語法）
+    processedContent = processedContent.replace(/```markdown\n/g, '');
+    processedContent = processedContent.replace(/```\n$/g, '');
     
     // 頭部標題處理
     const titleMatch = processedContent.match(/^#\s+(.+)$/m);
@@ -63,22 +56,11 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
     // 解析Markdown為HTML
     const parsedHtml = await marked.parse(processedContent);
     
-    // 處理圖片，確保圖片正常顯示，支持各種格式的圖片標籤
-    const enhancedHtml = (parsedHtml as string).replace(/<img\s+([^>]*)>/g, 
-      (match: string, attributes: string) => {
-        // 提取src屬性
-        const srcMatch = attributes.match(/src=["']([^"']*)["']/);
-        if (!srcMatch) return match; // 如果沒有src屬性，保持不變
-        
-        const src = srcMatch[1];
-        
-        // 確保保留原有的屬性
-        const sanitizedAttributes = attributes
-          .replace(/src=["'][^"']*["']/, `src="${src}"`)
-          .replace(/\s+$/, '');
-        
+    // 處理圖片，確保圖片正常顯示
+    const enhancedHtml = (parsedHtml as string).replace(/<img src="(.*?)"(.+?)>/g, 
+      (match: string, src: string, attrs: string) => {
         return `<figure class="article-image">
-          <img ${sanitizedAttributes} loading="lazy" />
+          <img src="${src}" ${attrs} loading="lazy" />
         </figure>`;
       }
     );

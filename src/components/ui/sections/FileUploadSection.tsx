@@ -34,10 +34,10 @@ export function FileUploadSection({ className = '' }: FileUploadSectionProps) {
     
     // 使用公開URL作為查看路徑
     if (result.publicUrl) {
-      setMarkdownUrl(`/viewer/${encodeURIComponent(result.publicUrl)}`);
+      setMarkdownUrl(`/viewer/${encodeURIComponent(result.publicUrl)}?view=markdown`);
     } else if (result.markdownKey) {
       const key = result.markdownKey.split('/').pop() || '';
-      setMarkdownUrl(`/viewer/processed/${key}`);
+      setMarkdownUrl(`/viewer/processed/${key}?view=markdown`);
     }
   };
   
@@ -58,10 +58,10 @@ export function FileUploadSection({ className = '' }: FileUploadSectionProps) {
     if (stage === 'extract' && 'publicUrl' in result) {
       const extractResult = result as ExtractResult;
       if (extractResult.publicUrl) {
-        setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
+        setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}?view=markdown`);
       } else if (extractResult.markdownKey) {
         const key = extractResult.markdownKey.split('/').pop() || '';
-        setMarkdownUrl(`/viewer/processed/${key}`);
+        setMarkdownUrl(`/viewer/processed/${key}?view=markdown`);
       }
     }
   };

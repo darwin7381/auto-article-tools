@@ -5,7 +5,7 @@ import { FileUpload } from '../ui/file-upload/FileUpload';
 import ProgressDisplay from '../progress/ProgressDisplay';
 import useProcessingFlow, { ExtractResult } from './useProcessingFlow';
 import { ProcessingResult as BaseProcessingResult } from './useAiProcessingStage';
-import { useProcessing, StageResult } from '@/context/ProcessingContext';
+import { useProcessing } from '@/context/ProcessingContext';
 import { Button } from '../ui/button/Button';
 
 // 擴展ProcessingResult類型以包含markdownContent
@@ -48,16 +48,17 @@ export default function IntegratedFileProcessor() {
       const extendedResult = processResult as ExtendedProcessingResult;
       setResult(extendedResult);
       setProcessSuccess(true);
+      setIsProcessing(false); // 确保处理状态重置
       
       // 保存最終處理結果
       saveStageResult('complete', extendedResult);
       
       // 設置Markdown URL用於預覽
       if (extendedResult.publicUrl) {
-        setMarkdownUrl(`/viewer/${encodeURIComponent(extendedResult.publicUrl)}`);
+        setMarkdownUrl(`/viewer/${encodeURIComponent(extendedResult.publicUrl)}?view=markdown`);
       } else if (extendedResult.markdownKey) {
         const key = extendedResult.markdownKey.split('/').pop() || '';
-        setMarkdownUrl(`/viewer/processed/${key}`);
+        setMarkdownUrl(`/viewer/processed/${key}?view=markdown`);
       }
       
       setActiveTab('result');
@@ -92,10 +93,10 @@ export default function IntegratedFileProcessor() {
       if (stage === 'extract' && 'publicUrl' in result) {
         const extractResult = result as ExtractResult;
         if (extractResult.publicUrl) {
-          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
+          setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}?view=markdown`);
         } else if (extractResult.markdownKey) {
           const key = extractResult.markdownKey.split('/').pop() || '';
-          setMarkdownUrl(`/viewer/processed/${key}`);
+          setMarkdownUrl(`/viewer/processed/${key}?view=markdown`);
         }
       }
     },
@@ -128,6 +129,7 @@ export default function IntegratedFileProcessor() {
     setProcessSuccess(false);
     setActiveTab('upload');
     resetProcessState();
+    setIsProcessing(false); // 確保處理狀態被重置
   };
 
   // 處理文件上傳
@@ -195,10 +197,17 @@ export default function IntegratedFileProcessor() {
   const handleProcess = () => {
     if (isProcessing) return;
     
+    // 如果已處理完成，需要重置狀態以啟動新的處理流程
+    if (processSuccess) {
+      setIsProcessing(false);
+      setProcessSuccess(false);
+      setResult(null);
+      setMarkdownUrl(null);
+      resetProcessState();
+    }
+    
     // 重置處理狀態
     setUploadError(null);
-    setResult(null);
-    setMarkdownUrl(null);
     
     if (selectedInputType === 'file' && selectedFile) {
       processFile(selectedFile);
@@ -217,11 +226,10 @@ export default function IntegratedFileProcessor() {
   const handleViewStage = (stageId: string, stageResult?: Record<string, unknown>) => {
     if (!stageResult) return;
     
-    setViewingStage({ id: stageId, result: stageResult });
-    
-    // 針對不同階段可以有不同的查看行為
+    // 獲取階段查看URL
     const viewerUrl = getStageViewerUrl(stageId, stageResult);
     if (viewerUrl) {
+      // 直接在新窗口中打開，不再設置 viewingStage
       window.open(viewerUrl, '_blank', 'noopener,noreferrer');
     }
   };
@@ -230,21 +238,30 @@ export default function IntegratedFileProcessor() {
   const getStageViewerUrl = (stageId: string, result: Record<string, unknown>): string | undefined => {
     if (stageId === 'extract' && result.markdownKey) {
       const key = String(result.markdownKey).split('/').pop() || '';
-      return `/viewer/processed/${key}`;
+      return `/viewer/processed/${key}?view=markdown`;
     }
     
     if (stageId === 'process' && result.markdownKey) {
       const key = String(result.markdownKey).split('/').pop() || '';
-      return `/viewer/processed/${key}`;
+      return `/viewer/processed/${key}?view=markdown`;
     }
     
     if (stageId === 'advanced-ai' && result.markdownKey) {
       const key = String(result.markdownKey).split('/').pop() || '';
-      return `/viewer/processed/${key}`;
+      return `/viewer/processed/${key}?view=markdown`;
     }
     
-    if (stageId === 'format-conversion' && result.htmlKey) {
-      return `/api/processors/view-html?key=${encodeURIComponent(String(result.htmlKey))}`;
+    if (stageId === 'format-conversion') {
+      // 如果有 HTML 文件鍵，直接使用 viewer 查看
+      if (result.htmlKey) {
+        const key = String(result.htmlKey).split('/').pop() || '';
+        return `/viewer/processed/${key}?view=html`;
+      }
+      
+      // 向後兼容舊版 API，通過 API 端點查看
+      if (result.htmlUrl) {
+        return `/api/processors/view-html?key=${encodeURIComponent(String(result.htmlUrl))}`;
+      }
     }
     
     return undefined;
@@ -653,14 +670,26 @@ export default function IntegratedFileProcessor() {
                   (selectedInputType === 'link' && (!linkUrl || !!urlError)) || 
                   isProcessing
                 }
-                isLoading={isProcessing}
+                isLoading={false}
+                color={processSuccess ? "secondary" : "primary"}
                 startIcon={
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-                  </svg>
+                  isProcessing ? (
+                    <svg className="animate-spin h-5 w-5 mr-1 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : processSuccess ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                    </svg>
+                  )
                 }
               >
-                {selectedInputType === 'file' ? '開始處理' : '處理連結'}
+                {isProcessing ? '處理中...' : (processSuccess ? '重新處理' : (selectedInputType === 'file' ? '開始處理' : '處理連結'))}
               </Button>
             </div>
           </div>
@@ -806,7 +835,7 @@ export default function IntegratedFileProcessor() {
                 displayGroups={['final']}
                 onViewStage={handleViewStage}
               />
-
+              
               {/* 這裡根據實際結果類型顯示不同內容 */}
               {result.markdownContent && (
                 <div className="max-h-96 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded p-4 text-sm font-mono whitespace-pre-wrap">

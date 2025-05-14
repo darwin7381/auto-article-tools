@@ -375,7 +375,7 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
         currentStage: nextStage,
         overall: {
           ...prevState.overall,
-          progress: overallProgress,
+          progress: (completedStages === totalStages || prevState.currentStage === 'complete') ? 100 : Math.min(overallProgress, 99), // 完成阶段或所有阶段完成时显示100%
         }
       };
       
