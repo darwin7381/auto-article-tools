@@ -1,7 +1,21 @@
 // 測試WordPress API連接和發布功能
-require('dotenv').config({ path: '.env.local' });
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
-const testWordPressPost = async () => {
+interface WordPressUser {
+  name: string;
+  id: number;
+  [key: string]: unknown;
+}
+
+interface WordPressPost {
+  id: number;
+  status: string;
+  link: string;
+  [key: string]: unknown;
+}
+
+const testWordPressPost = async (): Promise<void> => {
   const WP_API_BASE = process.env.WORDPRESS_API_URL || '';
   const WP_API_USER = process.env.WORDPRESS_API_USER || '';
   const WP_API_PASSWORD = process.env.WORDPRESS_API_PASSWORD || '';
@@ -37,7 +51,7 @@ const testWordPressPost = async () => {
       return;
     }
     
-    const userData = await userResponse.json();
+    const userData = await userResponse.json() as WordPressUser;
     console.log(`認證成功！已連接為用戶: ${userData.name}`);
     
     // 發布測試文章
@@ -62,13 +76,13 @@ const testWordPressPost = async () => {
       return;
     }
     
-    const postData = await postResponse.json();
+    const postData = await postResponse.json() as WordPressPost;
     console.log('測試文章發布成功！');
     console.log(`文章ID: ${postData.id}`);
     console.log(`文章狀態: ${postData.status}`);
     console.log(`文章連結: ${postData.link}`);
   } catch (error) {
-    console.error('發生錯誤：', error.message);
+    console.error('發生錯誤：', error instanceof Error ? error.message : String(error));
   }
 };
 

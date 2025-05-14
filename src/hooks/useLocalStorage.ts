@@ -10,7 +10,7 @@ export function useLocalStorage() {
    * @param key 存儲的鍵名
    * @param value 要存儲的值
    */
-  const setItem = (key: string, value: any): void => {
+  const setItem = (key: string, value: unknown): void => {
     try {
       if (typeof window === 'undefined') return;
       
@@ -28,7 +28,7 @@ export function useLocalStorage() {
    * @param parseJson 是否需要解析JSON，默認為false
    * @returns 存儲的值或null
    */
-  const getItem = (key: string, parseJson: boolean = false): any => {
+  const getItem = <T = string>(key: string, parseJson: boolean = false): T | string | null => {
     try {
       if (typeof window === 'undefined') return null;
       
@@ -38,7 +38,7 @@ export function useLocalStorage() {
       // 如果需要解析JSON，嘗試解析
       if (parseJson) {
         try {
-          return JSON.parse(value);
+          return JSON.parse(value) as T;
         } catch {
           return value;
         }

@@ -32,8 +32,8 @@ export async function processDOCX(buffer: Buffer, fileId: string): Promise<{
     // 提取文本和圖片
     const result = await convertDocxToHtml(buffer, fileId);
     
-    // 將HTML轉換為Markdown格式，恢復傳遞 fileId 參數
-    const markdown = createDocxMarkdown(result.value, fileId);
+    // 將HTML轉換為Markdown格式，只傳遞HTML內容參數
+    const markdown = createDocxMarkdown(result.value);
     
     // 保存Markdown到R2和本地
     return await saveMarkdown(markdown, fileId);
