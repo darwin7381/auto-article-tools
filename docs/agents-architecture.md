@@ -17,13 +17,43 @@
 src/
 ├── agents/                # 專門管理所有AI任務處理者
 │   ├── contentAgent.ts    # 內容處理Agent
+│   ├── prWriterAgent.ts   # PR新聞稿處理Agent
 │   ├── index.ts           # 統一導出
 │   └── common/            # 共用的Agent工具
-│       └── agentUtils.ts  # 通用工具函數
+│       └── agentUtils.ts  # 通用工具函數（含重試機制）
+├── app/
+│   └── api/               # API路由層
+│       ├── process-openai/      # 基本內容處理API
+│       └── advanced-ai-processing/ # 高級AI處理API
 ├── services/              # 業務服務層
 │   ├── storage/           # 存儲相關服務
 │   ├── document/          # 文檔處理服務
 │   └── ...                # 其他業務服務
+```
+
+### 處理流程與重試機制
+
+項目主要依賴兩個AI處理API路由：
+- `/api/process-openai` - 由 `contentAgent` 處理，負責基本內容處理
+- `/api/advanced-ai-processing` - 由 `prWriterAgent` 處理，負責PR新聞稿增強
+
+完整處理流程如下：
+```
+上傳階段 → 提取階段 → AI初步處理階段(process-openai) → 高級AI處理階段(advanced-ai-processing) → 格式轉換階段
+```
+
+每個AI處理節點都實現了多層次重試保護：
+
+```
+客戶端請求
+    ↓
+API路由層 (route.ts) → 整體流程重試
+    ↓
+Agent業務層 (Agent.ts) → 業務邏輯重試
+    ↓
+AI調用層 (OpenAI Client) → API調用重試
+    ↓
+處理結果返回
 ```
 
 ### Agents 與 Services 的區別
@@ -33,8 +63,9 @@ src/
 | 職責 | 處理複雜的AI任務和智能決策 | 處理基礎業務邏輯和數據操作 |
 | 依賴 | 依賴外部AI服務（如OpenAI） | 通常是自包含的業務邏輯 |
 | 狀態 | 可能需要維護複雜上下文 | 傾向於無狀態設計 |
-| 錯誤處理 | 需要強健的回退機制 | 標準的錯誤處理 |
+| 錯誤處理 | 實現多層重試機制與降級策略，處理AI服務特有問題（如超時、模型錯誤） | 標準的錯誤處理，通常不需要複雜重試邏輯 |
 | 接口設計 | 通常更加靈活可變 | 傾向於固定的接口設計 |
+| 處理策略 | 可能調整參數配置適應不同任務 | 固定的處理邏輯和標準流程 |
 
 ## Agent 組件
 
@@ -96,6 +127,19 @@ export * from './summaryAgent'; // 新增Agent
 2. **更多專業Agent**：添加專門的翻譯Agent、SEO優化Agent等
 3. **Agent選擇策略**：根據任務自動選擇最適合的Agent
 4. **性能優化**：實現Agent操作的緩存和併發處理
+5. **錯誤處理與重試機制增強**：
+   - 集中式錯誤監控與統計分析
+   - 基於歷史錯誤模式的自適應重試策略
+   - 環境感知型重試（根據生產/測試環境調整重試策略）
+   - 基於令牌桶的重試限流機制
+6. **故障自愈能力**：
+   - 實現服務自診斷功能，自動檢測和修復常見問題
+   - 添加熔斷機制，防止系統過載
+   - 實現更完善的降級策略，確保核心功能可用性
+7. **監控與可觀測性**：
+   - 重試事件的詳細指標收集與分析
+   - AI處理效能與穩定性儀表板
+   - 錯誤原因自動分類與趨勢分析
 
 ## 最佳實踐
 
@@ -104,6 +148,130 @@ export * from './summaryAgent'; // 新增Agent
 3. 保持Agent接口的一致性
 4. 在Agent中實現詳細的日誌記錄
 5. 定期評估和優化提示詞設計
+
+## 錯誤處理與重試機制
+
+在AI處理流程中，網絡波動、服務超時或臨時性API錯誤是常見問題。我們實現了強健的分層重試機制，確保生產環境中能處理這些暫時性故障，提高系統穩定性。
+
+### 重試架構設計
+
+我們採用了「分層重試」架構，將重試邏輯實現在多個層級：
+
+```
+API路由層 (外層) → Agent業務層 (內層) → API調用層 (最內層)
+```
+
+#### 分層重試優勢
+
+1. **更全面的錯誤覆蓋**：不同層級可捕獲不同類型的錯誤
+2. **粒度控制**：內層處理細粒度操作失敗，外層處理整體流程失敗
+3. **降級策略**：當內層重試失敗時，外層可實施不同的降級策略
+
+#### 重試機制核心組件
+
+在 `src/agents/common/agentUtils.ts` 中實現的通用重試工具函數：
+
+```typescript
+/**
+ * 自動重試機制 - 對AI處理操作進行自動重試
+ * @param operation 要重試的操作函數
+ * @param options 重試選項
+ * @returns 操作結果
+ */
+export async function withRetry<T>(
+  operation: () => Promise<T>, 
+  options: {
+    maxRetries?: number;
+    retryDelay?: number;
+    onRetry?: (error: Error, retryCount: number) => void;
+    retryCondition?: (error: unknown) => boolean;
+  } = {}
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? 3;
+  const retryDelay = options.retryDelay ?? 1000;
+  const onRetry = options.onRetry ?? ((error, count) => 
+    console.warn(`重試 #${count}，錯誤:`, error.message));
+  const retryCondition = options.retryCondition ?? (() => true);
+  
+  // 重試邏輯實現...
+}
+```
+
+### 重試機制實現層級
+
+1. **Agent層實現** (contentAgent.ts, prWriterAgent.ts)
+   - 重試 OpenAI API 調用
+   - 保存處理結果到儲存服務
+   - 特點：細粒度控制，專注於特定操作
+
+2. **API路由層實現** (process-openai/route.ts, advanced-ai-processing/route.ts)
+   - 重試整個處理流程
+   - 處理請求解析和響應格式化
+   - 特點：端到端保護，處理邊界情況
+
+### 可重試錯誤類型
+
+我們設計了智能錯誤識別機制，僅對特定類型的錯誤進行重試：
+
+```typescript
+const retryableErrors = [
+  'timeout', 
+  'exceeded maximum time', 
+  'rate limit', 
+  'server error',
+  'network error',
+  'Gateway Timeout',
+  'timed out',
+  'not valid JSON'
+];
+
+return retryableErrors.some(errText => 
+  errorMessage.toLowerCase().includes(errText.toLowerCase())
+);
+```
+
+### 重試策略配置
+
+1. **最大重試次數**：預設為 3 次，可根據操作重要性調整
+2. **退避延遲**：基本延遲（預設1000ms）× 嘗試次數，實現指數退避
+3. **重試條件**：自定義判斷函數，決定哪些錯誤需要重試
+4. **重試通知**：可配置回調函數，記錄每次重試的詳細信息
+
+### 重試機制最佳實踐
+
+1. **避免無限重試**：始終設置合理的最大重試次數（3-5次）
+2. **實施退避策略**：每次重試增加延遲時間，避免對服務造成壓力
+3. **精確的錯誤分類**：只對可恢復的臨時性錯誤進行重試
+4. **完整的日誌記錄**：記錄每次重試的原因、次數和結果
+5. **降級機制**：所有重試失敗後，提供合理的降級選項（如返回原始內容）
+
+### 項目中的重試實現示例
+
+在 PR Writer Agent 中的應用：
+
+```typescript
+// 使用重試機制調用API
+const content = await withRetry(
+  async () => {
+    const completion = await openaiClient!.chat.completions.create({...});
+    return completion.choices[0].message.content;
+  },
+  {
+    maxRetries: 3,
+    retryDelay: 2000,
+    onRetry: (error, count) => {
+      console.warn(`PR Writer處理重試 #${count}：`, error.message);
+    },
+    retryCondition: (error) => {
+      // 根據錯誤類型決定是否重試
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return retryableErrors.some(errText => 
+        errorMessage.toLowerCase().includes(errText.toLowerCase())
+      );
+    }
+  }
+);
+```
 
 ## OpenAI模型參數配置指南
 
