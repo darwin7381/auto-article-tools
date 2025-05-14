@@ -36,8 +36,8 @@ const stageGroups = {
     stages: ['advanced-ai', 'format-conversion']
   },
   final: {
-    title: "完成階段", 
-    stages: ['complete']
+    title: "上稿階段", 
+    stages: ['prep-publish', 'publish-news']
   }
 };
 
@@ -48,7 +48,8 @@ const defaultStages: ProcessStage[] = [
   { id: 'process', name: 'AI 初步內容處理', status: 'pending', progress: 0 },
   { id: 'advanced-ai', name: 'PR writer處理', status: 'pending', progress: 0 },
   { id: 'format-conversion', name: '格式轉換', status: 'pending', progress: 0 },
-  { id: 'complete', name: '處理完成', status: 'pending', progress: 0 },
+  { id: 'prep-publish', name: '上稿準備', status: 'pending', progress: 0 },
+  { id: 'publish-news', name: '上架新聞', status: 'pending', progress: 0 },
 ];
 
 const initialState: ProcessState = {
@@ -248,7 +249,7 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
       
       // 檢查是否是最後一個階段，如果是則設置整體狀態為完成
       let updated;
-      if (stageId === 'complete') {
+      if (stageId === 'publish-news') {
         updated = {
           ...prevState,
           stages: newStages,
@@ -375,7 +376,7 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
         currentStage: nextStage,
         overall: {
           ...prevState.overall,
-          progress: (completedStages === totalStages || prevState.currentStage === 'complete') ? 100 : Math.min(overallProgress, 99), // 完成阶段或所有阶段完成时显示100%
+          progress: (completedStages === totalStages || prevState.currentStage === 'publish-news') ? 100 : Math.min(overallProgress, 99), // 完成阶段或所有阶段完成时显示100%
         }
       };
       

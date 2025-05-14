@@ -1,10 +1,9 @@
-import { createTempDirectory, deleteLocalFile } from '../storage/localService';
 import { uploadFileToR2 } from '../storage/r2Service';
 import { DocxProcessResult } from './docxService';
-import fs from 'fs';
 
 /**
  * PDF 處理服務 - 提供PDF文件的處理與轉換功能
+ * 注意：不使用本地文件系統，直接使用R2和內存操作
  */
 
 // ConvertAPI Token
@@ -17,7 +16,7 @@ if (!CONVERT_API_TOKEN) {
 const FILES_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 
 /**
- * 將PDF轉換為DOCX
+ * 將PDF轉換為DOCX（使用ConvertAPI直接轉換，無需本地文件系統）
  * @param pdfUrl PDF文件的R2鍵值
  * @returns 轉換後的DOCX文件的Buffer
  */
@@ -27,53 +26,36 @@ export async function convertPdfToDocx(pdfUrl: string): Promise<Buffer> {
   console.log(`開始轉換PDF: ${fullPdfUrl}`);
   
   try {
-    // 創建臨時目錄用於保存轉換結果
-    const tempDir = createTempDirectory();
-    
     // 使用動態導入ConvertAPI
     const convertapiModule = await import('convertapi');
     const convertapi = new convertapiModule.default(CONVERT_API_TOKEN as string);
     
-    // 直接使用完整URL進行轉換
+    // 直接使用完整URL進行轉換，獲取結果URL而非本地文件
     const result = await convertapi.convert('docx', {
       File: fullPdfUrl
     }, 'pdf');
     
-    // 保存轉換結果到臨時目錄
-    const savedFiles = await result.saveFiles(tempDir);
-    console.log(`保存的文件: ${savedFiles}`);
-    
-    // 檢查轉換結果
-    if (!savedFiles) {
+    // 獲取轉換結果的URL
+    const files = result.files;
+    if (!files || files.length < 1) {
       throw new Error('轉換結果為空');
     }
     
-    // 讀取轉換後的文件
-    let docxFilePath: string;
+    const fileUrl = files[0].url;
+    console.log(`轉換後的文件URL: ${fileUrl}`);
     
-    if (Array.isArray(savedFiles)) {
-      if (savedFiles.length <= 0) {
-        throw new Error('沒有生成任何文件');
-      }
-      docxFilePath = savedFiles[0];
-    } else {
-      // 非陣列情況
-      docxFilePath = savedFiles as unknown as string;
+    // 直接從URL下載文件內容
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error(`下載轉換後的文件失敗: ${response.status} ${response.statusText}`);
     }
     
-    console.log(`讀取轉換後的文件: ${docxFilePath}`);
+    // 將回應轉換為Buffer
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    console.log(`DOCX文件大小: ${buffer.length}字節`);
     
-    const docxBuffer = fs.readFileSync(docxFilePath);
-    console.log(`DOCX文件大小: ${docxBuffer.length}字節`);
-    
-    // 刪除臨時文件
-    try {
-      deleteLocalFile(docxFilePath);
-    } catch (err) {
-      console.warn('刪除臨時文件失敗:', err);
-    }
-    
-    return docxBuffer;
+    return buffer;
   } catch (error) {
     console.error('PDF轉換失敗:', error);
     throw new Error('PDF轉換失敗: ' + (error instanceof Error ? error.message : '未知錯誤'));
