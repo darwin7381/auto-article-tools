@@ -7,6 +7,9 @@ import useProcessingFlow, { ExtractResult } from './useProcessingFlow';
 import { ProcessingResult as BaseProcessingResult } from './useAiProcessingStage';
 import { useProcessing } from '@/context/ProcessingContext';
 import { Button } from '../ui/button/Button';
+import EditorIntegration from '@/components/ui/editor-integration';
+import WordPressSettings from '@/components/ui/wordpress-settings';
+import { useSimplifiedWPIntegration } from '@/hooks/useSimplifiedWPIntegration';
 
 // 擴展ProcessingResult類型以包含markdownContent
 interface ExtendedProcessingResult extends BaseProcessingResult {
@@ -20,6 +23,67 @@ interface StageView {
   id: string;
   result: Record<string, unknown>;
 }
+
+// 替換舊的上稿準備階段組件
+const PrepPublishingComponent = ({ fileId, htmlContent, markdownUrl, onContentChange }: { 
+  fileId: string, 
+  htmlContent?: string,
+  markdownUrl?: string, 
+  onContentChange?: (content: string) => void 
+}) => {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-lg font-semibold">
+        <span className="text-blue-500">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+        </span>
+        <h3>Tiptap 編輯器</h3>
+      </div>
+      <EditorIntegration 
+        fileId={fileId}
+        initialHtml={htmlContent || ''}
+        markdownUrl={markdownUrl}
+        onContentSave={onContentChange}
+      />
+    </div>
+  );
+};
+
+// 替換舊的WordPress發布設置組件
+const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) => {
+  const { 
+    isSubmitting, 
+    publishResult, 
+    publishToWordPress 
+  } = useSimplifiedWPIntegration({ 
+    initialContent: htmlContent || '' 
+  });
+  
+  return (
+    <div className="space-y-4 mt-8">
+      <div className="flex items-center gap-2 text-lg font-semibold">
+        <span className="text-green-500">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+        </span>
+        <h3>WordPress 發布設定</h3>
+      </div>
+      
+      <div className="bg-background/50 rounded-lg p-4 border border-divider">
+        <WordPressSettings
+          onPublish={publishToWordPress}
+          isSubmitting={isSubmitting}
+          error={publishResult?.error}
+        />
+      </div>
+    </div>
+  );
+};
 
 export default function IntegratedFileProcessor() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -495,7 +559,7 @@ export default function IntegratedFileProcessor() {
           } ${!result ? 'opacity-50 cursor-not-allowed' : ''}`}
           disabled={!result}
         >
-          4. 處理結果
+          4. 上稿
         </button>
       </div>
 
@@ -527,7 +591,7 @@ export default function IntegratedFileProcessor() {
                 }`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 0-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
                 </svg>
                 輸入連結
               </button>
@@ -599,7 +663,7 @@ export default function IntegratedFileProcessor() {
                       <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${linkType === 'website' ? 'text-primary-500' : 'text-gray-500'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10"></circle>
                         <line x1="2" y1="12" x2="22" y2="12"></line>
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10z"></path>
                       </svg>
                       <span className="text-sm font-medium">一般網站</span>
                     </div>
@@ -710,8 +774,8 @@ export default function IntegratedFileProcessor() {
                   stages: ['advanced-ai', 'format-conversion']
                 },
                 final: {
-                  title: "完成階段", 
-                  stages: ['complete']
+                  title: "上稿階段", 
+                  stages: ['prep-publish', 'publish-news']
                 }
               }}
               displayGroups={['initial']}
@@ -766,8 +830,8 @@ export default function IntegratedFileProcessor() {
                   stages: ['advanced-ai', 'format-conversion']
                 },
                 final: {
-                  title: "完成階段", 
-                  stages: ['complete']
+                  title: "上稿階段", 
+                  stages: ['prep-publish', 'publish-news']
                 }
               }}
               displayGroups={['advanced']}
@@ -806,13 +870,13 @@ export default function IntegratedFileProcessor() {
           </div>
         )}
 
-        {/* 結果顯示 */}
+        {/* 結果顯示（上稿階段）*/}
         {activeTab === 'result' && result && (
           <div className="space-y-6">
             {/* 結果預覽區域 */}
             <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-4">
               <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-2">
-                處理結果預覽
+                上稿準備
               </h4>
               
               {/* 顯示結果階段 */}
@@ -828,56 +892,33 @@ export default function IntegratedFileProcessor() {
                     stages: ['advanced-ai', 'format-conversion']
                   },
                   final: {
-                    title: "完成階段", 
-                    stages: ['complete']
+                    title: "上稿階段", 
+                    stages: ['prep-publish', 'publish-news']
                   }
                 }}
                 displayGroups={['final']}
                 onViewStage={handleViewStage}
               />
               
-              {/* 這裡根據實際結果類型顯示不同內容 */}
-              {result.markdownContent && (
-                <div className="max-h-96 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded p-4 text-sm font-mono whitespace-pre-wrap">
-                  {result.markdownContent.slice(0, 500)}
-                  {result.markdownContent.length > 500 && '...'}
-                </div>
-              )}
-              
-              <div className="flex justify-end mt-4 gap-3">
-                <Button 
-                  variant="light" 
-                  color="primary"
-                  onClick={() => {
-                    if (result.markdownContent) {
-                      navigator.clipboard.writeText(result.markdownContent);
+              {/* 上稿準備階段 */}
+              <PrepPublishingComponent 
+                fileId={result.fileId?.toString() || processState?.id || ''}
+                htmlContent={result.htmlContent?.toString()}
+                markdownUrl={markdownUrl || undefined}
+                onContentChange={(content) => {
+                  if (result) {
+                    setResult({
+                      ...result,
+                      htmlContent: content
+                    });
                     }
                   }}
-                  startIcon={
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-                    </svg>
-                  }
-                >
-                  複製內容
-                </Button>
-                {markdownUrl && (
-                  <Button 
-                    color="primary"
-                    onClick={() => {
-                      window.open(markdownUrl, '_blank', 'noopener,noreferrer');
-                    }}
-                    startIcon={
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    }
-                  >
-                    查看完整內容
-                  </Button>
-                )}
-              </div>
+              />
+              
+              {/* WordPress 發布設定 */}
+              <WordPressPublishComponent 
+                htmlContent={result.htmlContent?.toString()}
+              />
             </div>
             
             {/* 狀態通知 */}

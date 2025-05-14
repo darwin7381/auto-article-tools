@@ -76,10 +76,9 @@ export function generateFrontMatter(metadata: MarkdownMetadata): string {
 /**
  * 創建DOCX處理後的Markdown內容
  * @param htmlContent 轉換後的HTML內容
- * @param fileId 文件ID
  * @returns 格式化的Markdown內容
  */
-export function createDocxMarkdown(htmlContent: string, fileId: string): string {
+export function createDocxMarkdown(htmlContent: string): string {
   // 將HTML轉換為Markdown格式
   const markdown = htmlContent
     .replace(/<h1>(.*?)<\/h1>/g, '# $1\n\n')
