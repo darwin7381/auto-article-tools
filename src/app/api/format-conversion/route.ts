@@ -13,11 +13,23 @@ function cleanMarkdownContent(content: string): string {
   // 移除YAML frontmatter (位於文件開頭的---之間的內容)
   cleanedContent = cleanedContent.replace(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/, '');
   
-  // 移除開頭的 ```markdown 標記
-  cleanedContent = cleanedContent.replace(/^```markdown\r?\n/g, '');
+  // 處理整個文本被包裹在 ```markdown...``` 中的情況
+  if (cleanedContent.trim().startsWith("```markdown") || cleanedContent.trim().startsWith("```Markdown")) {
+    const endIndex = cleanedContent.lastIndexOf("```");
+    if (endIndex !== -1) {
+      // 提取 ``` 和 ``` 之間的內容
+      cleanedContent = cleanedContent.substring(cleanedContent.indexOf('\n') + 1, endIndex).trim();
+    }
+  }
+  
+  // 移除開頭的 ```markdown 標記 (支持所有大小寫形式)
+  cleanedContent = cleanedContent.replace(/^```[mM]arkdown\r?\n/g, '');
   
   // 移除結尾的 ``` 標記
   cleanedContent = cleanedContent.replace(/\r?\n```\s*$/g, '');
+  
+  // 清理可能存在的中間 markdown 代碼塊
+  cleanedContent = cleanedContent.replace(/```[mM]arkdown\r?\n([\s\S]*?)\r?\n```/g, '$1');
   
   // 移除可能的HTML註釋
   cleanedContent = cleanedContent.replace(/<!--[\s\S]*?-->/g, '');

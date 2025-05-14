@@ -105,14 +105,8 @@ export async function enhanceMarkdown(fileId: string, markdownPath: string): Pro
       // 使用Agent處理內容
       const enhancedContent = await processContent(markdownContent);
       
-      // 添加簡單元數據
-      const finalMarkdown = `---
-source: ai-enhanced
-fileId: ${fileId}
-processTime: ${new Date().toISOString()}
----
-
-${enhancedContent}`;
+      // 直接使用處理後的內容，不添加frontmatter
+      const finalMarkdown = enhancedContent;
       
       // 保存處理後的Markdown
       const { r2Key, localPath } = await saveMarkdown(finalMarkdown, fileId, '-enhanced');
@@ -126,14 +120,8 @@ ${enhancedContent}`;
     } catch (aiError) {
       console.error('AI處理異常:', aiError);
       
-      // 如果AI處理失敗，仍然保存原始內容
-      const finalMarkdown = `---
-source: original-content
-fileId: ${fileId}
-processTime: ${new Date().toISOString()}
----
-
-${markdownContent}`;
+      // 如果AI處理失敗，保存原始內容，不添加frontmatter
+      const finalMarkdown = markdownContent;
       
       // 保存原始內容
       const { r2Key, localPath } = await saveMarkdown(finalMarkdown, fileId, '-unprocessed');
