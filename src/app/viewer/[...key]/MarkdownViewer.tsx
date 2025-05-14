@@ -17,6 +17,31 @@ interface MarkdownViewerProps {
 export default function MarkdownViewer({ content, title, error }: MarkdownViewerProps) {
   const [viewMode, setViewMode] = useState<'markdown' | 'article'>('article');
   const [articleHtml, setArticleHtml] = useState('');
+  const [processedMarkdown, setProcessedMarkdown] = useState('');
+  
+  // 處理 Markdown 內容，確保正確顯示
+  useEffect(() => {
+    if (!content) {
+      setProcessedMarkdown('');
+      return;
+    }
+    
+    console.log('原始內容前60個字符:', content.substring(0, 60).replace(/\n/g, '\\n'));
+    console.log('是否已有```markdown開頭:', content.trim().startsWith('```markdown'));
+    
+    // 為Markdown視圖準備內容
+    let wrappedContent = content;
+    
+    // 如果內容不是以 ```markdown 開頭，我們用一個特殊技巧：
+    // 創建一個包含完整 markdown 代碼塊的字符串
+    if (!content.trim().startsWith('```markdown')) {
+      wrappedContent = "```markdown\n" + content + "\n```";
+      console.log('已為內容添加 ```markdown 包裝');
+    }
+    
+    setProcessedMarkdown(wrappedContent);
+    
+  }, [content]);
   
   // 使用useCallback優化函數，防止不必要的重複創建
   const convertToArticleHtml = useCallback(async (markdownContent: string) => {
@@ -100,10 +125,10 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
   
   // 當內容或視圖模式更新時，處理HTML
   useEffect(() => {
-    if (content && viewMode === 'article') {
-      convertToArticleHtml(content);
+    if (processedMarkdown && viewMode === 'article') {
+      convertToArticleHtml(processedMarkdown);
     }
-  }, [content, viewMode, convertToArticleHtml]);
+  }, [processedMarkdown, viewMode, convertToArticleHtml]);
   
   return (
     <div className="container mx-auto p-4">
@@ -176,7 +201,7 @@ export default function MarkdownViewer({ content, title, error }: MarkdownViewer
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
               >
-                {content}
+                {processedMarkdown}
               </ReactMarkdown>
             </div>
           )}

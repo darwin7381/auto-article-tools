@@ -95,14 +95,8 @@ export function createDocxMarkdown(htmlContent: string, fileId: string): string 
     .replace(/<a href="(.*?)">(.*?)<\/a>/g, '[$2]($1)')
     .replace(/<img src="(.*?)".*?>/g, '![]($1)\n\n');
   
-  // 添加元數據
-  const frontMatter = generateFrontMatter({
-    source: 'docx',
-    fileId: fileId,
-    processTime: new Date().toISOString()
-  });
-  
-  return `${frontMatter}\n${markdown}`;
+  // 直接返回處理後的Markdown內容，不添加frontmatter
+  return markdown;
 }
 
 /**

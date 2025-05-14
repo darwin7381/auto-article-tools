@@ -77,15 +77,9 @@ ${markdownContent}`;
       return markdownContent;
     }
 
-    // 移除可能存在的Markdown程式碼區塊標記
-    let cleanedContent = content;
-    // 移除開頭的 ```markdown 標記
-    cleanedContent = cleanedContent.replace(/^```markdown\n/g, '');
-    // 移除結尾的 ``` 標記
-    cleanedContent = cleanedContent.replace(/```\s*$/g, '');
-
+    // 不再進行清理，直接返回 AI 回應
     console.log('PR Writer處理成功');
-    return cleanedContent;
+    return content;
   } catch (error) {
     console.error('PR Writer處理失敗:', error);
     // 發生任何錯誤，返回原始內容
@@ -114,14 +108,8 @@ export async function enhanceToPRRelease(fileId: string, markdownPath: string): 
       // 使用PR Writer Agent處理內容
       const enhancedContent = await processPRContent(markdownContent);
       
-      // 添加PR新聞稿元數據，確保沒有包含```markdown標記
-      const finalMarkdown = `---
-source: pr-writer-enhanced
-fileId: ${fileId}
-processTime: ${new Date().toISOString()}
----
-
-${enhancedContent}`;
+      // 直接使用处理后的内容，不添加frontmatter
+      const finalMarkdown = enhancedContent;
       
       // 保存處理後的PR新聞稿Markdown
       const { r2Key, localPath } = await saveMarkdown(finalMarkdown, fileId, '-pr-enhanced');
@@ -135,15 +123,8 @@ ${enhancedContent}`;
     } catch (aiError) {
       console.error('PR Writer處理異常:', aiError);
       
-      // 如果AI處理失敗，仍然保存原始內容
-      const finalMarkdown = `---
-source: content-processed-only
-fileId: ${fileId}
-processTime: ${new Date().toISOString()}
-note: PR Writer處理失敗，使用原始內容
----
-
-${markdownContent}`;
+      // 如果AI處理失敗，仍然保存原始內容，不添加frontmatter
+      const finalMarkdown = markdownContent;
       
       // 保存原始內容
       const { r2Key, localPath } = await saveMarkdown(finalMarkdown, fileId, '-content-only');
