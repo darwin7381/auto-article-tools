@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { getFileFromR2 } from '../services/storage/r2Service';
 import { saveMarkdown } from '../services/document/markdownService';
-import { createChatConfig } from './common/agentUtils';
+import { createChatConfig, withRetry } from './common/agentUtils';
 
 /**
  * 內容處理Agent - 專門處理文檔內容增強
@@ -59,27 +59,56 @@ ${markdownContent}`;
       top_p: 0.95,
     });
     
-    // API調用
-    const completion = await openaiClient.chat.completions.create({
-      ...config,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ]
-    });
+    // 使用重試機制調用API
+    const content = await withRetry(
+      async () => {
+        const completion = await openaiClient!.chat.completions.create({
+          ...config,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ]
+        });
 
-    // 獲取回應內容
-    const content = completion.choices[0].message.content;
-    if (!content) {
-      console.warn('AI回應為空，返回原始內容');
-      return markdownContent;
-    }
+        // 獲取回應內容
+        const content = completion.choices[0].message.content;
+        if (!content) {
+          throw new Error('AI回應為空');
+        }
+        return content;
+      },
+      {
+        maxRetries: 3,
+        retryDelay: 2000,
+        onRetry: (error, count) => {
+          console.warn(`內容處理重試 #${count}：`, error.message);
+        },
+        retryCondition: (error) => {
+          // 根據錯誤類型決定是否重試
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const retryableErrors = [
+            'timeout', 
+            'exceeded maximum time', 
+            'rate limit', 
+            'server error',
+            'network error',
+            'Gateway Timeout',
+            'timed out',
+            'not valid JSON'
+          ];
+          
+          return retryableErrors.some(errText => 
+            errorMessage.toLowerCase().includes(errText.toLowerCase())
+          );
+        }
+      }
+    );
 
     console.log('AI處理成功');
     return content;
   } catch (error) {
-    console.error('AI處理失敗:', error);
-    // 發生任何錯誤，返回原始內容
+    console.error('AI處理失敗(已重試):', error);
+    // 所有重試都失敗，返回原始內容
     return markdownContent;
   }
 }
@@ -98,7 +127,17 @@ export async function enhanceMarkdown(fileId: string, markdownPath: string): Pro
 }> {
   try {
     // 從R2獲取Markdown內容
-    const markdownBuffer = await getFileFromR2(markdownPath);
+    const markdownBuffer = await withRetry(
+      () => getFileFromR2(markdownPath),
+      {
+        maxRetries: 3,
+        retryDelay: 1000,
+        onRetry: (error, count) => {
+          console.warn(`獲取原始Markdown內容重試 #${count}：`, error.message);
+        }
+      }
+    );
+    
     const markdownContent = markdownBuffer.toString('utf-8');
     
     try {
@@ -109,7 +148,16 @@ export async function enhanceMarkdown(fileId: string, markdownPath: string): Pro
       const finalMarkdown = enhancedContent;
       
       // 保存處理後的Markdown
-      const { r2Key, localPath } = await saveMarkdown(finalMarkdown, fileId, '-enhanced');
+      const { r2Key, localPath } = await withRetry(
+        () => saveMarkdown(finalMarkdown, fileId, '-enhanced'),
+        {
+          maxRetries: 3,
+          retryDelay: 1000,
+          onRetry: (error, count) => {
+            console.warn(`保存增強內容重試 #${count}：`, error.message);
+          }
+        }
+      );
       
       return {
         success: true,
@@ -118,13 +166,22 @@ export async function enhanceMarkdown(fileId: string, markdownPath: string): Pro
         markdownUrl: localPath,
       };
     } catch (aiError) {
-      console.error('AI處理異常:', aiError);
+      console.error('AI處理異常(已重試):', aiError);
       
       // 如果AI處理失敗，保存原始內容，不添加frontmatter
       const finalMarkdown = markdownContent;
       
       // 保存原始內容
-      const { r2Key, localPath } = await saveMarkdown(finalMarkdown, fileId, '-unprocessed');
+      const { r2Key, localPath } = await withRetry(
+        () => saveMarkdown(finalMarkdown, fileId, '-unprocessed'),
+        {
+          maxRetries: 3,
+          retryDelay: 1000,
+          onRetry: (error, count) => {
+            console.warn(`保存未處理內容重試 #${count}：`, error.message);
+          }
+        }
+      );
       
       return {
         success: false,
