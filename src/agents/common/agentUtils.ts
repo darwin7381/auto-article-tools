@@ -70,6 +70,58 @@ export function withJsonOutput(schema?: object) {
 }
 
 /**
+ * 自動重試機制 - 對AI處理操作進行自動重試
+ * @param operation 要重試的操作函數
+ * @param options 重試選項
+ * @returns 操作結果
+ */
+export async function withRetry<T>(
+  operation: () => Promise<T>, 
+  options: {
+    maxRetries?: number;
+    retryDelay?: number;
+    onRetry?: (error: Error, retryCount: number) => void;
+    retryCondition?: (error: unknown) => boolean;
+  } = {}
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? 3;
+  const retryDelay = options.retryDelay ?? 1000;
+  const onRetry = options.onRetry ?? ((error, count) => console.warn(`重試 #${count}，錯誤:`, error.message));
+  const retryCondition = options.retryCondition ?? (() => true);
+  
+  let lastError: unknown;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      
+      // 判斷是否符合重試條件
+      if (attempt < maxRetries && retryCondition(error)) {
+        // 通知重試回調
+        if (error instanceof Error) {
+          onRetry(error, attempt + 1);
+        } else {
+          onRetry(new Error(String(error)), attempt + 1);
+        }
+        
+        // 等待後重試
+        await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
+      } else {
+        break;
+      }
+    }
+  }
+  
+  // 所有重試失敗後拋出最後的錯誤
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+  throw new Error(String(lastError));
+}
+
+/**
  * 異常回退機制 - 在AI處理失敗時提供安全的回退選項
  * @param fallbackValue 回退值
  * @param operation 要嘗試的操作

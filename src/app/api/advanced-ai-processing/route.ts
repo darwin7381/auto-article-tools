@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server';
 import { enhanceToPRRelease } from '@/agents/prWriterAgent';
+import { withRetry } from '@/agents/common/agentUtils';
 
 export async function POST(req: Request) {
   try {
-    const { markdownKey, fileId, options } = await req.json();
+    // 解析請求數據
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (parseError) {
+      console.error('請求數據解析錯誤:', parseError);
+      return NextResponse.json(
+        { success: false, error: '無效的JSON請求格式' },
+        { status: 400 }
+      );
+    }
+    
+    const { markdownKey, fileId, options } = requestData;
     
     if (!markdownKey) {
       return NextResponse.json(
@@ -19,8 +32,36 @@ export async function POST(req: Request) {
     console.log(`使用的markdownPath: ${markdownPath}`);
     
     try {
-      // 使用PR Writer Agent處理
-      const enhancedResult = await enhanceToPRRelease(fileId, markdownPath);
+      // 使用PR Writer Agent處理，並添加重試機制
+      const enhancedResult = await withRetry(
+        () => enhanceToPRRelease(fileId, markdownPath),
+        {
+          maxRetries: 3,
+          retryDelay: 3000,
+          onRetry: (error, count) => {
+            console.warn(`高級AI處理重試 #${count}：`, error.message);
+          },
+          retryCondition: (error) => {
+            // 根據錯誤類型決定是否重試
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const retryableErrors = [
+              'timeout', 
+              'exceeded maximum time', 
+              'rate limit', 
+              'server error',
+              'network error',
+              'Gateway Timeout',
+              'timed out',
+              'not valid JSON'
+            ];
+            
+            return retryableErrors.some(errText => 
+              errorMessage.toLowerCase().includes(errText.toLowerCase())
+            );
+          }
+        }
+      );
+      
       console.log(`PR Writer處理成功，結果: markdownKey=${enhancedResult.markdownKey}`);
       
       // 返回結果
@@ -33,7 +74,7 @@ export async function POST(req: Request) {
         stageComplete: true
       });
     } catch (processingError) {
-      console.error(`PR Writer處理內部錯誤:`, processingError);
+      console.error(`PR Writer處理內部錯誤(已重試)：`, processingError);
       throw processingError; // 向外層拋出錯誤以便統一處理
     }
   } catch (error) {

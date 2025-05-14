@@ -2,11 +2,22 @@ import { NextResponse } from 'next/server';
 import { processContent } from '@/agents/contentAgent';
 import { getFileFromR2 } from '@/services/storage/r2Service';
 import { saveMarkdown } from '@/services/document/markdownService';
+import { withRetry } from '@/agents/common/agentUtils';
 
 export async function POST(request: Request) {
   try {
     // 支持直接接收markdown內容或markdown URL
-    const reqBody = await request.json();
+    let reqBody;
+    try {
+      reqBody = await request.json();
+    } catch (parseError) {
+      console.error('請求數據解析錯誤:', parseError);
+      return NextResponse.json(
+        { success: false, error: '無效的JSON請求格式' },
+        { status: 400 }
+      );
+    }
+    
     const { markdown, markdownUrl, markdownKey } = reqBody;
     
     let markdownContent = '';
@@ -21,7 +32,16 @@ export async function POST(request: Request) {
       // 從R2獲取Markdown內容
       try {
         console.log('從URL獲取Markdown內容:', markdownUrl);
-        const markdownBuffer = await getFileFromR2(markdownUrl);
+        const markdownBuffer = await withRetry(
+          () => getFileFromR2(markdownUrl),
+          {
+            maxRetries: 3,
+            retryDelay: 1000,
+            onRetry: (error, count) => {
+              console.warn(`從URL獲取Markdown重試 #${count}：`, error.message);
+            }
+          }
+        );
         markdownContent = markdownBuffer.toString('utf-8');
         fileId = markdownUrl.split('/').pop()?.split('.')[0] || `file-${Date.now()}`;
       } catch (fetchError) {
@@ -31,7 +51,16 @@ export async function POST(request: Request) {
       // 從R2使用key獲取Markdown內容
       try {
         console.log('從R2 Key獲取Markdown內容:', markdownKey);
-        const markdownBuffer = await getFileFromR2(markdownKey);
+        const markdownBuffer = await withRetry(
+          () => getFileFromR2(markdownKey),
+          {
+            maxRetries: 3,
+            retryDelay: 1000,
+            onRetry: (error, count) => {
+              console.warn(`從R2 Key獲取Markdown重試 #${count}：`, error.message);
+            }
+          }
+        );
         markdownContent = markdownBuffer.toString('utf-8');
         fileId = reqBody.fileId || markdownKey.split('/').pop()?.split('.')[0] || `file-${Date.now()}`;
       } catch (fetchError) {
@@ -44,10 +73,20 @@ export async function POST(request: Request) {
     // 處理OpenAI處理
     try {
       console.log('開始使用OpenAI處理內容...');
+      // processContent已經內建重試機制
       const enhancedContent = await processContent(markdownContent);
       
       // 保存處理後的結果
-      const { r2Key, localPath, publicUrl } = await saveMarkdown(enhancedContent, fileId, '-ai-enhanced');
+      const { r2Key, localPath, publicUrl } = await withRetry(
+        () => saveMarkdown(enhancedContent, fileId, '-ai-enhanced'),
+        {
+          maxRetries: 3,
+          retryDelay: 1000,
+          onRetry: (error, count) => {
+            console.warn(`保存AI增強內容重試 #${count}：`, error.message);
+          }
+        }
+      );
       
       return NextResponse.json({
         success: true,
@@ -61,7 +100,7 @@ export async function POST(request: Request) {
         processingComplete: true // 添加：標記整體處理已完成
       });
     } catch (aiError) {
-      console.error("OpenAI處理失敗:", aiError);
+      console.error("OpenAI處理失敗(已重試):", aiError);
       return NextResponse.json({
         success: false,
         error: 'OpenAI處理失敗',
