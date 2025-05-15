@@ -866,70 +866,63 @@ export default function IntegratedFileProcessor() {
         {/* 結果顯示（上稿階段）*/}
         {activeTab === 'result' && result && (
           <div className="space-y-6">
-            {/* 結果預覽區域 */}
-            <div className="border border-gray-200 dark:border-gray-800 rounded-xl p-4">
-              <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-2">
-                上稿準備
-              </h4>
-              
-              {/* 顯示結果階段 */}
-              <ProgressDisplay 
-                state={processState!}
-                stageGroups={{
-                  initial: { 
-                    title: "初步處理階段",
-                    stages: ['upload', 'extract', 'process']
-                  },
-                  advanced: { 
-                    title: "後期處理階段",
-                    stages: ['advanced-ai', 'format-conversion']
-                  },
-                  final: {
-                    title: "上稿階段", 
-                    stages: ['prep-publish', 'publish-news']
+            {/* 顯示結果階段 */}
+            <ProgressDisplay 
+              state={processState!}
+              stageGroups={{
+                initial: { 
+                  title: "初步處理階段",
+                  stages: ['upload', 'extract', 'process']
+                },
+                advanced: { 
+                  title: "後期處理階段",
+                  stages: ['advanced-ai', 'format-conversion']
+                },
+                final: {
+                  title: "上稿階段", 
+                  stages: ['prep-publish', 'publish-news']
+                }
+              }}
+              displayGroups={['final']}
+              onViewStage={handleViewStage}
+            />
+            
+            {/* 上稿準備階段 */}
+            <PrepPublishingComponent 
+              fileId={result.fileId?.toString() || processState?.id || ''}
+              htmlContent={result.htmlContent?.toString()}
+              markdownUrl={markdownUrl || undefined}
+              onContentChange={(content) => {
+                if (result) {
+                  setResult({
+                    ...result,
+                    htmlContent: content
+                  });
+                }
+              }}
+              onContinue={() => {
+                // 標記上稿準備階段為完成
+                if (processState) {
+                  // 更新狀態
+                  saveStageResult('prep-publish', { 
+                    ...result, 
+                    status: 'completed' 
+                  });
+                  
+                  // 滾動到 WordPress 發布設定區域
+                  const wpSection = document.getElementById('wordpress-publish-section');
+                  if (wpSection) {
+                    wpSection.scrollIntoView({ behavior: 'smooth' });
                   }
-                }}
-                displayGroups={['final']}
-                onViewStage={handleViewStage}
-              />
-              
-              {/* 上稿準備階段 */}
-              <PrepPublishingComponent 
-                fileId={result.fileId?.toString() || processState?.id || ''}
+                }
+              }}
+            />
+
+            {/* WordPress 發布設定 */}
+            <div id="wordpress-publish-section">
+              <WordPressPublishComponent 
                 htmlContent={result.htmlContent?.toString()}
-                markdownUrl={markdownUrl || undefined}
-                onContentChange={(content) => {
-                  if (result) {
-                    setResult({
-                      ...result,
-                      htmlContent: content
-                    });
-                  }
-                }}
-                onContinue={() => {
-                  // 標記上稿準備階段為完成
-                  if (processState) {
-                    // 更新狀態
-                    saveStageResult('prep-publish', { 
-                      ...result, 
-                      status: 'completed' 
-                    });
-                    
-                    // 滾動到 WordPress 發布設定區域
-                    const wpSection = document.getElementById('wordpress-publish-section');
-                    if (wpSection) {
-                      wpSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }
-                }}
               />
-              
-              {/* WordPress 發布設定 */}
-              <div id="wordpress-publish-section">
-                <WordPressPublishComponent 
-                  htmlContent={result.htmlContent?.toString()}
-                />
-              </div>
             </div>
             
             {/* 狀態通知 */}
