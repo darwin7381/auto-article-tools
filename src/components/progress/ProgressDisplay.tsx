@@ -118,7 +118,7 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
         
         <div className="relative">
           {/* 階段連接線 */}
-          <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+          <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
           
                 {/* 組內階段 */}
           <div className="space-y-4">
@@ -251,39 +251,37 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
           showValueLabel={false}
         />
 
-        <div className="text-right text-xs text-gray-500 dark:text-gray-400">
-          {Math.round(animatedProgress)}% 完成
+        <div className="flex justify-between items-center">
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {state.metadata && (
+              <>
+                {state.type === 'file' && state.metadata.fileName && (
+                  <span>檔案：{state.metadata.fileName}</span>
+                )}
+                {state.type === 'url' && state.metadata.url && (
+                  <span>連結：{state.metadata.url}</span>
+                )}
+              </>
+            )}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {Math.round(animatedProgress)}% 完成
+          </div>
         </div>
       </div>
       
       {/* 處理階段顯示 - 更新為支持階段群組 */}
       <div className="space-y-4 pt-2">
-        <h4 className="text-md font-medium text-gray-800 dark:text-gray-200">
-          處理階段
-        </h4>
-        
         <div className="relative">
           {renderStageGroups()}
         </div>
       </div>
       
-      {/* 處理元數據 */}
-      {state.metadata && Object.keys(state.metadata).length > 0 && (
+      {/* 其他處理元數據（除了文件名/URL之外的信息） */}
+      {state.metadata && (state.metadata.title || state.metadata.language || state.metadata.wordCount !== undefined || state.metadata.imageCount !== undefined) && (
         <div className="mt-6 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-sm">
-          <h4 className="font-medium mb-2 text-gray-800 dark:text-gray-200">處理信息</h4>
+          <h4 className="font-medium mb-2 text-gray-800 dark:text-gray-200">其他信息</h4>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-            {state.type === 'file' && state.metadata.fileName && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">文件名稱:</dt>
-                <dd className="text-gray-800 dark:text-gray-200">{state.metadata.fileName}</dd>
-              </>
-            )}
-            {state.type === 'url' && state.metadata.url && (
-              <>
-                <dt className="text-gray-500 dark:text-gray-400">URL:</dt>
-                <dd className="text-gray-800 dark:text-gray-200 truncate">{state.metadata.url}</dd>
-              </>
-            )}
             {state.metadata.title && (
               <>
                 <dt className="text-gray-500 dark:text-gray-400">標題:</dt>
