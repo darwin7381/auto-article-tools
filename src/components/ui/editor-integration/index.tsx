@@ -237,7 +237,7 @@ export default function EditorIntegration({
       {!isCollapsed && (
         <div 
           ref={editorContainerRef}
-          className="w-full min-h-[300px] max-h-[500px] overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md"
+          className="w-full min-h-[345px] max-h-[575px] overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md"
         >
           <TapEditor 
             initialContent={content} 
@@ -248,9 +248,9 @@ export default function EditorIntegration({
         </div>
       )}
 
-      {/* 全屏編輯模式彈窗 - 修改為真正的全屏 */}
+      {/* 全屏編輯模式彈窗 - 修改為真正的全屏，並提高z-index */}
       {isFullScreen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
           <div className="bg-transparent w-full h-full flex items-center justify-center overflow-hidden pointer-events-none">
             {/* 編輯器主容器 */}
             <div 
