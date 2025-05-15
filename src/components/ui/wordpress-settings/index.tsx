@@ -123,7 +123,7 @@ export function WordPressSettings({
         {/* 特色圖片 */}
         <div className="space-y-1">
           <label htmlFor="featured_media" className="block text-sm font-medium">
-            特色圖片 (ID)
+            特色圖片 (ID 或 URL)
           </label>
           <input
             id="featured_media"
@@ -131,9 +131,9 @@ export function WordPressSettings({
             value={formData.featured_media}
             onChange={(e) => handleChange('featured_media', e.target.value)}
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-            placeholder="例如: 123"
+            placeholder="例如: 123 或 https://example.com/image.jpg"
           />
-          <p className="text-xs text-gray-500">請輸入WordPress媒體庫中的圖片ID</p>
+          <p className="text-xs text-gray-500">輸入WordPress媒體庫中的圖片ID，或直接輸入圖片URL</p>
         </div>
         
         {/* 分類 */}

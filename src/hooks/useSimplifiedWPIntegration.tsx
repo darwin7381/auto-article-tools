@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-// 不再需要直接導入publishPost
-// import { publishPost } from '@/services/wordpress/wordpressService';
 
 interface WordPressIntegrationOptions {
   initialContent?: string;
@@ -72,6 +70,57 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
     };
   };
   
+  // 檢測輸入的是URL還是ID
+  const isURL = (input: string): boolean => {
+    try {
+      new URL(input);
+      return true;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      return false;
+    }
+  };
+  
+  // 從URL上傳圖片到WordPress
+  const uploadImageFromUrl = async (imageUrl: string): Promise<number | null> => {
+    try {
+      // 使用服務端代理上傳圖片
+      const response = await fetch('/api/wordpress-proxy/upload-image-from-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageUrl }),
+        cache: 'no-store'
+      });
+      
+      // 首先獲取響應體，無論成功與否
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        console.error(`解析響應失敗: ${parseError instanceof Error ? parseError.message : '未知錯誤'}`);
+        console.error(`響應狀態: ${response.status} ${response.statusText}`);
+        return null;
+      }
+      
+      if (!response.ok) {
+        console.error(`上傳圖片失敗 (HTTP ${response.status}): ${
+          responseData && responseData.error 
+            ? responseData.error
+            : `請求失敗，狀態碼: ${response.status} ${response.statusText}`
+        }`);
+        // 不拋出異常，而是返回null
+        return null;
+      }
+      
+      return responseData.id;
+    } catch (error) {
+      console.error(`上傳圖片過程中發生網絡或系統錯誤: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  };
+  
   // 發布到WordPress (通過服務端代理)
   const publishToWordPress = async (formData: WordPressPublishData) => {
     setIsSubmitting(true);
@@ -127,11 +176,31 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
         }
       }
       
-      // 添加特色圖片(featured_media)參數
+      // 處理特色圖片(featured_media)參數
       if (formData.featured_media && formData.featured_media.trim() !== '') {
-        const mediaId = parseInt(formData.featured_media.trim());
-        if (!isNaN(mediaId) && mediaId > 0) {
-          publishData.featured_media = mediaId;
+        try {
+          const featuredMedia = formData.featured_media.trim();
+          
+          // 檢測輸入是URL還是ID
+          if (isURL(featuredMedia)) {
+            // 如果是URL，先上傳獲取ID
+            const mediaId = await uploadImageFromUrl(featuredMedia);
+            
+            if (mediaId) {
+              publishData.featured_media = mediaId;
+            } else {
+              // 特色圖片上傳失敗但繼續發布
+            }
+          } else {
+            // 如果是ID，直接使用
+            const mediaId = parseInt(featuredMedia);
+            if (!isNaN(mediaId) && mediaId > 0) {
+              publishData.featured_media = mediaId;
+            }
+          }
+        } catch (imageError) {
+          // 捕獲所有圖片處理錯誤，但不影響發布流程
+          console.error("處理特色圖片時發生錯誤，將繼續發布文章:", imageError);
         }
       }
       
@@ -141,6 +210,7 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
       }
       
       if (debug) {
+        // 僅在調試模式輸出詳細信息
         console.log("發布數據:", {
           title: formData.title,
           contentLength: content.length,
@@ -156,7 +226,6 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
       }
       
       // 調用服務端代理API
-      console.log("正在呼叫WordPress服務端代理API...");
       const response = await fetch('/api/wordpress-proxy/publish', {
         method: 'POST',
         headers: {
@@ -173,9 +242,6 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
         console.error("WordPress API代理失敗:", response.status, responseData);
         throw new Error(responseData.error || `WordPress發布失敗 (${response.status})`);
       }
-      
-      // 處理成功情況
-      console.log("WordPress發布成功:", responseData);
       
       const successResult: PublishResult = {
         success: true,

@@ -161,6 +161,8 @@ PDF文件處理流程如下：
 - 使用 OpenAI 增強內容品質
 - 輸出標準化的 Markdown 格式
 - 一鍵發布到 WordPress 網站
+- 支持從URL直接上傳特色圖片
+- 提供半自動與全自動處理流程選項
 
 ## 技術架構
 
@@ -169,12 +171,14 @@ PDF文件處理流程如下：
 - Next.js 15 前端框架
 - TailwindCSS 樣式
 - Heroui UI 組件
+- TipTap編輯器
 
 ### 後端
 
 - Next.js API 路由
 - Cloudflare R2 存儲
 - OpenAI API 內容增強
+- WordPress REST API 集成
 
 ### 服務層設計
 
@@ -191,6 +195,9 @@ src/
 │   ├── conversion/      # 文件轉換服務
 │   │   ├── docxService.ts      # DOCX處理
 │   │   └── pdfService.ts       # PDF處理
+│   ├── wordpress/       # WordPress集成服務
+│   │   ├── wordpressService.ts      # 客戶端WordPress服務
+│   │   └── serverWordpressService.ts # 服務器端WordPress服務
 │   └── utils/           # 工具服務
 │       └── openaiService.ts    # OpenAI處理
 ```
@@ -200,6 +207,7 @@ src/
 - **存儲服務**: 處理文件的上傳、下載和存儲
 - **文檔服務**: 處理Markdown的創建和格式化
 - **轉換服務**: 處理文件格式轉換(PDF→DOCX→Markdown)
+- **WordPress服務**: 處理WordPress發布和媒體上傳
 - **工具服務**: 提供OpenAI內容增強等功能
 
 ## 安裝與設置
@@ -208,12 +216,18 @@ src/
 2. 安裝依賴: `npm install`
 3. 設置環境變量(.env.local):
    ```
+   # OpenAI和存儲配置
    OPENAI_API_KEY=your_api_key
    CLOUDFLARE_R2_ACCESS_KEY_ID=your_access_key
    CLOUDFLARE_R2_SECRET_ACCESS_KEY=your_secret_key
    CLOUDFLARE_R2_ENDPOINT=your_endpoint
    CLOUDFLARE_R2_BUCKET_NAME=your_bucket_name
    R2_PUBLIC_URL=your_public_url
+   
+   # WordPress配置
+   NEXT_PUBLIC_WORDPRESS_API_URL=your_wordpress_url
+   WORDPRESS_API_USER=your_wordpress_username
+   WORDPRESS_API_PASSWORD=your_wordpress_password
    ```
 4. 啟動開發服務器: `npm run dev`
 
@@ -223,7 +237,24 @@ src/
 2. 上傳DOCX或PDF文件
 3. 等待處理完成
 4. 預覽生成的內容
-5. 發布到WordPress(需配置WordPress連接)
+5. 設置WordPress發布選項（標題、分類、特色圖片等）
+6. 點擊發布按鈕將內容發送到WordPress
+
+## WordPress集成
+
+系統提供了完整的WordPress集成功能：
+
+- **安全的服務端代理**: 所有WordPress API調用通過服務端代理執行
+- **特色圖片處理**: 支持從URL上傳特色圖片到WordPress媒體庫
+- **自定義發布選項**: 支持設置標題、分類、標籤、作者ID等
+- **混合式自動化**: 提供半自動和全自動處理流程選項
+
+### 文檔
+
+詳細的集成文檔可在以下位置找到：
+- `docs/wordpress-integration-guide.md`: WordPress集成完整指南
+- `docs/wordpress-integration-roadmap.md`: WordPress集成路線圖和規劃
+- `docs/test-scripts.md`: WordPress API測試腳本使用說明
 
 ## 開發指南
 
