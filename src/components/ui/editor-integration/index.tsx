@@ -118,6 +118,8 @@ export default function EditorIntegration({
   // 開啟全屏編輯模式
   const openFullScreenEditor = () => {
     setIsFullScreen(true);
+    // 同時折疊小型編輯器
+    setIsCollapsed(true);
     // 禁止背景滾動
     document.body.style.overflow = 'hidden';
     
@@ -133,8 +135,13 @@ export default function EditorIntegration({
   // 關閉全屏編輯模式
   const closeFullScreenEditor = () => {
     setIsFullScreen(false);
+    // 確保小編輯器保持折疊狀態
+    setIsCollapsed(true);
     // 恢復背景滾動
     document.body.style.overflow = '';
+    
+    // 儲存當前內容到localStorage以確保同步
+    setItem(editorStorageKey, content);
   };
   
   // 處理內容變更
@@ -234,7 +241,7 @@ export default function EditorIntegration({
       </div>
       
       {/* 展開/收合的編輯器（帶有高度限制和滾動條） */}
-      {!isCollapsed && (
+      {!isCollapsed && !isFullScreen && (
         <div 
           ref={editorContainerRef}
           className="w-full min-h-[345px] max-h-[575px] overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md"
