@@ -78,8 +78,12 @@ const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) =>
     title: '',
     categories: '',
     tags: '',
-    status: 'draft' as 'publish' | 'draft' | 'pending',
-    isPrivate: false
+    status: 'draft' as 'publish' | 'draft' | 'pending' | 'future' | 'private',
+    isPrivate: false,
+    slug: '',
+    author: '',
+    featured_media: '',
+    date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16) // 預設為明天的當前時間
   });
   
   // 發布處理函數
@@ -89,12 +93,22 @@ const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) =>
       return;
     }
     
+    // 檢查定時發布時必須填寫日期
+    if (formData.status === 'future' && !formData.date) {
+      alert('選擇定時發布時必須設定發布日期');
+      return;
+    }
+    
     publishToWordPress({
       title: formData.title,
       categories: formData.categories || undefined,
       tags: formData.tags || undefined,
       status: formData.status,
-      isPrivate: formData.isPrivate
+      isPrivate: formData.isPrivate,
+      slug: formData.slug || undefined,
+      author: formData.author || undefined,
+      featured_media: formData.featured_media || undefined,
+      date: formData.status === 'future' ? formData.date : undefined
     });
   };
   

@@ -14,8 +14,12 @@ export interface WordPressPublishData {
   title: string;
   categories?: string;
   tags?: string;
-  status: 'publish' | 'draft' | 'pending';
+  status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
   isPrivate: boolean;
+  slug?: string;
+  author?: string;
+  featured_media?: string;
+  date?: string;
 }
 
 interface PublishResult {
@@ -78,14 +82,63 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
       const content = initialContent || '<p>空白內容</p>';
       
       // 準備發布數據
-      const publishData = {
+      interface PublishRequestData {
+        title: string;
+        content: string;
+        status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
+        categories?: number[];
+        tags?: string[];
+        isPrivate: boolean;
+        slug?: string;
+        author?: number;
+        featured_media?: number;
+        date?: string;
+      }
+      
+      const publishData: PublishRequestData = {
         title: formData.title,
         content: content,
         status: formData.status,
-        ...formatCategoriesAndTags(formData.categories),
-        ...formatTags(formData.tags),
         isPrivate: formData.isPrivate
       };
+      
+      // 添加分類和標籤
+      const categoriesData = formatCategoriesAndTags(formData.categories);
+      const tagsData = formatTags(formData.tags);
+      
+      if (categoriesData.categories) {
+        publishData.categories = categoriesData.categories;
+      }
+      
+      if (tagsData.tags) {
+        publishData.tags = tagsData.tags;
+      }
+      
+      // 添加自訂連結(slug)參數
+      if (formData.slug && formData.slug.trim() !== '') {
+        publishData.slug = formData.slug.trim();
+      }
+      
+      // 添加指定作者(author)參數
+      if (formData.author && formData.author.trim() !== '') {
+        const authorId = parseInt(formData.author.trim());
+        if (!isNaN(authorId) && authorId > 0) {
+          publishData.author = authorId;
+        }
+      }
+      
+      // 添加特色圖片(featured_media)參數
+      if (formData.featured_media && formData.featured_media.trim() !== '') {
+        const mediaId = parseInt(formData.featured_media.trim());
+        if (!isNaN(mediaId) && mediaId > 0) {
+          publishData.featured_media = mediaId;
+        }
+      }
+      
+      // 添加定時發布日期(date)參數
+      if (formData.status === 'future' && formData.date) {
+        publishData.date = new Date(formData.date).toISOString();
+      }
       
       if (debug) {
         console.log("發布數據:", {
@@ -94,7 +147,11 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
           status: formData.status,
           categories: publishData.categories,
           tags: publishData.tags,
-          isPrivate: formData.isPrivate
+          isPrivate: formData.isPrivate,
+          slug: publishData.slug,
+          author: publishData.author,
+          featured_media: publishData.featured_media,
+          date: publishData.date
         });
       }
       
