@@ -57,7 +57,7 @@ export function WordPressForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700">
+        <div className="p-3 bg-red-50 border border-red-300 rounded-md text-red-700">
           {error}
         </div>
       )}
@@ -72,7 +72,7 @@ export function WordPressForm({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          className="w-full px-3 py-2 border border-gray-400 rounded-md"
           placeholder="請輸入文章標題"
           required
         />
@@ -87,7 +87,7 @@ export function WordPressForm({
           id="status"
           value={status}
           onChange={(e) => setStatus(e.target.value as 'publish' | 'draft' | 'pending')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          className="w-full px-3 py-2 border border-gray-400 rounded-md"
         >
           <option value="draft">草稿</option>
           <option value="pending">待審核</option>
@@ -105,7 +105,7 @@ export function WordPressForm({
           type="text"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          className="w-full px-3 py-2 border border-gray-400 rounded-md"
           placeholder="例如: 1,4,7"
         />
       </div>
@@ -120,7 +120,7 @@ export function WordPressForm({
           type="text"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          className="w-full px-3 py-2 border border-gray-400 rounded-md"
           placeholder="例如: 新聞,科技,區塊鏈"
         />
       </div>
@@ -132,7 +132,7 @@ export function WordPressForm({
           type="checkbox"
           checked={isPrivate}
           onChange={(e) => setIsPrivate(e.target.checked)}
-          className="h-4 w-4 text-blue-600 rounded"
+          className="h-4 w-4 text-blue-600 rounded border-gray-400"
         />
         <label htmlFor="isPrivate" className="font-medium">
           設為私密文章

@@ -20,7 +20,7 @@ export function Progress({ className = '', ...props }: ProgressProps) {
 
   return (
     <HeroProgress
-      className={`bg-gray-200 dark:bg-gray-700 ${className}`}
+      className={`bg-gray-300 dark:bg-gray-700 ${className}`}
       showValueLabel={false}
       barClassName={`${barColorClass} transition-all`}
       {...props}
