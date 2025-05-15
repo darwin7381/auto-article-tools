@@ -242,6 +242,25 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
       padding-bottom: 100px; /* 確保滾動到底部有足夠空間 */
     }
     
+    /* 特別處理置頂欄 */
+    .sticky-header {
+      position: sticky !important;
+      z-index: 50 !important;
+    }
+    
+    .top-header {
+      top: 0 !important;
+    }
+    
+    .second-header {
+      top: 41px !important;
+    }
+    
+    /* 確保全屏模式下工具欄仍然能正確置頂 */
+    .fullscreen-editor .sticky-header {
+      z-index: 9999 !important;
+    }
+    
     .tiptap-toolbar {
       position: sticky !important;
       top: 0 !important;
@@ -464,7 +483,7 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
         /* 特別處理置頂欄 */
         .sticky-header {
           position: sticky !important;
-          z-index: 9999 !important;
+          z-index: 50 !important;
         }
         
         .top-header {
@@ -478,7 +497,7 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
         /* 讓滾動獨立於頭部 */
         .editor-scroll-container {
           overflow-y: auto;
-          min-height: 300px;
+          min-height: 345px;
           flex: 1;
         }
         
