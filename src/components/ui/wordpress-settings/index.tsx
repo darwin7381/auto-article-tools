@@ -18,6 +18,7 @@ interface WordPressSettingsProps {
     isPrivate: boolean;
   }>>;
   error?: string;
+  detailedError?: string;
 }
 
 export interface WordPressPublishData {
@@ -34,7 +35,8 @@ export interface WordPressPublishData {
 export function WordPressSettings({
   formData,
   onChange,
-  error
+  error,
+  detailedError
 }: WordPressSettingsProps) {
   // 處理表單字段的更新
   const handleChange = (field: string, value: string | boolean) => {
@@ -48,8 +50,13 @@ export function WordPressSettings({
     <div className="space-y-4">
       <div className="space-y-3">
         {error && (
-          <div className="p-2 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-            {error}
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm space-y-2">
+            <p className="font-medium">{error}</p>
+            {detailedError && (
+              <div className="text-xs p-2 bg-red-100/50 rounded">
+                <p className="whitespace-pre-line">{detailedError}</p>
+              </div>
+            )}
           </div>
         )}
         
