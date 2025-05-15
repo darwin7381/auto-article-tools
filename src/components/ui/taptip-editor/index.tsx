@@ -22,6 +22,7 @@ export interface TapEditorProps {
   initialContent?: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  className?: string;
 }
 
 // 自定義Span標記擴展，用於保留所有HTML屬性
@@ -87,7 +88,7 @@ const SpanMark = Mark.create({
 /**
  * TapEditor - 使用Tiptap實現的富文本編輯器
  */
-export function TapEditor({ initialContent = '', onChange, placeholder = '開始輸入內容...' }: TapEditorProps) {
+export function TapEditor({ initialContent = '', onChange, placeholder = '開始輸入內容...', className = '' }: TapEditorProps) {
   // 控制當前視圖模式
   const [currentView, setCurrentView] = useState<EditorView>('visual');
   // 用來存儲HTML源碼的狀態
@@ -145,19 +146,36 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-lg dark:prose-invert focus:outline-none min-h-[500px] p-4 w-full max-w-none',
+        class: `prose prose-lg dark:prose-invert focus:outline-none p-4 w-full max-w-none ${className.includes('h-full') ? 'min-h-[80vh]' : 'min-h-[300px]'}`,
       },
       // 保留粘貼的HTML原始格式
       transformPastedHTML: (html) => html,
+      // 防止自動滾動到底部
+      scrollThreshold: 0,
+      scrollMargin: 0,
     },
-  }, [currentView === 'visual']);
+  }, [currentView === 'visual', className]);
 
   // 當視圖切換時進行處理
   useEffect(() => {
     if (currentView === 'visual' && editor) {
       // 視覺模式下，設置編輯器內容
       editor.commands.setContent(htmlSource);
-      setTimeout(() => editor.commands.focus(), 100);
+      
+      // 延遲設置焦點確保內容已經渲染
+      setTimeout(() => {
+        // 將游標設置到文檔開頭
+        editor.commands.focus('start');
+        
+        // 強制滾動到頂部（多次嘗試確保生效）
+        const editorElement = document.querySelector('.ProseMirror');
+        if (editorElement instanceof HTMLElement) {
+          editorElement.scrollTop = 0;
+          setTimeout(() => {
+            if (editorElement) editorElement.scrollTop = 0;
+          }, 50);
+        }
+      }, 100);
     }
   }, [currentView, editor, htmlSource]);
 
@@ -223,6 +241,15 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
   const editorStyles = `
     .ProseMirror {
       outline: none;
+      height: 100%;
+      min-height: 300px;
+      padding-bottom: 100px; /* 確保滾動到底部有足夠空間 */
+    }
+    
+    .fullscreen-editor .tiptap-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
     
     .ProseMirror h1 {
@@ -401,12 +428,15 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
     }
   `;
 
+  // 檢查是否為全屏模式
+  const isFullScreen = className.includes('h-full');
+
   return (
-    <div className="border border-gray-300 rounded-md overflow-hidden bg-white text-black dark:bg-gray-800 dark:text-white dark:border-gray-700">
+    <div className={`border border-gray-300 rounded-md overflow-hidden bg-white text-black dark:bg-gray-800 dark:text-white dark:border-gray-700 ${className} ${isFullScreen ? 'fullscreen-editor' : ''}`}>
       <style jsx global>{editorStyles}</style>
       
       {/* 工具欄 - 兩種視圖共享 */}
-      <div className="bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600 p-2 flex justify-between items-center">
+      <div className="tiptap-toolbar bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600 p-2 flex justify-between items-center">
         {/* 視圖切換按鈕 - 右上角 */}
         <div className="flex space-x-1">
           <button
@@ -434,7 +464,7 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
 
       {/* 視覺編輯視圖工具欄 - 只在視覺模式顯示 */}
       {currentView === 'visual' && (
-        <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-2 flex flex-wrap gap-1">
+        <div className="tiptap-toolbar bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-2 flex flex-wrap gap-1">
           {/* 文本格式工具 */}
           <div className="flex gap-1 mr-2 border-r border-gray-300 dark:border-gray-600 pr-2">
             <Button
@@ -719,28 +749,30 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
       )}
 
       {/* 編輯器主容器 */}
-      <div className="tiptap-editor-container">
-        {/* 視覺編輯器 - 條件渲染 */}
-        {currentView === 'visual' ? (
-          <div className="bg-white dark:bg-gray-800 text-black dark:text-white">
-            {editor && <EditorContent editor={editor} className="prose-lg max-w-none" />}
-          </div>
-        ) : (
-          /* HTML 代碼編輯器 */
-          <div className="bg-white dark:bg-gray-800 text-black dark:text-white">
-            <textarea
-              className="w-full min-h-[500px] p-4 font-mono text-sm bg-white dark:bg-gray-800 text-black dark:text-white border-none focus:ring-0 focus:outline-none"
-              value={htmlSource}
-              onChange={handleHtmlChange}
-              placeholder="輸入HTML代碼..."
-              spellCheck="false"
-            />
-          </div>
-        )}
+      <div className="tiptap-editor-container h-full flex flex-col overflow-auto">
+        <div className="flex-1">
+          {/* 視覺編輯器 - 條件渲染 */}
+          {currentView === 'visual' ? (
+            <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full">
+              {editor && <EditorContent editor={editor} className="prose-lg max-w-none h-full" />}
+            </div>
+          ) : (
+            /* HTML 代碼編輯器 */
+            <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full">
+              <textarea
+                className="w-full h-full min-h-[300px] p-4 font-mono text-sm bg-white dark:bg-gray-800 text-black dark:text-white border-none focus:ring-0 focus:outline-none"
+                value={htmlSource}
+                onChange={handleHtmlChange}
+                placeholder="輸入HTML代碼..."
+                spellCheck="false"
+              />
+            </div>
+          )}
+        </div>
 
         {/* 表格操作工具欄 - 僅在選中表格時顯示 */}
         {currentView === 'visual' && editor?.isActive('table') && (
-          <div className="bg-gray-100 dark:bg-gray-700 border-t border-gray-300 dark:border-gray-600 p-2 flex gap-1 flex-wrap">
+          <div className="tiptap-toolbar bg-gray-100 dark:bg-gray-700 border-t border-gray-300 dark:border-gray-600 p-2 flex gap-1 flex-wrap sticky bottom-0">
             <Button
               type="button"
               variant="light"

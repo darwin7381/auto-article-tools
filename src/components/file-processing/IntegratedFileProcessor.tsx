@@ -25,28 +25,21 @@ interface StageView {
 }
 
 // 替換舊的上稿準備階段組件
-const PrepPublishingComponent = ({ fileId, htmlContent, markdownUrl, onContentChange }: { 
+const PrepPublishingComponent = ({ fileId, htmlContent, markdownUrl, onContentChange, onContinue }: { 
   fileId: string, 
   htmlContent?: string,
   markdownUrl?: string, 
-  onContentChange?: (content: string) => void 
+  onContentChange?: (content: string) => void,
+  onContinue?: () => void // 新增：繼續處理的回調函數
 }) => {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-lg font-semibold">
-        <span className="text-blue-500">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-          </svg>
-        </span>
-        <h3>Tiptap 編輯器</h3>
-      </div>
       <EditorIntegration 
         fileId={fileId}
         initialHtml={htmlContent || ''}
         markdownUrl={markdownUrl}
         onContentSave={onContentChange}
+        onContinue={onContinue} // 傳遞繼續處理回調
       />
     </div>
   );
@@ -911,14 +904,32 @@ export default function IntegratedFileProcessor() {
                       ...result,
                       htmlContent: content
                     });
+                  }
+                }}
+                onContinue={() => {
+                  // 標記上稿準備階段為完成
+                  if (processState) {
+                    // 更新狀態
+                    saveStageResult('prep-publish', { 
+                      ...result, 
+                      status: 'completed' 
+                    });
+                    
+                    // 滾動到 WordPress 發布設定區域
+                    const wpSection = document.getElementById('wordpress-publish-section');
+                    if (wpSection) {
+                      wpSection.scrollIntoView({ behavior: 'smooth' });
                     }
-                  }}
+                  }
+                }}
               />
               
               {/* WordPress 發布設定 */}
-              <WordPressPublishComponent 
-                htmlContent={result.htmlContent?.toString()}
-              />
+              <div id="wordpress-publish-section">
+                <WordPressPublishComponent 
+                  htmlContent={result.htmlContent?.toString()}
+                />
+              </div>
             </div>
             
             {/* 狀態通知 */}
