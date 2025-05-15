@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { Progress } from '@heroui/progress';
 
 export interface ProcessStage {
@@ -41,9 +41,16 @@ export interface ProgressDisplayProps {
   stageGroups?: Record<string, { title: string, stages: string[] }>;
   displayGroups?: string[];
   onViewStage?: (stageId: string, result?: Record<string, unknown>) => void;
+  stageSlots?: Record<string, ReactNode>;
 }
 
-export default function ProgressDisplay({ state, stageGroups, displayGroups, onViewStage }: ProgressDisplayProps) {
+export default function ProgressDisplay({ 
+  state, 
+  stageGroups, 
+  displayGroups, 
+  onViewStage,
+  stageSlots 
+}: ProgressDisplayProps) {
   const [animatedProgress, setAnimatedProgress] = useState(0);
   
   useEffect(() => {
@@ -97,9 +104,15 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
   const renderStageGroups = () => {
     if (!stageGroups) {
       // 如果沒有提供stageGroups，則使用傳統模式直接顯示所有階段
-  return (
+      return (
         <div className="space-y-4">
-          {state.stages.map((stage) => renderStage(stage))}
+          {state.stages.map((stage) => (
+            <React.Fragment key={stage.id}>
+              {renderStage(stage)}
+              {/* 在階段後插入自定義內容 */}
+              {stageSlots && stageSlots[stage.id]}
+            </React.Fragment>
+          ))}
         </div>
       );
     }
@@ -114,18 +127,24 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
             <div key={groupId} className="space-y-4">
               <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 border-b pb-2 border-gray-200 dark:border-gray-700">
                 {group.title}
-        </h4>
-        
-        <div className="relative">
-          {/* 階段連接線 */}
-          <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-          
+              </h4>
+              
+              <div className="relative">
+                {/* 階段連接線 */}
+                <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+                
                 {/* 組內階段 */}
-          <div className="space-y-4">
+                <div className="space-y-4">
                   {group.stages.map(stageId => {
                     const stage = state.stages.find(s => s.id === stageId);
                     if (!stage) return null;
-                    return renderStage(stage);
+                    return (
+                      <React.Fragment key={stage.id}>
+                        {renderStage(stage)}
+                        {/* 在階段後插入自定義內容 */}
+                        {stageSlots && stageSlots[stage.id]}
+                      </React.Fragment>
+                    );
                   })}
                 </div>
               </div>
@@ -146,7 +165,7 @@ export default function ProgressDisplay({ state, stageGroups, displayGroups, onV
                    !['upload'].includes(stage.id);
     
     return (
-      <div key={stage.id} className="relative flex items-start gap-3 pl-9">
+      <div className="relative flex items-start gap-3 pl-9">
         {/* 圓形指示器 */}
         <div className={`absolute left-2 top-1 -translate-x-1/2 h-5 w-5 rounded-full border-2 ${
           isActive 
