@@ -110,7 +110,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
                         ? 'border-success-500 bg-success-100 dark:bg-success-900/40'
                         : stage.status === 'error'
                           ? 'border-danger-500 bg-danger-100 dark:bg-danger-900/40'
-                          : 'border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800'
+                          : 'border-gray-400 bg-gray-100 dark:border-gray-600 dark:bg-gray-800'
                   } flex items-center justify-center`}>
                     {stage.status === 'completed' && (
                       <svg className="h-3 w-3 text-success-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -128,7 +128,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
                   </div>
                   
                   <div className={`flex-1 ${
-                    isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'
+                    isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-400'
                   }`}>
                     <div className="flex justify-between items-center">
                       <h5 className={`text-sm font-medium ${
@@ -142,7 +142,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
                     </div>
                     
                     {stage.message && (
-                      <p className="text-xs mt-1">
+                      <p className="text-xs text-gray-700 dark:text-gray-400 mt-1">
                         {stage.message}
                       </p>
                     )}
@@ -179,7 +179,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
               
               <div className="relative">
                 {/* 階段連接線 */}
-                <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+                <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-300 dark:bg-gray-700"></div>
                 
                 {/* 組內階段 */}
                 <div className="space-y-4">
@@ -200,7 +200,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
                               ? 'border-success-500 bg-success-100 dark:bg-success-900/40'
                               : stage.status === 'error'
                                 ? 'border-danger-500 bg-danger-100 dark:bg-danger-900/40'
-                                : 'border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800'
+                                : 'border-gray-400 bg-gray-100 dark:border-gray-600 dark:bg-gray-800'
                         } flex items-center justify-center`}>
                           {stage.status === 'completed' && (
                             <svg className="h-3 w-3 text-success-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -218,7 +218,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
                         </div>
                         
                         <div className={`flex-1 ${
-                          isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'
+                          isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-400'
                         }`}>
                           <div className="flex justify-between items-center">
                             <h5 className={`text-sm font-medium ${
@@ -232,7 +232,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
                           </div>
                           
                           {stage.message && (
-                            <p className="text-xs mt-1">
+                            <p className="text-xs text-gray-700 dark:text-gray-400 mt-1">
                               {stage.message}
                             </p>
                           )}
@@ -284,7 +284,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
         />
 
         <div className="flex justify-between items-center">
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="text-xs text-gray-700 dark:text-gray-400">
             {state.metadata && (
               <>
                 {state.type === 'file' && state.metadata.fileName && (
@@ -296,7 +296,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
               </>
             )}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="text-xs text-gray-700 dark:text-gray-400">
             {Math.round(animatedProgress)}% 完成
           </div>
         </div>
@@ -306,7 +306,7 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
       <div className="space-y-4 pt-2">        
         <div className="relative">
           {/* 階段連接線 */}
-          <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+          <div className="absolute left-2 top-0 h-full w-0.5 bg-gray-300 dark:bg-gray-700"></div>
           
           {/* 各處理階段 - 使用渲染函數 */}
           {renderStages()}
@@ -315,18 +315,18 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
       
       {/* 其他處理元數據（除了文件名/URL之外的信息） */}
       {state.metadata && (state.metadata.title || state.metadata.language || state.metadata.wordCount !== undefined || state.metadata.imageCount !== undefined) && (
-        <div className="mt-6 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-sm">
+        <div className="mt-6 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-300 dark:border-gray-700 text-sm">
           <h4 className="font-medium mb-2 text-gray-800 dark:text-gray-200">其他信息</h4>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
             {state.metadata.title && (
               <>
-                <dt className="text-gray-500 dark:text-gray-400">標題:</dt>
+                <dt className="text-gray-700 dark:text-gray-400">標題:</dt>
                 <dd className="text-gray-800 dark:text-gray-200">{state.metadata.title}</dd>
               </>
             )}
             {state.metadata.language && (
               <>
-                <dt className="text-gray-500 dark:text-gray-400">語言:</dt>
+                <dt className="text-gray-700 dark:text-gray-400">語言:</dt>
                 <dd className="text-gray-800 dark:text-gray-200">
                   {state.metadata.language === 'zh-TW' ? '繁體中文' : 
                    state.metadata.language === 'zh-CN' ? '簡體中文' :
@@ -338,13 +338,13 @@ export function ProgressDisplay({ state, className = '', stageGroups, displayGro
             )}
             {state.metadata.wordCount !== undefined && (
               <>
-                <dt className="text-gray-500 dark:text-gray-400">字數:</dt>
+                <dt className="text-gray-700 dark:text-gray-400">字數:</dt>
                 <dd className="text-gray-800 dark:text-gray-200">{state.metadata.wordCount.toLocaleString()}</dd>
               </>
             )}
             {state.metadata.imageCount !== undefined && (
               <>
-                <dt className="text-gray-500 dark:text-gray-400">圖片數:</dt>
+                <dt className="text-gray-700 dark:text-gray-400">圖片數:</dt>
                 <dd className="text-gray-800 dark:text-gray-200">{state.metadata.imageCount}</dd>
               </>
             )}

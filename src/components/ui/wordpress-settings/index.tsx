@@ -101,7 +101,7 @@ export function WordPressSettings({
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             placeholder="例如: my-custom-article-url"
           />
-          <p className="text-xs text-gray-500">不填寫時將自動根據標題生成</p>
+          <p className="text-xs text-gray-700">不填寫時將自動根據標題生成</p>
         </div>
         
         {/* 指定作者 */}
@@ -117,7 +117,7 @@ export function WordPressSettings({
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             placeholder="例如: 1"
           />
-          <p className="text-xs text-gray-500">請輸入作者ID，不填寫則使用當前登入的用戶</p>
+          <p className="text-xs text-gray-700">請輸入作者ID，不填寫則使用當前登入的用戶</p>
         </div>
         
         {/* 特色圖片 */}
@@ -133,7 +133,7 @@ export function WordPressSettings({
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             placeholder="例如: 123 或 https://example.com/image.jpg"
           />
-          <p className="text-xs text-gray-500">輸入WordPress媒體庫中的圖片ID，或直接輸入圖片URL</p>
+          <p className="text-xs text-gray-700">輸入WordPress媒體庫中的圖片ID，或直接輸入圖片URL</p>
         </div>
         
         {/* 分類 */}
@@ -199,7 +199,7 @@ export function WordPressSettings({
               className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               required={formData.status === 'future'}
             />
-            <p className="text-xs text-gray-500">選擇「定時發布」時必須設定未來的發布日期時間</p>
+            <p className="text-xs text-gray-700">選擇「定時發布」時必須設定未來的發布日期時間</p>
           </div>
         )}
         

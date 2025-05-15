@@ -11,7 +11,7 @@ import { ThemeProvider } from "next-themes";
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider appearance={{ baseTheme: dark }}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
         <HeroUIProvider>
           <ProcessingProvider>
             {children}
