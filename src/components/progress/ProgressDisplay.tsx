@@ -162,10 +162,10 @@ export default function ProgressDisplay({
     const canView = stage.status === 'completed' && 
                    onViewStage && 
                    (stage.viewUrl || stage.resultKey || stageResult) &&
-                   !['upload'].includes(stage.id);
+                   !['upload', 'prep-publish'].includes(stage.id);
     
     return (
-      <div className="relative flex items-start gap-3 pl-9">
+      <div className="relative flex items-start gap-3 pl-9" data-stage-id={stage.id}>
         {/* 圓形指示器 */}
         <div className={`absolute left-2 top-1 -translate-x-1/2 h-5 w-5 rounded-full border-2 ${
           isActive 
@@ -199,7 +199,7 @@ export default function ProgressDisplay({
         }`}>
           <div className="flex justify-between items-center">
             <h5 className={`text-sm font-medium ${
-              isActive ? 'text-primary-600 dark:text-primary-400' : ''
+              isActive || stage.status === 'processing' ? 'text-primary-600 dark:text-primary-400' : ''
             }`}>
               {stage.name}
             </h5>
@@ -224,7 +224,7 @@ export default function ProgressDisplay({
           </div>
           
           {stage.message && (
-            <p className="text-xs mt-1">
+            <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
               {stage.message}
             </p>
           )}

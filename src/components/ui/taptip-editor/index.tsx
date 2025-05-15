@@ -162,22 +162,18 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
       // 視覺模式下，設置編輯器內容
       editor.commands.setContent(htmlSource);
       
-      // 延遲設置焦點確保內容已經渲染
-      setTimeout(() => {
-        // 將游標設置到文檔開頭
-        editor.commands.focus('start');
-        
-        // 強制滾動到頂部（多次嘗試確保生效）
-        const editorElement = document.querySelector('.ProseMirror');
-        if (editorElement instanceof HTMLElement) {
-          editorElement.scrollTop = 0;
-          setTimeout(() => {
-            if (editorElement) editorElement.scrollTop = 0;
-          }, 50);
-        }
-      }, 100);
+      // 設置光標位置但不強制滾動
+      editor.commands.focus('start');
     }
-  }, [currentView, editor, htmlSource]);
+  }, [currentView, editor]); // 移除htmlSource依賴，避免每次內容變化都觸發滾動
+
+  // 單獨處理htmlSource變化的邏輯，不包含滾動
+  useEffect(() => {
+    if (currentView === 'visual' && editor && htmlSource) {
+      // 不設置內容，避免重新渲染和光標跳轉
+      // 只在視圖切換時設置內容，而不是每次htmlSource變化都設置
+    }
+  }, [htmlSource]);
 
   // 處理HTML源碼更改
   const handleHtmlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -246,10 +242,32 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
       padding-bottom: 100px; /* 確保滾動到底部有足夠空間 */
     }
     
+    .tiptap-toolbar {
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 9999 !important;
+      background-color: inherit !important;
+    }
+    
+    .tiptap-toolbar + .tiptap-toolbar {
+      top: 41px !important; /* 第二個工具欄的位置 */
+    }
+    
     .fullscreen-editor .tiptap-toolbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 9999 !important;
+    }
+    
+    /* 確保內容區域有正確的相對定位，這樣sticky才能正常工作 */
+    .tiptap-editor-container {
+      position: relative !important;
+      overflow: visible !important;
+    }
+    
+    /* 修復可視化編輯模式下的問題 */
+    .tiptap-editor-container > div {
+      overflow: visible !important;
     }
     
     .ProseMirror h1 {
@@ -432,12 +450,46 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
   const isFullScreen = className.includes('h-full');
 
   return (
-    <div className={`border border-gray-300 rounded-md overflow-hidden bg-white text-black dark:bg-gray-800 dark:text-white dark:border-gray-700 ${className} ${isFullScreen ? 'fullscreen-editor' : ''}`}>
-      <style jsx global>{editorStyles}</style>
+    <div className={`border border-gray-300 rounded-md overflow-visible bg-white text-black dark:bg-gray-800 dark:text-white dark:border-gray-700 ${className} ${isFullScreen ? 'fullscreen-editor' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
+      <style jsx global>{`
+        ${editorStyles}
+        /* 強制使編輯器容器不影響sticky定位 */
+        .ProseMirror {
+          outline: none;
+          height: 100%;
+          min-height: 300px;
+          padding-bottom: 100px;
+        }
+        
+        /* 特別處理置頂欄 */
+        .sticky-header {
+          position: sticky !important;
+          z-index: 9999 !important;
+        }
+        
+        .top-header {
+          top: 0 !important;
+        }
+        
+        .second-header {
+          top: 41px !important;
+        }
+        
+        /* 讓滾動獨立於頭部 */
+        .editor-scroll-container {
+          overflow-y: auto;
+          min-height: 300px;
+          flex: 1;
+        }
+        
+        /* 進一步優化 Tiptap 編輯器容器 */
+        .ProseMirror-focused {
+          outline: none !important;
+        }
+      `}</style>
       
-      {/* 工具欄 - 兩種視圖共享 */}
-      <div className="tiptap-toolbar bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600 p-2 flex justify-between items-center">
-        {/* 視圖切換按鈕 - 右上角 */}
+      {/* 工具欄 - 兩種視圖共享 - 使用獨立class而非內聯樣式 */}
+      <div className="sticky-header top-header bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600 p-2 flex justify-between items-center">
         <div className="flex space-x-1">
           <button
             onClick={() => setCurrentView('visual')}
@@ -464,7 +516,7 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
 
       {/* 視覺編輯視圖工具欄 - 只在視覺模式顯示 */}
       {currentView === 'visual' && (
-        <div className="tiptap-toolbar bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-2 flex flex-wrap gap-1">
+        <div className="sticky-header second-header bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-2 flex flex-wrap gap-1">
           {/* 文本格式工具 */}
           <div className="flex gap-1 mr-2 border-r border-gray-300 dark:border-gray-600 pr-2">
             <Button
@@ -748,104 +800,102 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
         </div>
       )}
 
-      {/* 編輯器主容器 */}
-      <div className="tiptap-editor-container h-full flex flex-col overflow-auto">
-        <div className="flex-1">
-          {/* 視覺編輯器 - 條件渲染 */}
-          {currentView === 'visual' ? (
-            <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full">
-              {editor && <EditorContent editor={editor} className="prose-lg max-w-none h-full" />}
-            </div>
-          ) : (
-            /* HTML 代碼編輯器 */
-            <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full">
-              <textarea
-                className="w-full h-full min-h-[300px] p-4 font-mono text-sm bg-white dark:bg-gray-800 text-black dark:text-white border-none focus:ring-0 focus:outline-none"
-                value={htmlSource}
-                onChange={handleHtmlChange}
-                placeholder="輸入HTML代碼..."
-                spellCheck="false"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* 表格操作工具欄 - 僅在選中表格時顯示 */}
-        {currentView === 'visual' && editor?.isActive('table') && (
-          <div className="tiptap-toolbar bg-gray-100 dark:bg-gray-700 border-t border-gray-300 dark:border-gray-600 p-2 flex gap-1 flex-wrap sticky bottom-0">
-            <Button
-              type="button"
-              variant="light"
-              size="sm"
-              onClick={() => editor.chain().focus().addColumnBefore().run()}
-              className="h-8 px-2"
-              title="左側添加列"
-            >
-              左側添加列
-            </Button>
-            <Button
-              type="button"
-              variant="light"
-              size="sm"
-              onClick={() => editor.chain().focus().addColumnAfter().run()}
-              className="h-8 px-2"
-              title="右側添加列"
-            >
-              右側添加列
-            </Button>
-            <Button
-              type="button"
-              variant="light"
-              size="sm"
-              onClick={() => editor.chain().focus().deleteColumn().run()}
-              className="h-8 px-2"
-              title="刪除列"
-            >
-              刪除列
-            </Button>
-            <Button
-              type="button"
-              variant="light"
-              size="sm"
-              onClick={() => editor.chain().focus().addRowBefore().run()}
-              className="h-8 px-2"
-              title="上方添加行"
-            >
-              上方添加行
-            </Button>
-            <Button
-              type="button"
-              variant="light"
-              size="sm"
-              onClick={() => editor.chain().focus().addRowAfter().run()}
-              className="h-8 px-2"
-              title="下方添加行"
-            >
-              下方添加行
-            </Button>
-            <Button
-              type="button"
-              variant="light"
-              size="sm"
-              onClick={() => editor.chain().focus().deleteRow().run()}
-              className="h-8 px-2"
-              title="刪除行"
-            >
-              刪除行
-            </Button>
-            <Button
-              type="button"
-              variant="light"
-              size="sm"
-              onClick={() => editor.chain().focus().deleteTable().run()}
-              className="h-8 px-2"
-              title="刪除表格"
-            >
-              刪除表格
-            </Button>
+      {/* 獨立的滾動容器 */}
+      <div className="editor-scroll-container">
+        {/* 視覺編輯器 */}
+        {currentView === 'visual' ? (
+          <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full">
+            {editor && <EditorContent editor={editor} className="prose-lg max-w-none h-full" />}
+          </div>
+        ) : (
+          /* HTML 代碼編輯器 */
+          <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full">
+            <textarea
+              className="w-full h-full min-h-[300px] p-4 font-mono text-sm bg-white dark:bg-gray-800 text-black dark:text-white border-none focus:ring-0 focus:outline-none"
+              value={htmlSource}
+              onChange={handleHtmlChange}
+              placeholder="輸入HTML代碼..."
+              spellCheck="false"
+            />
           </div>
         )}
       </div>
+
+      {/* 表格操作工具欄 - 僅在選中表格時顯示 */}
+      {currentView === 'visual' && editor?.isActive('table') && (
+        <div className="sticky-header bg-gray-100 dark:bg-gray-700 border-t border-gray-300 dark:border-gray-600 p-2 flex gap-1 flex-wrap" style={{ bottom: 0 }}>
+          <Button
+            type="button"
+            variant="light"
+            size="sm"
+            onClick={() => editor.chain().focus().addColumnBefore().run()}
+            className="h-8 px-2"
+            title="左側添加列"
+          >
+            左側添加列
+          </Button>
+          <Button
+            type="button"
+            variant="light"
+            size="sm"
+            onClick={() => editor.chain().focus().addColumnAfter().run()}
+            className="h-8 px-2"
+            title="右側添加列"
+          >
+            右側添加列
+          </Button>
+          <Button
+            type="button"
+            variant="light"
+            size="sm"
+            onClick={() => editor.chain().focus().deleteColumn().run()}
+            className="h-8 px-2"
+            title="刪除列"
+          >
+            刪除列
+          </Button>
+          <Button
+            type="button"
+            variant="light"
+            size="sm"
+            onClick={() => editor.chain().focus().addRowBefore().run()}
+            className="h-8 px-2"
+            title="上方添加行"
+          >
+            上方添加行
+          </Button>
+          <Button
+            type="button"
+            variant="light"
+            size="sm"
+            onClick={() => editor.chain().focus().addRowAfter().run()}
+            className="h-8 px-2"
+            title="下方添加行"
+          >
+            下方添加行
+          </Button>
+          <Button
+            type="button"
+            variant="light"
+            size="sm"
+            onClick={() => editor.chain().focus().deleteRow().run()}
+            className="h-8 px-2"
+            title="刪除行"
+          >
+            刪除行
+          </Button>
+          <Button
+            type="button"
+            variant="light"
+            size="sm"
+            onClick={() => editor.chain().focus().deleteTable().run()}
+            className="h-8 px-2"
+            title="刪除表格"
+          >
+            刪除表格
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

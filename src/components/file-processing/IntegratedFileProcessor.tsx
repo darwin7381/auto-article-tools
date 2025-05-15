@@ -55,25 +55,100 @@ const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) =>
     initialContent: htmlContent || '' 
   });
   
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // 直接從表單中提取數據
+  const [formData, setFormData] = useState({
+    title: '',
+    categories: '',
+    tags: '',
+    status: 'draft' as 'publish' | 'draft' | 'pending',
+    isPrivate: false
+  });
+  
+  const handlePublish = () => {
+    if (!formData.title.trim()) return;
+    
+    publishToWordPress({
+      title: formData.title,
+      categories: formData.categories || undefined,
+      tags: formData.tags || undefined,
+      status: formData.status,
+      isPrivate: formData.isPrivate
+    });
+  };
+  
   return (
-    <div className="space-y-4 mt-8">
-      <div className="flex items-center gap-2 text-lg font-semibold">
-        <span className="text-green-500">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
-        </span>
-        <h3>WordPress 發布設定</h3>
-      </div>
-      
-      <div className="bg-background/50 rounded-lg p-4 border border-divider">
-        <WordPressSettings
-          onPublish={publishToWordPress}
-          isSubmitting={isSubmitting}
-          error={publishResult?.error}
-        />
-      </div>
+    <div className="mt-2 pl-8 pr-0">
+      {publishResult?.success ? (
+        <div className="bg-background/50 rounded-lg p-4">
+          <div className="space-y-3">
+            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+              <h3 className="text-green-800 font-medium">發布成功！</h3>
+              <p className="text-green-600 text-sm mt-1">文章已成功發布到WordPress</p>
+              {publishResult.postUrl && (
+                <a 
+                  href={publishResult.postUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline mt-2 text-sm inline-flex items-center gap-1"
+                >
+                  <span>在WordPress中查看文章</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </a>
+              )}
+            </div>
+            <p className="text-sm text-gray-500">文章ID: {publishResult.postId}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${
+                  isExpanded 
+                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
+                    : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3,3v18h18 M3,15h6c0.83,0,1.5-0.67,1.5-1.5v0c0-0.83-0.67-1.5-1.5-1.5H7v-3h2c0.83,0,1.5-0.67,1.5-1.5v0 c0-0.83-0.67-1.5-1.5-1.5H3" />
+                  <path d="M16,3h5v5 M21,3L3,21" />
+                </svg>
+                <span>{isExpanded ? '收起WordPress發布表單' : '配置WordPress發布設定'}</span>
+              </button>
+            </div>
+            
+            <Button
+              onClick={handlePublish}
+              disabled={isSubmitting || !formData.title.trim()}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm"
+              color="primary"
+              startIcon={
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12.75 15l3-3m0 0l-3-3m3 3h-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }
+            >
+              {isSubmitting ? '發布中...' : '發布到 WordPress'}
+            </Button>
+          </div>
+          
+          {isExpanded && (
+            <div className="bg-background/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+              <WordPressSettings
+                formData={formData}
+                onChange={setFormData}
+                error={publishResult?.error}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -96,7 +171,7 @@ export default function IntegratedFileProcessor() {
   const [viewingStage, setViewingStage] = useState<StageView | null>(null);
   
   // 獲取處理上下文
-  const { processState, resetProcessState, saveStageResult } = useProcessing();
+  const { processState, resetProcessState, saveStageResult, updateStageProgress, updateProcessState } = useProcessing();
 
   // 處理流程hook
   const { processFile, processUrl, cleanup } = useProcessingFlow({
@@ -172,6 +247,31 @@ export default function IntegratedFileProcessor() {
       cleanup();
     };
   }, [cleanup]);
+
+  // 用於初始化上稿準備階段狀態的Effect
+  useEffect(() => {
+    if (processState && 
+        activeTab === 'result' && 
+        processState.stages.find(s => s.id === 'prep-publish')?.status === 'pending') {
+      // 將上稿準備階段狀態設置為processing
+      setTimeout(() => {
+        // 先設置當前階段為上稿準備
+        const prepPublishStage = processState.stages.find(s => s.id === 'prep-publish');
+        if (prepPublishStage) {
+          // 更新整體進度狀態為處理中
+          updateProcessState({
+            currentStage: 'prep-publish',
+            overall: {
+              ...processState.overall,
+              status: 'processing'
+            }
+          });
+          // 然後更新階段進度
+          updateStageProgress('prep-publish', 60, '上稿準備中，請編輯內容...');
+        }
+      }, 0);
+    }
+  }, [processState, activeTab, updateStageProgress, updateProcessState]);
 
   // 重置功能
   const handleReset = () => {
@@ -884,25 +984,48 @@ export default function IntegratedFileProcessor() {
                   onContinue={() => {
                     // 標記上稿準備階段為完成
                     if (processState) {
-                      // 更新狀態
-                      saveStageResult('prep-publish', { 
-                        ...result, 
-                        status: 'completed' 
-                      });
-                      
-                      // 滾動到 WordPress 發布設定區域
-                      const wpSection = document.getElementById('wordpress-publish-section');
-                      if (wpSection) {
-                        wpSection.scrollIntoView({ behavior: 'smooth' });
-                      }
+                      // 使用setTimeout避免渲染過程中的setState
+                      setTimeout(() => {
+                        // 完成上稿準備階段
+                        saveStageResult('prep-publish', { 
+                          ...result, 
+                          status: 'completed' 
+                        });
+                        
+                        // 完成後更新當前階段為上架新聞
+                        updateProcessState({
+                          currentStage: 'publish-news',
+                          stages: processState.stages.map(s => 
+                            s.id === 'prep-publish' 
+                              ? { ...s, status: 'completed', progress: 100, message: '上稿準備完成，編輯內容就緒' }
+                              : s.id === 'publish-news'
+                                ? { ...s, status: 'processing', progress: 10, message: '準備WordPress發布設定...' }
+                                : s
+                          )
+                        });
+                        
+                        // 滾動到WordPress階段
+                        const publishNewsStage = document.querySelector('[data-stage-id="publish-news"]');
+                        if (publishNewsStage) {
+                          publishNewsStage.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }, 0);
                     }
                   }}
                 />
               );
 
+              // WordPress發布組件插槽
+              const wpPublishSlot = (
+                <WordPressPublishComponent 
+                  htmlContent={result.htmlContent?.toString()}
+                />
+              );
+
               // 配置階段插槽
               const stageSlots = {
-                'prep-publish': editorSlot // 在上稿準備階段後顯示編輯器
+                'prep-publish': editorSlot, // 在上稿準備階段後顯示編輯器
+                'publish-news': wpPublishSlot // 在上架新聞階段後顯示WordPress發布設置
               };
 
               return (
@@ -928,13 +1051,6 @@ export default function IntegratedFileProcessor() {
                 />
               );
             })()}
-            
-            {/* WordPress 發布設定 */}
-            <div id="wordpress-publish-section" className="space-y-3 mt-8">
-              <WordPressPublishComponent 
-                htmlContent={result.htmlContent?.toString()}
-              />
-            </div>
             
             {/* 狀態通知 */}
             {renderStatusNotification()}
