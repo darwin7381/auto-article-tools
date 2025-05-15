@@ -7,15 +7,23 @@ interface WordPressSettingsProps {
     title: string;
     categories: string;
     tags: string;
-    status: 'publish' | 'draft' | 'pending';
+    status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
     isPrivate: boolean;
+    slug: string;
+    author: string;
+    featured_media: string;
+    date: string;
   };
   onChange: Dispatch<SetStateAction<{
     title: string;
     categories: string;
     tags: string;
-    status: 'publish' | 'draft' | 'pending';
+    status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
     isPrivate: boolean;
+    slug: string;
+    author: string;
+    featured_media: string;
+    date: string;
   }>>;
   error?: string;
   detailedError?: string;
@@ -25,8 +33,12 @@ export interface WordPressPublishData {
   title: string;
   categories?: string;
   tags?: string;
-  status: 'publish' | 'draft' | 'pending';
+  status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
   isPrivate: boolean;
+  slug?: string;
+  author?: string;
+  featured_media?: string;
+  date?: string;
 }
 
 /**
@@ -76,6 +88,54 @@ export function WordPressSettings({
           />
         </div>
         
+        {/* 自訂連結 (slug) */}
+        <div className="space-y-1">
+          <label htmlFor="slug" className="block text-sm font-medium">
+            自訂連結 (slug)
+          </label>
+          <input
+            id="slug"
+            type="text"
+            value={formData.slug}
+            onChange={(e) => handleChange('slug', e.target.value)}
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+            placeholder="例如: my-custom-article-url"
+          />
+          <p className="text-xs text-gray-500">不填寫時將自動根據標題生成</p>
+        </div>
+        
+        {/* 指定作者 */}
+        <div className="space-y-1">
+          <label htmlFor="author" className="block text-sm font-medium">
+            指定作者 (ID)
+          </label>
+          <input
+            id="author"
+            type="text"
+            value={formData.author}
+            onChange={(e) => handleChange('author', e.target.value)}
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+            placeholder="例如: 1"
+          />
+          <p className="text-xs text-gray-500">請輸入作者ID，不填寫則使用當前登入的用戶</p>
+        </div>
+        
+        {/* 特色圖片 */}
+        <div className="space-y-1">
+          <label htmlFor="featured_media" className="block text-sm font-medium">
+            特色圖片 (ID)
+          </label>
+          <input
+            id="featured_media"
+            type="text"
+            value={formData.featured_media}
+            onChange={(e) => handleChange('featured_media', e.target.value)}
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+            placeholder="例如: 123"
+          />
+          <p className="text-xs text-gray-500">請輸入WordPress媒體庫中的圖片ID</p>
+        </div>
+        
         {/* 分類 */}
         <div className="space-y-1">
           <label htmlFor="categories" className="block text-sm font-medium">
@@ -114,14 +174,34 @@ export function WordPressSettings({
           <select
             id="status"
             value={formData.status}
-            onChange={(e) => handleChange('status', e.target.value as 'publish' | 'draft' | 'pending')}
+            onChange={(e) => handleChange('status', e.target.value as 'publish' | 'draft' | 'pending' | 'future' | 'private')}
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
           >
             <option value="draft">草稿</option>
             <option value="pending">待審核</option>
             <option value="publish">直接發布</option>
+            <option value="future">定時發布</option>
+            <option value="private">私密文章</option>
           </select>
         </div>
+        
+        {/* 定時發布日期 (只在選擇「定時發布」時顯示) */}
+        {formData.status === 'future' && (
+          <div className="space-y-1">
+            <label htmlFor="date" className="block text-sm font-medium">
+              發布日期時間 <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="date"
+              type="datetime-local"
+              value={formData.date}
+              onChange={(e) => handleChange('date', e.target.value)}
+              className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              required={formData.status === 'future'}
+            />
+            <p className="text-xs text-gray-500">選擇「定時發布」時必須設定未來的發布日期時間</p>
+          </div>
+        )}
         
         {/* 私密文章 */}
         <div className="flex items-center space-x-2">

@@ -13,6 +13,35 @@ console.log('WordPress服務端環境變量檢查:', {
   apiUrlPrefix: WP_API_URL ? WP_API_URL.substring(0, 10) + '...' : '未設置'
 });
 
+// 處理圖片HTML，使其在WordPress中正確顯示
+function processImagesInHtml(html: string): string {
+  if (!html) return html;
+  
+  try {
+    // 使用正則表達式處理圖片標籤
+    // 1. 移除可能導致樣式衝突的class屬性
+    // 2. 確保圖片有響應式樣式
+    return html.replace(/<img\s+([^>]*)>/gi, (match, attributes) => {
+      // 保留src、alt和原始width/height屬性
+      const srcMatch = attributes.match(/src=["']([^"']*)["']/i);
+      const altMatch = attributes.match(/alt=["']([^"']*)["']/i);
+      const widthMatch = attributes.match(/width=["']([^"']*)["']/i);
+      const heightMatch = attributes.match(/height=["']([^"']*)["']/i);
+      
+      const src = srcMatch ? srcMatch[0] : '';
+      const alt = altMatch ? altMatch[0] : 'alt=""';
+      const width = widthMatch ? widthMatch[0] : '';
+      const height = heightMatch ? heightMatch[0] : '';
+      
+      // 添加WordPress友好的圖片樣式
+      return `<img ${src} ${alt} ${width} ${height} style="max-width:100%; height:auto;" class="wp-image" />`;
+    });
+  } catch (error) {
+    console.error('處理圖片HTML時出錯:', error);
+    return html; // 發生錯誤時返回原始HTML
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 檢查環境變量是否設置
@@ -34,6 +63,11 @@ export async function POST(request: NextRequest) {
 
     // 解析請求體
     const requestData = await request.json();
+    
+    // 處理內容中的圖片，避免在WordPress中顯示不正確
+    if (requestData.content) {
+      requestData.content = processImagesInHtml(requestData.content);
+    }
     
     // 構建WordPress API端點
     const apiEndpoint = `${WP_API_URL.endsWith('/') ? WP_API_URL.slice(0, -1) : WP_API_URL}/wp-json/wp/v2/posts`;
