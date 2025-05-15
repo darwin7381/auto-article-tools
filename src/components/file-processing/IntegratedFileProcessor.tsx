@@ -47,17 +47,33 @@ const PrepPublishingComponent = ({ fileId, htmlContent, markdownUrl, onContentCh
 
 // 替換舊的WordPress發布設置組件
 const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) => {
+  // 確保htmlContent有值且為字符串
+  const sanitizedHtmlContent = typeof htmlContent === 'string' && htmlContent.trim() ? 
+    htmlContent : '<p>無內容，請編輯文章內容後再發布</p>';
+  
   const { 
     isSubmitting, 
     publishResult, 
     publishToWordPress 
   } = useSimplifiedWPIntegration({ 
-    initialContent: htmlContent || '' 
+    initialContent: sanitizedHtmlContent,
+    debug: true // 啟用調試模式
   });
+  
+  // 輸出HTML內容信息（僅在開發模式）
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log("WordPressPublishComponent HTML內容信息:", {
+        hasContent: !!htmlContent,
+        contentLength: htmlContent?.length || 0,
+        sanitizedLength: sanitizedHtmlContent.length
+      });
+    }
+  }, [htmlContent, sanitizedHtmlContent]);
   
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // 直接從表單中提取數據
+  // 表單數據狀態
   const [formData, setFormData] = useState({
     title: '',
     categories: '',
@@ -66,8 +82,12 @@ const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) =>
     isPrivate: false
   });
   
+  // 發布處理函數
   const handlePublish = () => {
-    if (!formData.title.trim()) return;
+    if (!formData.title.trim()) {
+      alert('請輸入文章標題');
+      return;
+    }
     
     publishToWordPress({
       title: formData.title,
@@ -78,77 +98,114 @@ const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) =>
     });
   };
   
-  return (
-    <div className="mt-2 pl-8 pr-0">
-      {publishResult?.success ? (
-        <div className="bg-background/50 rounded-lg p-4">
-          <div className="space-y-3">
-            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-              <h3 className="text-green-800 font-medium">發布成功！</h3>
-              <p className="text-green-600 text-sm mt-1">文章已成功發布到WordPress</p>
-              {publishResult.postUrl && (
-                <a 
-                  href={publishResult.postUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline mt-2 text-sm inline-flex items-center gap-1"
-                >
-                  <span>在WordPress中查看文章</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                  </svg>
-                </a>
-              )}
+  // 顯示成功或錯誤訊息
+  const renderPublishStatus = () => {
+    if (publishResult?.success) {
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <p className="text-green-700 font-medium">發布成功！文章已發送到WordPress</p>
+          </div>
+          
+          {publishResult.postUrl && (
+            <a 
+              href={publishResult.postUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center text-sm text-blue-600 hover:underline"
+            >
+              <span>在WordPress中查看文章</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+              </svg>
+            </a>
+          )}
+        </div>
+      );
+    }
+    
+    if (publishResult?.error) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <p className="text-red-700 font-medium">發布失敗</p>
+              <p className="text-red-600 text-sm mt-1">{publishResult.error}</p>
+              <p className="text-xs text-gray-500 mt-2">
+                所有WordPress認證和API操作都在服務端進行，您的帳號和密碼不會暴露。
+                如持續發生錯誤，請聯繫系統管理員確認伺服器配置。
+              </p>
             </div>
-            <p className="text-sm text-gray-500">文章ID: {publishResult.postId}</p>
           </div>
         </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${
-                  isExpanded 
-                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
-                    : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3,3v18h18 M3,15h6c0.83,0,1.5-0.67,1.5-1.5v0c0-0.83-0.67-1.5-1.5-1.5H7v-3h2c0.83,0,1.5-0.67,1.5-1.5v0 c0-0.83-0.67-1.5-1.5-1.5H3" />
-                  <path d="M16,3h5v5 M21,3L3,21" />
+      );
+    }
+    
+    return null;
+  };
+  
+  return (
+    <div className="mt-2 pl-8 pr-0">
+      {renderPublishStatus()}
+      
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${
+                isExpanded 
+                  ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
+                  : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3,3v18h18 M3,15h6c0.83,0,1.5-0.67,1.5-1.5v0c0-0.83-0.67-1.5-1.5-1.5H7v-3h2c0.83,0,1.5-0.67,1.5-1.5v0 c0-0.83-0.67-1.5-1.5-1.5H3" />
+                <path d="M16,3h5v5 M21,3L3,21" />
+              </svg>
+              <span>{isExpanded ? '收起發布表單' : '配置WordPress發布設定'}</span>
+            </button>
+          </div>
+          
+          <Button
+            onClick={handlePublish}
+            disabled={isSubmitting || !formData.title.trim()}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm"
+            color="primary"
+            startIcon={
+              isSubmitting ? (
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>{isExpanded ? '收起WordPress發布表單' : '配置WordPress發布設定'}</span>
-              </button>
-            </div>
-            
-            <Button
-              onClick={handlePublish}
-              disabled={isSubmitting || !formData.title.trim()}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm"
-              color="primary"
-              startIcon={
+              ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12.75 15l3-3m0 0l-3-3m3 3h-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-              }
-            >
-              {isSubmitting ? '發布中...' : '發布到 WordPress'}
-            </Button>
-          </div>
-          
-          {isExpanded && (
-            <div className="bg-background/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-              <WordPressSettings
-                formData={formData}
-                onChange={setFormData}
-                error={publishResult?.error}
-              />
-            </div>
-          )}
+              )
+            }
+          >
+            {isSubmitting ? '發布中...' : '發布到WordPress'}
+          </Button>
         </div>
-      )}
+        
+        {isExpanded && (
+          <div className="bg-background/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <WordPressSettings
+              formData={formData}
+              onChange={setFormData}
+              error={publishResult?.error}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1018,7 +1075,7 @@ export default function IntegratedFileProcessor() {
               // WordPress發布組件插槽
               const wpPublishSlot = (
                 <WordPressPublishComponent 
-                  htmlContent={result.htmlContent?.toString()}
+                  htmlContent={result?.htmlContent ? String(result.htmlContent) : ''}
                 />
               );
 

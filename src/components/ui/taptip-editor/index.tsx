@@ -238,7 +238,7 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
     .ProseMirror {
       outline: none;
       height: 100%;
-      min-height: 300px;
+      min-height: 345px !important;
       padding-bottom: 100px; /* 確保滾動到底部有足夠空間 */
     }
     
@@ -823,18 +823,19 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
       <div className="editor-scroll-container">
         {/* 視覺編輯器 */}
         {currentView === 'visual' ? (
-          <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full">
-            {editor && <EditorContent editor={editor} className="prose-lg max-w-none h-full" />}
+          <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full" style={{ minHeight: '345px' }}>
+            {editor && <EditorContent editor={editor} className="prose-lg max-w-none h-full" style={{ minHeight: '345px' }} />}
           </div>
         ) : (
           /* HTML 代碼編輯器 */
           <div className="bg-white dark:bg-gray-800 text-black dark:text-white h-full">
             <textarea
-              className="w-full h-full min-h-[300px] p-4 font-mono text-sm bg-white dark:bg-gray-800 text-black dark:text-white border-none focus:ring-0 focus:outline-none"
+              className="w-full h-full min-h-[345px] p-4 font-mono text-sm bg-white dark:bg-gray-800 text-black dark:text-white border-none focus:ring-0 focus:outline-none"
               value={htmlSource}
               onChange={handleHtmlChange}
               placeholder="輸入HTML代碼..."
               spellCheck="false"
+              style={{ minHeight: '345px', height: '100%' }}
             />
           </div>
         )}

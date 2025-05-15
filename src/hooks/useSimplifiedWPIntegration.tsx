@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { publishPost } from '@/services/wordpress/wordpressService';
+// 不再需要直接導入publishPost
+// import { publishPost } from '@/services/wordpress/wordpressService';
 
 interface WordPressIntegrationOptions {
   initialContent?: string;
   fileId?: string;
+  debug?: boolean;
 }
 
 export interface WordPressPublishData {
@@ -21,78 +23,127 @@ interface PublishResult {
   postId?: number;
   postUrl?: string;
   error?: string;
+  debugInfo?: {
+    contentSample?: string;
+    [key: string]: unknown;
+  };
 }
 
 /**
- * 簡化版WordPress整合Hook
+ * 簡化版WordPress整合Hook (使用服務端代理)
  */
 export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions) {
-  const { initialContent = '' } = options;
+  const { initialContent = '', debug = false } = options;
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   
-  // 將表單數據轉換為WordPress API格式
-  const formatCategoriesAndTags = (
-    categories?: string,
-    tags?: string
-  ) => {
-    // 處理分類ID
-    const categoryIds = categories ? 
-      categories.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : 
-      [];
+  // 將分類和標籤字符串轉換為適合API的格式
+  const formatCategoriesAndTags = (categories?: string) => {
+    if (!categories) return { categories: undefined };
     
-    // 處理標籤
-    const tagsList = tags ? 
-      tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0) : 
-      [];
+    // 處理分類ID
+    const categoryIds = categories
+      .split(',')
+      .map(id => parseInt(id.trim()))
+      .filter(id => !isNaN(id));
     
     return {
-      categories: categoryIds.length > 0 ? categoryIds : undefined,
-      tags: tagsList.length > 0 ? tagsList : undefined,
+      categories: categoryIds.length > 0 ? categoryIds : undefined
     };
   };
   
-  // 發布到WordPress
+  // 將標籤字符串轉換為標籤數組
+  const formatTags = (tags?: string) => {
+    if (!tags) return { tags: undefined };
+    
+    // 處理標籤
+    const tagsList = tags
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+    
+    return {
+      tags: tagsList.length > 0 ? tagsList : undefined
+    };
+  };
+  
+  // 發布到WordPress (通過服務端代理)
   const publishToWordPress = async (formData: WordPressPublishData) => {
     setIsSubmitting(true);
     setPublishResult(null);
     
     try {
-      // 處理分類和標籤
-      const { categories, tags } = formatCategoriesAndTags(
-        formData.categories,
-        formData.tags
-      );
+      // 確保有HTML內容
+      const content = initialContent || '<p>空白內容</p>';
       
       // 準備發布數據
       const publishData = {
         title: formData.title,
-        content: initialContent,
+        content: content,
         status: formData.status,
-        categories,
-        tags,
+        ...formatCategoriesAndTags(formData.categories),
+        ...formatTags(formData.tags),
         isPrivate: formData.isPrivate
       };
       
-      // 發布文章
-      const result = await publishPost(publishData);
+      if (debug) {
+        console.log("發布數據:", {
+          title: formData.title,
+          contentLength: content.length,
+          status: formData.status,
+          categories: publishData.categories,
+          tags: publishData.tags,
+          isPrivate: formData.isPrivate
+        });
+      }
       
-      // 儲存結果
+      // 調用服務端代理API
+      console.log("正在呼叫WordPress服務端代理API...");
+      const response = await fetch('/api/wordpress-proxy/publish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(publishData),
+        cache: 'no-store'
+      });
+      
+      // 處理響應
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        console.error("WordPress API代理失敗:", response.status, responseData);
+        throw new Error(responseData.error || `WordPress發布失敗 (${response.status})`);
+      }
+      
+      // 處理成功情況
+      console.log("WordPress發布成功:", responseData);
+      
       const successResult: PublishResult = {
         success: true,
-        postId: result.id,
-        postUrl: result.url
+        postId: responseData.id,
+        postUrl: responseData.link,
+        debugInfo: debug ? { 
+          contentSample: content.substring(0, 200),
+          responseData
+        } : undefined
       };
       
       setPublishResult(successResult);
       return successResult;
     } catch (error) {
-      console.error('發布到WordPress失敗:', error);
+      console.error('WordPress發布操作失敗:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
       
       const errorResult: PublishResult = {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: errorMessage,
+        debugInfo: debug ? { 
+          contentSample: initialContent.substring(0, 200),
+          error: errorMessage
+        } : undefined
       };
       
       setPublishResult(errorResult);
