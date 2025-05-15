@@ -9,20 +9,8 @@ const WP_API_BASE = process.env.NEXT_PUBLIC_WORDPRESS_API_URL || '';
 const WP_API_USER = process.env.WORDPRESS_API_USER || '';
 const WP_API_PASSWORD = process.env.WORDPRESS_API_PASSWORD || '';
 
-// 打印檢查環境變數
-console.log('WordPress環境變數檢查:', {
-  apiBase: WP_API_BASE,
-  hasUsername: !!WP_API_USER,
-  hasPassword: !!WP_API_PASSWORD,
-  usernameFirstChar: WP_API_USER ? WP_API_USER.charAt(0) : '',
-  passwordLength: WP_API_PASSWORD ? WP_API_PASSWORD.length : 0
-});
-
 // 創建WordPress API完整URL的通用函數
 function createWpApiUrl(endpoint: string): string {
-  // 打印實際使用的API基本URL
-  console.log(`創建WordPress API URL: 基本URL=${WP_API_BASE}, endpoint=${endpoint}`);
-  
   // 確保API基本URL是完整的絕對URL
   if (!WP_API_BASE || !WP_API_BASE.startsWith('http')) {
     console.error('WordPress API基本URL無效:', WP_API_BASE);
@@ -54,7 +42,6 @@ function createWpApiUrl(endpoint: string): string {
   // 移除API基本URL結尾的斜線(如果有)
   const baseUrl = WP_API_BASE.endsWith('/') ? WP_API_BASE.slice(0, -1) : WP_API_BASE;
   const fullUrl = `${baseUrl}${apiPath}`;
-  console.log(`完整WordPress API URL: ${fullUrl}`);
   
   return fullUrl;
 }
@@ -123,15 +110,6 @@ export async function publishPost(
   // 構建完整的API URL
   const apiUrl = createWpApiUrl('/wp-json/wp/v2/posts');
   
-  // 添加更詳細的日誌以便調試
-  console.log("publishPost函數執行:", {
-    apiUrl,
-    hasUsername: !!auth.username,
-    hasPassword: !!auth.password,
-    titleLength: options.title.length,
-    contentLength: options.content.length
-  });
-  
   try {
     const postData = {
       title: options.title,
@@ -148,16 +126,6 @@ export async function publishPost(
       // @ts-expect-error - WordPress API 接受 private 狀態但類型定義中未包含
       postData.status = 'private';
     }
-
-    // 打印更多詳細信息以便調試
-    console.log("發送WordPress請求:", {
-      url: apiUrl,
-      method: 'POST',
-      hasAuthHeader: !!authHeader,
-      authHeaderPrefix: authHeader.substring(0, 10) + '...',
-      contentType: 'application/json',
-      dataKeys: Object.keys(postData)
-    });
     
     // 增加fetch選項
     const fetchOptions = {
@@ -175,15 +143,6 @@ export async function publishPost(
       referrerPolicy: 'no-referrer' as ReferrerPolicy
     };
     
-    console.log("Fetch選項:", JSON.stringify({
-      ...fetchOptions,
-      headers: {
-        ...Object.fromEntries(Object.entries(fetchOptions.headers)), 
-        'Authorization': '******' // 隱藏認證信息
-      },
-      body: '(body content omitted)'
-    }, null, 2));
-    
     // 使用try/catch專門捕獲fetch錯誤
     let response;
     try {
@@ -199,14 +158,6 @@ export async function publishPost(
       
       throw new Error(`網絡請求失敗: ${JSON.stringify(errorDetails)}`);
     }
-    
-    // 添加響應信息日誌
-    console.log("WordPress API響應:", {
-      status: response.status,
-      statusText: response.statusText,
-      contentType: response.headers.get('content-type'),
-      ok: response.ok
-    });
     
     if (!response.ok) {
       // 改進錯誤處理邏輯
@@ -235,10 +186,6 @@ export async function publishPost(
     }
     
     const data = await response.json();
-    console.log("WordPress發布成功:", {
-      id: data.id,
-      link: data.link
-    });
     
     return {
       id: data.id,
@@ -361,15 +308,6 @@ export async function publishToWordPress(
     const authString = `${credentials.username}:${credentials.password}`;
     const base64Auth = btoa(authString);
     
-    // 打印詳細日誌以便調試
-    console.log("publishToWordPress發送請求:", {
-      url: apiUrl,
-      method: 'POST',
-      hasAuthHeader: true,
-      contentType: 'application/json',
-      dataKeys: Object.keys(postData)
-    });
-    
     // 設置請求選項，與publishPost保持一致
     const requestOptions = {
       method: 'POST',
@@ -386,12 +324,6 @@ export async function publishToWordPress(
       referrerPolicy: 'no-referrer' as ReferrerPolicy
     };
     
-    console.log("publishToWordPress請求選項:", JSON.stringify({
-      ...requestOptions,
-      headers: Object.fromEntries(Object.entries(requestOptions.headers)),
-      body: '(body content omitted)'
-    }, null, 2));
-    
     // 发送请求並捕捉網絡錯誤
     let response;
     try {
@@ -407,14 +339,6 @@ export async function publishToWordPress(
         error: `網絡請求失敗: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`
       };
     }
-    
-    // 添加響應信息日誌
-    console.log("publishToWordPress響應:", {
-      status: response.status,
-      statusText: response.statusText,
-      contentType: response.headers.get('content-type'),
-      ok: response.ok
-    });
     
     // 处理响应
     if (response.ok) {
@@ -442,9 +366,10 @@ export async function publishToWordPress(
             length: errorText.length
           });
         }
-      } catch (parseError) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
         errorText = "無法解析錯誤響應";
-        console.error("解析錯誤響應失敗:", parseError);
+        console.error("解析錯誤響應失敗");
       }
       
       return {
@@ -505,5 +430,226 @@ export async function uploadMedia(
   } catch (error) {
     console.error('上傳媒體到 WordPress 失敗:', error);
     return 0;
+  }
+}
+
+/**
+ * 從URL上傳媒體文件到WordPress
+ * @param credentials WordPress認證信息
+ * @param imageUrl 圖片URL
+ * @returns 上傳後的媒體ID或錯誤信息
+ */
+export async function uploadMediaFromUrl(
+  credentials: WordPressCredentials,
+  imageUrl: string
+): Promise<{ 
+  id: number; 
+  success: boolean; 
+  error?: string; 
+  details?: unknown; 
+}> {
+  try {
+    // 檢查認證信息
+    if (!credentials.username || !credentials.password) {
+      console.error("缺少WordPress認證信息");
+      return {
+        id: 0,
+        success: false,
+        error: "缺少WordPress認證信息"
+      };
+    }
+    
+    // 檢查URL格式
+    let url;
+    try {
+      url = new URL(imageUrl);
+      // 額外檢查協議
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        console.error(`無效的URL協議: ${url.protocol}，必須使用http或https`);
+        return { 
+          id: 0, 
+          success: false, 
+          error: `無效的URL協議: ${url.protocol}，必須使用http或https` 
+        };
+      }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      console.error('無效的圖片URL格式:', imageUrl);
+      return { 
+        id: 0, 
+        success: false, 
+        error: '無效的圖片URL格式' 
+      };
+    }
+    
+    // 檢查URL是否為圖片格式
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+    const hasValidExtension = imageExtensions.some(ext => 
+      url.pathname.toLowerCase().endsWith(ext) || 
+      url.pathname.toLowerCase().includes(ext + '?')
+    );
+    
+    // 不是明確的圖片格式，進行額外警告
+    if (!hasValidExtension) {
+      console.warn(`URL不是明確的圖片格式，嘗試繼續: ${imageUrl}`);
+    }
+    
+    // 從URL獲取圖片內容
+    let imageResponse;
+    try {
+      imageResponse = await fetch(imageUrl, { 
+        headers: { 'Accept': 'image/*' },
+        redirect: 'follow',
+        mode: 'cors',
+        cache: 'no-store'
+      });
+    } catch (fetchError) {
+      const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      console.error(`獲取圖片失敗: ${errorMessage}`);
+      return { 
+        id: 0, 
+        success: false, 
+        error: `無法獲取圖片: ${errorMessage}` 
+      };
+    }
+    
+    if (!imageResponse.ok) {
+      console.error(`獲取圖片返回非成功狀態: ${imageResponse.status} ${imageResponse.statusText}`);
+      return { 
+        id: 0, 
+        success: false, 
+        error: `獲取圖片失敗: HTTP ${imageResponse.status} ${imageResponse.statusText}` 
+      };
+    }
+    
+    // 檢查回應的Content-Type
+    const responseContentType = imageResponse.headers.get('content-type');
+    if (!responseContentType) {
+      console.warn(`圖片URL未返回Content-Type，假設為image/jpeg`);
+    } else if (!responseContentType.startsWith('image/')) {
+      console.warn(`圖片URL返回了非圖片Content-Type: ${responseContentType}`);
+    }
+    
+    // 獲取圖片內容和MIME類型
+    let imageBlob;
+    try {
+      imageBlob = await imageResponse.blob();
+    } catch (blobError) {
+      const errorMessage = blobError instanceof Error ? blobError.message : String(blobError);
+      console.error(`讀取圖片數據失敗: ${errorMessage}`);
+      return { 
+        id: 0, 
+        success: false, 
+        error: `無法讀取圖片數據: ${errorMessage}`
+      };
+    }
+    
+    if (imageBlob.size === 0) {
+      console.error(`圖片數據為空: 大小=${imageBlob.size}字節`);
+      return {
+        id: 0,
+        success: false,
+        error: '獲取到空的圖片數據'
+      };
+    }
+    
+    const contentType = responseContentType || 'image/jpeg';
+    
+    // 從URL中提取文件名
+    const urlParts = imageUrl.split('/');
+    let filename = urlParts[urlParts.length - 1];
+    // 確保文件名中不含查詢參數
+    if (filename.includes('?')) {
+      filename = filename.split('?')[0];
+    }
+    // 確保文件名不為空
+    if (!filename || filename.trim() === '' || filename === '/') {
+      filename = `image-${Date.now()}.jpg`;
+    }
+    
+    // 創建WordPress媒體API URL
+    const apiUrl = createWpApiUrl('/wp-json/wp/v2/media');
+    
+    // 設置認證和其他頭信息
+    const headers = new Headers();
+    const authString = `${credentials.username}:${credentials.password}`;
+    const base64Auth = Buffer.from(authString).toString('base64');
+    headers.append('Authorization', `Basic ${base64Auth}`);
+    headers.append('Content-Disposition', `attachment; filename="${filename}"`);
+    headers.append('Content-Type', contentType);
+    
+    // 發送上傳請求
+    let uploadResponse;
+    try {
+      uploadResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: headers,
+        body: imageBlob,
+        mode: 'cors' as RequestMode,
+        credentials: 'omit' as RequestCredentials
+      });
+    } catch (uploadError) {
+      const errorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+      console.error(`上傳請求失敗: ${errorMessage}`);
+      return {
+        id: 0,
+        success: false,
+        error: `上傳請求失敗: ${errorMessage}`
+      };
+    }
+    
+    if (uploadResponse.ok) {
+      try {
+        const data = await uploadResponse.json();
+        return { id: data.id, success: true };
+      } catch (parseError) {
+        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+        console.error(`解析成功響應失敗: ${errorMessage}`);
+        return {
+          id: 0,
+          success: false,
+          error: `無法解析成功響應: ${errorMessage}`
+        };
+      }
+    } else {
+      // 處理上傳失敗響應
+      console.error(`WordPress媒體上傳失敗: 狀態=${uploadResponse.status} ${uploadResponse.statusText}`);
+      
+      let responseContent = null;
+      
+      try {
+        const contentType = uploadResponse.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const errorData = await uploadResponse.json();
+          responseContent = errorData;
+          console.error("WordPress錯誤響應(JSON):", JSON.stringify(errorData, null, 2));
+        } else {
+          // 對於非JSON回應，獲取文本內容
+          const text = await uploadResponse.text();
+          responseContent = text;
+          console.error("WordPress錯誤響應(文本):", {
+            preview: text.substring(0, 200),
+            length: text.length
+          });
+        }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        console.error("無法解析錯誤響應內容");
+      }
+      
+      return { 
+        id: 0, 
+        success: false, 
+        error: `上傳失敗: HTTP ${uploadResponse.status} ${uploadResponse.statusText}`,
+        details: responseContent
+      };
+    }
+  } catch (error) {
+    console.error('從URL上傳媒體失敗:', error);
+    return { 
+      id: 0, 
+      success: false, 
+      error: `上傳過程中發生錯誤: ${error instanceof Error ? error.message : String(error)}` 
+    };
   }
 } 
