@@ -165,7 +165,7 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
       // 設置光標位置但不強制滾動
       editor.commands.focus('start');
     }
-  }, [currentView, editor]); // 移除htmlSource依賴，避免每次內容變化都觸發滾動
+  }, [currentView, editor, htmlSource]); // 添加htmlSource依賴
 
   // 單獨處理htmlSource變化的邏輯，不包含滾動
   useEffect(() => {
@@ -173,7 +173,7 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
       // 不設置內容，避免重新渲染和光標跳轉
       // 只在視圖切換時設置內容，而不是每次htmlSource變化都設置
     }
-  }, [htmlSource]);
+  }, [htmlSource, currentView, editor]);
 
   // 處理HTML源碼更改
   const handleHtmlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
