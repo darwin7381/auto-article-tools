@@ -79,21 +79,36 @@ export function generateFrontMatter(metadata: MarkdownMetadata): string {
  * @returns 格式化的Markdown內容
  */
 export function createDocxMarkdown(htmlContent: string): string {
-  // 將HTML轉換為Markdown格式
-  const markdown = htmlContent
+  // 先處理列表，避免 <li> 轉換衝突
+  let markdown = htmlContent
+    // 有序列表
+    .replace(/<ol>([\s\S]*?)<\/ol>/g, (_, inner) => {
+      const items = inner
+        .replace(/^<li>|<\/li>$/g, '')
+        .split(/<\/li>\s*<li>/g)
+        .map((item: string, i: number) => `${i + 1}. ${item.trim()}`);
+      return items.join('\n') + '\n\n';
+    })
+    // 無序列表
+    .replace(/<ul>([\s\S]*?)<\/ul>/g, (_, inner) => {
+      const items = inner
+        .replace(/^<li>|<\/li>$/g, '')
+        .split(/<\/li>\s*<li>/g)
+        .map((item: string) => `- ${item.trim()}`);
+      return items.join('\n') + '\n\n';
+    });
+
+  // 其他基本標籤轉換
+  markdown = markdown
     .replace(/<h1>(.*?)<\/h1>/g, '# $1\n\n')
     .replace(/<h2>(.*?)<\/h2>/g, '## $1\n\n')
     .replace(/<h3>(.*?)<\/h3>/g, '### $1\n\n')
     .replace(/<p>(.*?)<\/p>/g, '$1\n\n')
     .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
     .replace(/<em>(.*?)<\/em>/g, '*$1*')
-    .replace(/<ul>(.*?)<\/ul>/g, '$1\n')
-    .replace(/<li>(.*?)<\/li>/g, '- $1\n')
-    .replace(/<ol>(.*?)<\/ol>/g, '$1\n')
-    .replace(/<li>(.*?)<\/li>/g, '1. $1\n')
     .replace(/<a href="(.*?)">(.*?)<\/a>/g, '[$2]($1)')
     .replace(/<img src="(.*?)".*?>/g, '![]($1)\n\n');
-  
+
   // 直接返回處理後的Markdown內容，不添加frontmatter
   return markdown;
 }
