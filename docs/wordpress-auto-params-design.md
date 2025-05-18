@@ -5,8 +5,8 @@
 ### 1.1 現有系統架構
 系統目前採用階段性流水線處理文件：
 - **初步處理階段**：upload → extract → process
-- **後期處理階段**：advanced-ai → format-conversion
-- **上稿階段**：prep-publish → copy-editing → publish-news
+- **後期處理階段**：advanced-ai → format-conversion → copy-editing
+- **上稿階段**：prep-publish → publish-news
 
 ### 1.2 混合操作模式說明
 系統支援三種混合操作模式，用戶可在一開始上傳文件時選擇：
@@ -24,7 +24,7 @@
    - 用戶需在「上稿準備」和「上架新聞」這兩個階段手動確認後才進入下一步
    - 系統仍會自動處理其他技術階段（如初步處理和後期處理階段）
 
-**注意**：所有模式下，系統都會在「文稿編輯」階段自動填寫WordPress參數（標題、分類、標籤等），用戶只需進行必要的調整，無需完整填寫。模式的區別主要在於是否需要手動確認特定階段。
+**注意**：所有模式下，系統都會在「文稿編輯」階段自動填寫WordPress參數（標題、分類、標籤等），用戶在prep-publish階段可進行必要的調整，無需完整填寫。模式的區別主要在於是否需要手動確認特定階段。
 
 ### 1.3 核心需求
 1. 自動提取並填充WordPress發布所需參數（標題、分類、標籤等）
@@ -34,7 +34,7 @@
 5. 保留WordPress發布設定的所有功能
 
 ### 1.4 挑戰與考量
-1. 用戶在prep-publish階段可能會對AI生成內容進行大幅修改
+1. 用戶在prep-publish階段可能會對已處理內容進行大幅修改
 2. 各篇文章情況差異大，參數提取難度不一
 3. Tiptap編輯器可能導致HTML結構變化
 4. 需支持在不同模式間無縫切換
@@ -42,22 +42,22 @@
 ## 2. 解決方案設計
 
 ### 2.1 方案概述
-引入一個獨立的「文稿編輯」(copy-editing)階段，在prep-publish和publish-news之間，由CopyEditorAgent負責：
+引入一個獨立的「文稿編輯」(copy-editing)階段，在format-conversion和prep-publish之間，由CopyEditorAgent負責：
 
-1. 分析用戶在prep-publish階段確認的內容
+1. 分析經過格式轉換的內容
 2. 提取並產生適合的WordPress發布參數
-3. 根據品牌要求適配內容格式
-4. 準備發布流程所需的所有元素
+3. 根據品牌要求預先適配內容格式
+4. 為用戶準備好預處理的內容供prep-publish階段編輯
 
 ### 2.2 流程圖
 ```
-                       用戶檢視/修正           CopyEditorAgent處理              確認發布參數
-format-conversion --> prep-publish --------> copy-editing ----------------> publish-news -------> WordPress發布
-        |                  |                      |                              |                    |
-        |                  |                      |                              |                    |
-        v                  v                      v                              v                    v
-    格式轉換         Tiptap編輯器          參數生成+內容適配                發布參數確認          發布結果展示
-                 (含HTML編輯功能)     (根據品牌特性調整內容格式)        (所有模式均展示預填參數)
+                     CopyEditorAgent處理            用戶檢視/修正                  確認發布參數
+format-conversion -----------> copy-editing --------> prep-publish ----------------> publish-news -------> WordPress發布
+        |                             |                     |                              |                    |
+        |                             |                     |                              |                    |
+        v                             v                     v                              v                    v
+    格式轉換                  參數生成+內容適配        Tiptap編輯器                  發布參數確認          發布結果展示
+                        (根據品牌特性調整內容格式)     (含HTML編輯功能)          (所有模式均展示預填參數)
 ```
 
 ### 2.3 CopyEditorAgent設計
@@ -66,11 +66,79 @@ format-conversion --> prep-publish --------> copy-editing ----------------> publ
 - 智能分析文章內容提取參數（標題、分類、標籤等）
 - 生成符合品牌標準的WordPress發布參數
 - 根據品牌要求適配內容格式（處理前言、添加相關閱讀等）
-- 處理Tiptap編輯器產生的HTML標記問題
+- 預處理內容以便用戶在Tiptap編輯器中編輯
 - 支持不同級別的自動化處理
 
 #### 2.3.2 技術實現
+CopyEditorAgent將分析內容並生成包含所有必要參數的JSON結構，用於後續階段使用。以下是產生的參數JSON範例：
 
+```json
+{
+  "wordpress_params": {
+    "title": "2024年蘋果全新MacBook Pro評測：M3晶片帶來驚人效能提升",
+    "excerpt": "本篇評測深入剖析了搭載M3晶片的全新MacBook Pro，探討其效能、電池續航力及散熱表現的重大突破，並解析其如何重新定義專業用戶的工作流程。",
+    "featured_image": {
+      "url": "https://example.com/images/macbook-pro-m3-2024.jpg",
+      "alt": "2024年款MacBook Pro M3正面展示圖"
+    },
+    "categories": [
+      "科技評測",
+      "蘋果生態系",
+      "筆記型電腦"
+    ],
+    "tags": [
+      "MacBook Pro",
+      "M3晶片",
+      "蘋果電腦",
+      "專業筆電",
+      "效能評測"
+    ],
+    "seo_meta": {
+      "focus_keyword": "MacBook Pro M3評測",
+      "meta_description": "深入剖析2024年搭載M3晶片的MacBook Pro，探討其效能提升、電池續航力及專業應用表現，幫助您判斷是否值得升級。"
+    },
+    "brand_settings": {
+      "apply_intro_style": true,
+      "related_reading": [
+        "Mac Studio與Mac Pro：專業用戶的終極選擇",
+        "M系列晶片發展史：從M1到M3的技術革新",
+        "2024年最佳筆電選購指南：Windows vs macOS"
+      ],
+      "content_type": "review"
+    }
+  },
+  "content_structure": {
+    "has_table_of_contents": true,
+    "has_comparison_table": true,
+    "has_verdict_section": true,
+    "word_count": 2350,
+    "image_count": 8,
+    "video_embedded": false
+  }
+}
+```
+
+### 2.4 Publish-News階段設計
+
+#### 2.4.1 主要功能
+Publish-News階段包含三個關鍵功能：
+
+1. **內容提取與參數更新**
+   - 從prep-publish階段提交的HTML內容中提取第一個h1標題作為WordPress主標題
+   - 提取第一張圖片作為特色圖片(Feature Image)
+   - 將其餘內容設為HTML段落主文
+   - 基於這些提取的內容，更新CopyEditorAgent之前生成的JSON參數表
+
+2. **發布參數確認界面**
+   - 提供用戶友好的表單界面，顯示所有WordPress發布參數
+   - 允許用戶在發布前進行最終調整
+   - 支持特殊的WordPress選項設定（如發布狀態、評論設定、可見性等）
+
+3. **WordPress發布流程**
+   - 執行實際的WordPress API發布請求
+   - 處理媒體文件上傳（包括特色圖片和內文圖片）
+   - 提供發布狀態反饋和結果確認
+   - 支持發布失敗時的重試機制
 
 ## 4. 錯誤處理與降級策略
 
@@ -88,10 +156,10 @@ format-conversion --> prep-publish --------> copy-editing ----------------> publ
 5. 錯誤處理與降級策略
 
 ### 5.2 集成點
-1. 在prep-publish和publish-news之間添加copy-editing階段
+1. 在format-conversion和prep-publish之間添加copy-editing階段
 2. 在copy-editing階段調用CopyEditorAgent
-3. 為所有模式提供自動參數填寫與調整界面
-4. 為半自動模式提供回到「上稿準備」、「文稿編輯」和「上架新聞」階段的導航功能
+3. 為所有模式提供自動參數填寫與預處理內容
+4. 為半自動模式提供回到「文稿編輯」、「上稿準備」和「上架新聞」階段的導航功能
 5. 為手動模式提供所有三個階段的確認機制
 6. 保留現有WordPress發布表單所有元素和功能
 7. 保留現有Tiptap編輯器的所有功能
@@ -100,12 +168,12 @@ format-conversion --> prep-publish --------> copy-editing ----------------> publ
 
 本方案通過引入獨立的「文稿編輯」(copy-editing)階段及CopyEditorAgent，實現以下目標：
 
-1. **優化處理流程** - 明確區分內容編輯(prep-publish)、文稿優化(copy-editing)和發布(publish-news)三個階段
+1. **優化處理流程** - 明確區分參數生成與內容預處理(copy-editing)、人工編輯(prep-publish)和發布(publish-news)三個階段
 2. **專業化文稿處理** - 由CopyEditorAgent負責專業的文稿編輯與參數生成工作
 3. **保留核心功能** - 完整保留Tiptap編輯器和WordPress發布表單功能
 4. **靈活支持三種模式** - 全自動流程、半自動返回調整、手動階段確認
 5. **智能參數填寫** - 自動分析內容填寫發布參數，用戶只需調整
-6. **品牌風格應用** - 根據品牌要求適配內容格式（前言、相關閱讀等）
+6. **品牌風格應用** - 根據品牌要求預先適配內容格式（前言、相關閱讀等）
 7. **穩健的容錯機制** - 提供多層次的錯誤處理與降級策略
 
-通過這種設計，系統能夠在保證AI高效處理的同時，允許人工介入進行必要的檢查和調整，實現效率與品質的平衡。 
+通過這種設計，系統能夠在保證AI高效處理的同時，允許人工介入進行必要的檢查和調整，實現效率與品質的平衡。將copy-editing提前到用戶編輯前，能更好地準備內容，減輕用戶在編輯階段的工作量。 
