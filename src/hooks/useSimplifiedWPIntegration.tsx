@@ -128,7 +128,20 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
     
     try {
       // 確保有HTML內容
-      const content = initialContent || '<p>空白內容</p>';
+      let content = initialContent || '<p>空白內容</p>';
+      
+      // 處理內容 - 移除第一個h1標籤，避免標題重複
+      try {
+        // 檢查是否已有h1標籤
+        if (content.match(/<h1[^>]*>.*?<\/h1>/i)) {
+          // 使用正則表達式移除第一個h1標籤及其內容
+          content = content.replace(/<h1[^>]*>.*?<\/h1>/i, '');
+          console.log('已移除內容中的h1標題，避免WordPress顯示重複標題');
+        }
+      } catch (error) {
+        console.error('處理內容時出錯:', error);
+        // 發生錯誤時使用原始內容，不做更改
+      }
       
       // 準備發布數據
       interface PublishRequestData {

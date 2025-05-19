@@ -1,12 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../button/Button';
 
 interface WordPressFormProps {
   onSubmit: (formData: WordPressFormData) => void;
   isSubmitting?: boolean;
   error?: string;
+  initialData?: {
+    title?: string;
+    categories?: string;
+    tags?: string;
+  };
 }
 
 export interface WordPressFormData {
@@ -25,12 +30,20 @@ export function WordPressForm({
   onSubmit,
   isSubmitting = false,
   error,
+  initialData = {},
 }: WordPressFormProps) {
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialData.title || '');
   const [status, setStatus] = useState<'publish' | 'draft' | 'pending'>('draft');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [category, setCategory] = useState<string>('');
-  const [tags, setTags] = useState<string>('');
+  const [category, setCategory] = useState<string>(initialData.categories || '');
+  const [tags, setTags] = useState<string>(initialData.tags || '');
+
+  // 當初始數據變更時更新表單字段
+  useEffect(() => {
+    if (initialData.title) setTitle(initialData.title);
+    if (initialData.categories) setCategory(initialData.categories);
+    if (initialData.tags) setTags(initialData.tags);
+  }, [initialData]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
