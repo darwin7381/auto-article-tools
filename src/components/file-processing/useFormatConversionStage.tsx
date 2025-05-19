@@ -7,6 +7,7 @@ export interface FormatConversionResult {
   publicUrl?: string;
   markdownKey?: string;
   htmlContent?: string;
+  htmlKey?: string;
   fileId?: string;
   format?: string;
   success?: boolean;
