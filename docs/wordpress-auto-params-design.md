@@ -263,12 +263,47 @@ Publish-News階段包含三個關鍵功能：
        return '';
      }, []);
      ```
+   - 在useSimplifiedWPIntegration.tsx中，發布前移除特色圖片：
+     ```typescript
+     // 提取並處理特色圖片
+     let featuredImageUrl = '';
+     try {
+       // 如果表單中提供了featured_media且為URL，將其保存為特色圖片URL
+       if (formData.featured_media && isURL(formData.featured_media.trim())) {
+         featuredImageUrl = formData.featured_media.trim();
+         // 如果特色圖片URL存在於內容中，則從內容中移除該圖片
+         if (featuredImageUrl && content.includes(featuredImageUrl)) {
+           // 找到包含該URL的img標籤，並移除整個figure或img標籤
+           const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+           content = content.replace(imgRegex, '');
+           console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
+         }
+       } else if (!formData.featured_media) {
+         // 如果沒有提供特色圖片，嘗試提取第一張圖片作為特色圖片
+         const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
+         if (imgMatch && imgMatch[1]) {
+           featuredImageUrl = imgMatch[1];
+           // 從內容中移除該圖片
+           const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+           content = content.replace(imgRegex, '');
+         }
+       }
+     } catch (error) {
+       console.error('處理特色圖片時出錯:', error);
+     }
+     
+     // 輔助函數：轉義正則表達式中的特殊字符
+     function escapeRegExp(string: string): string {
+       return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+     }
+     ```
 
 3. **特色圖片處理的重要考量**
-   - 與標題不同，特色圖片無需從HTML內容中移除，保留在文章內容中
-   - 支持多種圖片URL格式（絕對路徑、相對路徑、base64編碼等）
-   - 實現從URL自動上傳到WordPress媒體庫的功能
-   - 提供容錯機制，確保圖片提取或上傳失敗不影響整體發布流程
+   - 不同於之前版本，新版本在WordPress發布時會移除內容中的特色圖片，避免重複顯示
+   - 支持多種圖片容器結構，包括單獨的<img>標籤以及被<figure>標籤包裹的圖片
+   - 使用正則表達式轉義功能(escapeRegExp)確保處理過程中不會因圖片URL中的特殊字符而出錯
+   - 提供容錯機制，避免圖片處理失敗影響整體發布流程
+   - 支持從表單提供的圖片URL和從內容中自動提取兩種方式
 
 ### 3.3 WordPress參數表單預填充與顯示
 

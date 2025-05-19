@@ -235,7 +235,9 @@ function processImagesInHtml(html: string): string {
 
 ### 6.3 特色圖片處理問題
 
-**挑戰**: 特色圖片上傳過程中遇到客戶端vs服務器端函數衝突問題。在服務器端API路由中嘗試調用帶有`'use client'`標記的客戶端函數，導致運行時錯誤：「Attempted to call uploadMediaFromUrl() from the server but uploadMediaFromUrl is on the client.」
+**挑戰**: 
+1. 特色圖片上傳過程中遇到客戶端vs服務器端函數衝突問題。在服務器端API路由中嘗試調用帶有`'use client'`標記的客戶端函數，導致運行時錯誤：「Attempted to call uploadMediaFromUrl() from the server but uploadMediaFromUrl is on the client.」
+2. 特色圖片在發布到WordPress後會重複顯示，一次在特色圖片區域，一次在文章內容中，影響用戶體驗。
 
 **解決方案**:
 - 創建了專門的服務器端版本函數：`serverWordpressService.ts`
@@ -243,12 +245,54 @@ function processImagesInHtml(html: string): string {
 - 改進了URL驗證和圖片格式檢查
 - 增強了錯誤處理和日誌記錄
 - 確保特色圖片上傳失敗不會阻止整個文章發布流程
+- 在發布前檢測並從內容中移除作為特色圖片的圖片，避免重複顯示
+- 使用正則表達式識別特色圖片在內容中的位置，包括處理<figure>和<img>標籤
 
 **實現細節**:
 - 服務器端通過Node.js的`fetch` API直接處理圖片下載和上傳
 - 支持直接從URL上傳圖片到WordPress媒體庫
 - 添加詳細的日誌記錄，方便調試和問題排查
 - 當上傳圖片失敗時提供友好的錯誤提示，但仍允許文章發布
+- 使用正則表達式轉義函數確保URL中的特殊字符不會干擾圖片移除流程
+- 在發布前根據特色圖片URL從內容中移除該圖片，確保顯示整潔
+
+**內容處理代碼**:
+```typescript
+// 輔助函數：轉義正則表達式中的特殊字符
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// 提取並處理特色圖片
+let featuredImageUrl = '';
+try {
+  // 如果表單中提供了featured_media且為URL，將其保存為特色圖片URL
+  if (formData.featured_media && isURL(formData.featured_media.trim())) {
+    featuredImageUrl = formData.featured_media.trim();
+    
+    // 如果特色圖片URL存在於內容中，則從內容中移除該圖片
+    if (featuredImageUrl && content.includes(featuredImageUrl)) {
+      // 找到包含該URL的img標籤，並移除整個figure或img標籤
+      const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+      content = content.replace(imgRegex, '');
+      console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
+    }
+  } else if (!formData.featured_media) {
+    // 如果沒有提供特色圖片，嘗試提取第一張圖片作為特色圖片
+    const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (imgMatch && imgMatch[1]) {
+      featuredImageUrl = imgMatch[1];
+      // 從內容中移除該圖片
+      const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+      content = content.replace(imgRegex, '');
+    }
+  }
+} catch (error) {
+  console.error('處理特色圖片時出錯:', error);
+}
+```
+
+這一機制解決了特色圖片在WordPress中重複顯示的問題，保證了發布內容的整潔和專業性。
 
 ### 6.4 錯誤處理複雜性
 

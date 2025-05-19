@@ -15,14 +15,15 @@
 
 ## 2. 處理流程階段
 
-系統處理流程分為六個主要階段:
+系統處理流程分為七個主要階段:
 
 1. **上傳階段(upload)**: 處理文件上傳或URL解析
 2. **提取階段(extract)**: 從文件或網頁中提取文本和圖片
 3. **AI初步處理階段(process)**: 使用OpenAI進行內容初步處理
 4. **PR writer處理階段(advanced-ai)**: 進一步優化內容重點和結構
 5. **格式轉換階段(format-conversion)**: 將Markdown轉換為其他格式(如HTML)
-6. **完成階段(complete)**: 標記整個處理過程完成
+6. **文稿編輯階段(copy-editing)**: 提取WordPress參數並適配內容格式
+7. **完成階段(complete)**: 標記整個處理過程完成
 
 每個階段都有四種可能的狀態: `pending` (等待處理)、`processing` (處理中)、`completed` (已完成)、`error` (錯誤)。
 
@@ -48,6 +49,7 @@ graph TD
     G --> J[useAiProcessingStage]
     G --> J1[useAdvancedAiStage]
     G --> J2[useFormatConversionStage]
+    G --> J3[useCopyEditingStage]
     
     G --> D
     C --> D
@@ -60,7 +62,8 @@ graph TD
     I --> |"onComplete回調"| J
     J --> |"onComplete回調"| J1
     J1 --> |"onComplete回調"| J2
-    J2 --> |"onComplete回調"| K[完成處理]
+    J2 --> |"onComplete回調"| J3
+    J3 --> |"onComplete回調"| K[完成處理]
     end
 ```
 
@@ -75,6 +78,7 @@ sequenceDiagram
     participant AP as useAiProcessingStage
     participant AA as useAdvancedAiStage
     participant FC as useFormatConversionStage
+    participant CE as useCopyEditingStage
     participant PC as ProcessingContext
     participant Upload as /api/upload
     participant Extract as /api/extract-content
@@ -82,6 +86,7 @@ sequenceDiagram
     participant OpenAI as /api/process-openai
     participant AdvancedAI as /api/advanced-ai-processing
     participant Format as /api/format-conversion
+    participant CopyEdit as /api/copy-editing
     
     UI->>PF: processFile/processUrl
     PF->>PC: startProcessing()
@@ -106,8 +111,14 @@ sequenceDiagram
     FC->>Format: 提交Markdown內容
     Format-->>FC: 返回HTML等格式結果
     FC->>PC: completeStage('format-conversion')
-    FC->>PC: completeStage('complete')
-    FC-->>PF: onProcessSuccess(result)
+    FC-->>CE: onComplete(result)
+    
+    CE->>PC: updateStageProgress('copy-editing', %)
+    CE->>CopyEdit: 提交格式化內容
+    CopyEdit-->>CE: 返回WordPress參數和適配內容
+    CE->>PC: completeStage('copy-editing')
+    CE->>PC: completeStage('complete')
+    CE-->>PF: onProcessSuccess(result)
     PF-->>UI: 返回處理完成結果
 ```
 
@@ -198,6 +209,7 @@ sequenceDiagram
 | **process** | • AI Agent Editing<br>• 創建增強版Markdown<br>• `/api/process-openai` | • AI Agent Editing<br>• 創建增強版Markdown<br>• `/api/process-openai` | • AI Agent Editing<br>• 創建增強版Markdown<br>• `/api/process-openai` | • 與標準流程相同<br>• `/api/process-openai` | • 與標準流程相同<br>• `/api/process-openai` | • 與標準流程相同<br>• `/api/process-openai` |
 | **advanced-ai** | • 進一步優化內容重點和結構<br>• `/api/advanced-ai-processing` | • 進一步優化內容重點和結構<br>• `/api/advanced-ai-processing` | • 進一步優化內容重點和結構<br>• `/api/advanced-ai-processing` | • 與標準流程相同<br>• `/api/advanced-ai-processing` | • 與標準流程相同<br>• `/api/advanced-ai-processing` | • 與標準流程相同<br>• `/api/advanced-ai-processing` |
 | **format-conversion** | • 將Markdown轉換為HTML<br>• `/api/format-conversion` | • 將Markdown轉換為HTML<br>• `/api/format-conversion` | • 將Markdown轉換為HTML<br>• `/api/format-conversion` | • 與標準流程相同<br>• `/api/format-conversion` | • 與標準流程相同<br>• `/api/format-conversion` | • 與標準流程相同<br>• `/api/format-conversion` |
+| **copy-editing** | • 提取WordPress參數並適配內容格式 | • 提取WordPress參數並適配內容格式 | • 解析URL並適配內容格式 | • 解析URL並適配內容格式 | • 解析URL並適配內容格式 | • 解析URL並適配內容格式 |
 | **complete** | • 保存最終Markdown<br>• 更新處理完成狀態<br>• 生成查看連結 | • 保存最終Markdown<br>• 更新處理完成狀態<br>• 生成查看連結 | • 保存最終Markdown<br>• 更新處理完成狀態<br>• 生成查看連結 | • 與標準流程相同 | • 與標準流程相同 | • 與標準流程相同 |
 
 ## 9. 階段性流水線混合模式的實現
@@ -409,4 +421,5 @@ graph TD
 | process | Markdown | 內容預覽+新窗口 | markdownContent, markdownKey |
 | advanced-ai | Markdown | 內容預覽+新窗口 | markdownContent, markdownKey |
 | format-conversion | HTML | 內容預覽+新窗口 | htmlContent, htmlKey |
+| copy-editing | 格式化內容 | 內容預覽+新窗口 | formattedContent, formattedKey |
 | complete | 最終結果 | 預覽+新窗口 | markdownContent, markdownKey, htmlContent, htmlKey |
