@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FileUpload } from '../ui/file-upload/FileUpload';
 import ProgressDisplay from '../progress/ProgressDisplay';
 import useProcessingFlow, { ExtractResult } from './useProcessingFlow';
@@ -11,10 +11,18 @@ import EditorIntegration from '@/components/ui/editor-integration';
 import WordPressSettings from '@/components/ui/wordpress-settings';
 import { useSimplifiedWPIntegration } from '@/hooks/useSimplifiedWPIntegration';
 
-// 擴展ProcessingResult類型以包含markdownContent
+// 擴展ProcessingResult類型以包含markdownContent和wordpressParams
 interface ExtendedProcessingResult extends BaseProcessingResult {
   markdownContent?: string;
   publicUrl?: string;
+  wordpressParams?: {
+    title: string;
+    content: string;
+    excerpt?: string;
+    slug?: string;
+    categories?: Array<{ id: number }>;
+    tags?: Array<{ id: number }>;
+  };
   [key: string]: unknown; // 添加索引簽名，使其與StageResult兼容
 }
 
@@ -46,7 +54,20 @@ const PrepPublishingComponent = ({ fileId, htmlContent, markdownUrl, onContentCh
 };
 
 // 替換舊的WordPress發布設置組件
-const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) => {
+const WordPressPublishComponent = ({ 
+  htmlContent, 
+  wordpressParams 
+}: { 
+  htmlContent?: string, 
+  wordpressParams?: {
+    title?: string;
+    content?: string;
+    excerpt?: string;
+    slug?: string;
+    categories?: Array<{ id: number }>;
+    tags?: Array<{ id: number }>;
+  } 
+}) => {
   // 確保htmlContent有值且為字符串
   const sanitizedHtmlContent = typeof htmlContent === 'string' && htmlContent.trim() ? 
     htmlContent : '<p>無內容，請編輯文章內容後再發布</p>';
@@ -71,9 +92,84 @@ const WordPressPublishComponent = ({ htmlContent }: { htmlContent?: string }) =>
     }
   }, [htmlContent, sanitizedHtmlContent]);
   
+  // 提取HTML內容中的H1標題
+  const extractH1Title = useCallback((html: string): string => {
+    try {
+      // 使用正則表達式提取第一個H1標籤內容
+      const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+      if (h1Match && h1Match[1]) {
+        // 去除可能的HTML標籤，只保留文本
+        const h1Content = h1Match[1].replace(/<[^>]+>/g, '').trim();
+        console.log("從編輯器內容中提取H1標題:", h1Content);
+        return h1Content;
+      }
+    } catch (error) {
+      console.error("提取H1標題出錯:", error);
+    }
+    return '';
+  }, []);
+
+  // 當HTML內容加載時立即提取並使用標題
+  useEffect(() => {
+    if (sanitizedHtmlContent) {
+      const extractedTitle = extractH1Title(sanitizedHtmlContent);
+      if (extractedTitle) {
+        setFormData(prev => ({
+          ...prev,
+          title: extractedTitle
+        }));
+        console.log("從編輯器提取的標題已設置:", extractedTitle);
+      }
+    }
+  }, [sanitizedHtmlContent, extractH1Title]);
+
+  // 當WordPress參數變更時更新表單數據
+  useEffect(() => {
+    // 輸出詳細的調試信息
+    console.log("WordPress參數狀態:", {
+      有參數: !!wordpressParams,
+      參數類型: wordpressParams ? typeof wordpressParams : 'undefined'
+    });
+    
+    if (wordpressParams) {
+      try {
+        // 處理分類，確保是數組
+        let categoriesStr = '';
+        if (wordpressParams.categories && Array.isArray(wordpressParams.categories)) {
+          categoriesStr = wordpressParams.categories
+            .map(cat => cat && typeof cat === 'object' && 'id' in cat ? cat.id : '')
+            .filter(Boolean)
+            .join(',');
+        }
+        
+        // 處理標籤，確保是數組
+        let tagsStr = '';
+        if (wordpressParams.tags && Array.isArray(wordpressParams.tags)) {
+          tagsStr = wordpressParams.tags
+            .map(tag => tag && typeof tag === 'object' && 'id' in tag ? tag.id : '')
+            .filter(Boolean)
+            .join(',');
+        }
+        
+        // 更新表單數據（標題已經由前面的useEffect從編輯器提取處理好了）
+        setFormData(prev => ({
+          ...prev,
+          // 注意：不再設置title，因為它已經從編輯器內容中提取並設置了
+          categories: categoriesStr || prev.categories,
+          tags: tagsStr || prev.tags,
+          slug: wordpressParams.slug || prev.slug
+        }));
+        
+        console.log("表單數據已更新 (分類和標籤)");
+      } catch (error) {
+        console.error("解析WordPress參數時出錯:", error);
+      }
+    }
+  }, [wordpressParams]);
+  
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // 表單數據狀態
+  // 表單數據狀態 - 先使用空值初始化，在useEffect中再更新
   const [formData, setFormData] = useState({
     title: '',
     categories: '',
@@ -479,7 +575,7 @@ export default function IntegratedFileProcessor() {
       return `/viewer/processed/${key}?view=markdown`;
     }
     
-    if (stageId === 'format-conversion') {
+    if (stageId === 'format-conversion' || stageId === 'copy-editing') {
       // 如果有 HTML 文件鍵，直接使用 viewer 查看
       if (result.htmlKey) {
         const key = String(result.htmlKey).split('/').pop() || '';
@@ -594,7 +690,7 @@ export default function IntegratedFileProcessor() {
       );
     }
     
-    if (stageId === 'format-conversion') {
+    if (stageId === 'format-conversion' || stageId === 'copy-editing') {
       // 顯示HTML內容預覽
       if (result.htmlContent && typeof result.htmlContent === 'string') {
         return (
@@ -602,6 +698,16 @@ export default function IntegratedFileProcessor() {
             <div 
               className="max-h-96 overflow-y-auto" 
               dangerouslySetInnerHTML={{ __html: result.htmlContent.slice(0, 1000) + (result.htmlContent.length > 1000 ? '...' : '') }}
+            />
+          </div>
+        );
+      } else if (stageId === 'copy-editing' && result.adaptedContent && typeof result.adaptedContent === 'string') {
+        // 如果是文稿編輯階段且有adaptedContent，則顯示adaptedContent
+        return (
+          <div className="bg-gray-50 dark:bg-gray-900 rounded p-4">
+            <div 
+              className="max-h-96 overflow-y-auto" 
+              dangerouslySetInnerHTML={{ __html: result.adaptedContent.slice(0, 1000) + (result.adaptedContent.length > 1000 ? '...' : '') }}
             />
           </div>
         );
@@ -935,7 +1041,7 @@ export default function IntegratedFileProcessor() {
                 },
                 advanced: { 
                   title: "後期處理階段",
-                  stages: ['advanced-ai', 'format-conversion']
+                  stages: ['advanced-ai', 'format-conversion', 'copy-editing']
                 },
                 final: {
                   title: "上稿階段", 
@@ -991,7 +1097,7 @@ export default function IntegratedFileProcessor() {
                 },
                 advanced: { 
                   title: "後期處理階段",
-                  stages: ['advanced-ai', 'format-conversion']
+                  stages: ['advanced-ai', 'format-conversion', 'copy-editing']
                 },
                 final: {
                   title: "上稿階段", 
@@ -1087,9 +1193,23 @@ export default function IntegratedFileProcessor() {
               );
 
               // WordPress發布組件插槽
+              // 添加調試日誌
+              console.log('傳遞到WordPressPublishComponent的數據:', {
+                htmlContent: result?.htmlContent ? String(result.htmlContent).substring(0, 100) + '...' : '無',
+                wordpressParams: result?.wordpressParams || '無WordPress參數'
+              });
+              
               const wpPublishSlot = (
                 <WordPressPublishComponent 
                   htmlContent={result?.htmlContent ? String(result.htmlContent) : ''}
+                  wordpressParams={result?.wordpressParams as {
+                    title?: string;
+                    content?: string;
+                    excerpt?: string;
+                    slug?: string;
+                    categories?: Array<{ id: number }>;
+                    tags?: Array<{ id: number }>;
+                  }}
                 />
               );
 
@@ -1109,7 +1229,7 @@ export default function IntegratedFileProcessor() {
                     },
                     advanced: { 
                       title: "後期處理階段",
-                      stages: ['advanced-ai', 'format-conversion']
+                      stages: ['advanced-ai', 'format-conversion', 'copy-editing']
                     },
                     final: {
                       title: "上稿階段", 

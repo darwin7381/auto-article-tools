@@ -5,15 +5,17 @@ import useExtractStage, { ExtractResult } from './useExtractStage';
 import useAiProcessingStage, { ProcessingResult } from './useAiProcessingStage';
 import useAdvancedAiStage, { AdvancedAiResult } from './useAdvancedAiStage';
 import useFormatConversionStage, { FormatConversionResult } from './useFormatConversionStage';
+import useCopyEditingStage, { CopyEditingResult } from './useCopyEditingStage';
 
 // 重新導出類型以保持兼容性
 export type { ExtractResult } from './useExtractStage';
 export type { ProcessingResult } from './useAiProcessingStage';
 export type { AdvancedAiResult } from './useAdvancedAiStage';
 export type { FormatConversionResult } from './useFormatConversionStage';
+export type { CopyEditingResult } from './useCopyEditingStage';
 
 // 定義最終處理結果類型
-export interface FinalProcessingResult extends FormatConversionResult {
+export interface FinalProcessingResult extends CopyEditingResult {
   processingComplete?: boolean;
   [key: string]: unknown; // 添加索引簽名
 }
@@ -40,6 +42,11 @@ interface AdvancedAiStageHandler {
 
 interface FormatConversionStageHandler {
   startFormatConversion: (result: AdvancedAiResult) => Promise<FormatConversionResult>;
+  cleanup: () => void;
+}
+
+interface CopyEditingStageHandler {
+  startCopyEditing: (result: FormatConversionResult) => Promise<CopyEditingResult>;
   cleanup: () => void;
 }
 
@@ -84,6 +91,56 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
   // 建立階段引用
   const advancedAiStageRef = useRef<AdvancedAiStageHandler | null>(null);
   const formatConversionStageRef = useRef<FormatConversionStageHandler | null>(null);
+  const copyEditingStageRef = useRef<CopyEditingStageHandler | null>(null);
+
+  // 文稿編輯階段
+  const copyEditingStage = useCopyEditingStage(
+    { 
+      formatConversionResult: {} as FormatConversionResult
+    },
+    {
+      onComplete: (result) => {
+        console.log('文稿編輯階段完成:', result);
+        
+        // 獲取標題和內容
+        const title = result.wordpressParams?.title || '';
+        const adaptedContent = result.adaptedContent || '';
+        
+        // 關鍵修改：將標題作為H1添加到內容前面，以便用戶可以在編輯器中編輯標題
+        const titleHtml = title ? `<h1>${title}</h1>` : '';
+        const combinedContent = titleHtml + adaptedContent;
+        
+        // 將組合後的內容設置為htmlContent
+        const resultWithHtmlContent = {
+          ...result,
+          htmlContent: combinedContent,
+          // 確保wordpressParams正確保存和傳遞
+          wordpressParams: result.wordpressParams || {}
+        };
+        
+        // 調試輸出
+        console.log('標題已添加到內容中，組合後的字符數:', combinedContent.length);
+        console.log('處理後的WordPress參數:', resultWithHtmlContent.wordpressParams);
+        
+        callbacksRef.current.onStageComplete('copy-editing', resultWithHtmlContent as unknown as Record<string, unknown>);
+        
+        // 標記整個處理完成
+        const finalResult: FinalProcessingResult = {
+          ...resultWithHtmlContent,
+          processingComplete: true
+        };
+        
+        // 通知處理成功
+        callbacksRef.current.onProcessSuccess(finalResult);
+        
+        // 完成處理
+        return finalResult;
+      },
+      onError: (error) => {
+        callbacksRef.current.onProcessError(error, 'copy-editing');
+      }
+    }
+  );
 
   // 格式轉換階段
   const formatConversionStage = useFormatConversionStage(
@@ -95,17 +152,12 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         console.log('格式轉換階段完成:', result);
         callbacksRef.current.onStageComplete('format-conversion', result as Record<string, unknown>);
         
-        // 標記整個處理完成
-        const finalResult: FinalProcessingResult = {
-          ...result,
-          processingComplete: true
-        };
+        // 進入文稿編輯階段
+        if (copyEditingStageRef.current) {
+          copyEditingStageRef.current.startCopyEditing(result);
+        }
         
-        // 通知處理成功
-        callbacksRef.current.onProcessSuccess(finalResult);
-        
-        // 完成處理
-        return finalResult;
+        return result;
       },
       onError: (error) => {
         callbacksRef.current.onProcessError(error, 'format-conversion');
@@ -140,12 +192,14 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
   useEffect(() => {
     advancedAiStageRef.current = advancedAiStage;
     formatConversionStageRef.current = formatConversionStage;
+    copyEditingStageRef.current = copyEditingStage;
     
     return () => {
       advancedAiStage.cleanup();
       formatConversionStage.cleanup();
+      copyEditingStage.cleanup();
     };
-  }, [advancedAiStage, formatConversionStage]);
+  }, [advancedAiStage, formatConversionStage, copyEditingStage]);
 
   // AI初步處理階段
   const aiProcessingStage = useAiProcessingStage(
@@ -258,7 +312,8 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     aiProcessingStage.cleanup();
     advancedAiStage.cleanup();
     formatConversionStage.cleanup();
-  }, [extractStage, aiProcessingStage, advancedAiStage, formatConversionStage]);
+    copyEditingStage.cleanup();
+  }, [extractStage, aiProcessingStage, advancedAiStage, formatConversionStage, copyEditingStage]);
 
   // 處理文件上傳和處理流程 - 協調器
   const processFile = useCallback(async (file: File) => {

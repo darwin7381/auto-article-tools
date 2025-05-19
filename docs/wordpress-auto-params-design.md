@@ -70,7 +70,11 @@ format-conversion -----------> copy-editing --------> prep-publish -------------
 - 支持不同級別的自動化處理
 
 #### 2.3.2 技術實現
-CopyEditorAgent將分析內容並生成包含所有必要參數的JSON結構，用於後續階段使用。以下是產生的參數JSON範例：
+CopyEditorAgent將分析內容並生成包含所有必要參數的JSON結構，用於後續階段使用。
+
+**重要**：CopyEditorAgent必須確保生成的adaptedContent內容包含h1格式的主標題，以便用戶在編輯器中可以編輯整篇文章（包括標題）。在上架新聞階段，系統會從編輯器的HTML內容中提取第一個h1標籤作為WordPress主標題參數。
+
+以下是產生的參數JSON範例：
 
 ```json
 {
@@ -142,10 +146,10 @@ CopyEditorAgent將分析內容並生成包含所有必要參數的JSON結構，�
 Publish-News階段包含三個關鍵功能：
 
 1. **內容提取與參數更新**
-   - 從prep-publish階段提交的HTML內容中提取第一個h1標題作為WordPress主標題
+   - 從prep-publish階段提交的HTML內容中提取第一個h1標題作為WordPress主標題（**允許用戶在編輯器中直接編輯標題**）
    - 提取第一張圖片作為特色圖片(Feature Image)
-   - 將其餘內容設為HTML段落主文
-   - 基於這些提取的內容，更新CopyEditorAgent之前生成的JSON參數表
+   - HTML內容保持完整（包含h1標題），確保WordPress發布時可保留整體結構
+   - 基於編輯器提取的內容，更新CopyEditorAgent之前生成的JSON參數表
 
 2. **發布參數確認界面**
    - 提供用戶友好的表單界面，顯示所有WordPress發布參數
@@ -161,7 +165,62 @@ Publish-News階段包含三個關鍵功能：
 ## 4. 錯誤處理與降級策略
 
 ### 4.1 參數提取失敗
-當CopyEditorAgent無法提取有效參數時
+當CopyEditorAgent無法提取有效參數時，系統將採用以下降級策略：
+
+1. 使用基本參數集 - 如文件名作為標題，原始內容作為正文
+2. 發出警告，讓用戶知道需要手動檢查和完成參數
+3. 自動將模式切換為手動模式，確保用戶審核
+
+### 4.2 JSON解析回退機制
+
+由於AI模型（如GPT-4o）在生成JSON時經常附帶Markdown格式標記，系統實現了多層回退解析機制：
+
+1. **第一層嘗試**：直接使用`JSON.parse()`解析原始回應
+   ```javascript
+   try {
+     parsedResult = JSON.parse(result);
+   } catch (jsonError) {
+     // 進入第二層回退
+   }
+   ```
+
+2. **第二層回退**：從文本中提取JSON部分（忽略Markdown標記）
+   ```javascript
+   const jsonMatch = result.match(/\{[\s\S]*\}/);
+   if (jsonMatch) {
+     try {
+       parsedResult = JSON.parse(jsonMatch[0]);
+       console.log('從文本中提取JSON成功');
+     } catch (extractError) {
+       // 進入第三層回退
+     }
+   }
+   ```
+
+3. **第三層回退**：嘗試從響應中查找替代字段
+   ```javascript
+   // 嘗試從其他可能的字段提取
+   const possibleFields = ['wordpressParams', 'wordpress_parameters', 'params', 'parameters'];
+   for (const field of possibleFields) {
+     if (parsedResult[field] && typeof parsedResult[field] === 'object') {
+       parsedResult.wordpress_params = parsedResult[field];
+       break;
+     }
+   }
+   ```
+
+4. **最終回退**：使用基本參數結構
+   ```javascript
+   if (!parsedResult.wordpress_params) {
+     parsedResult.wordpress_params = {
+       title: '參數解析失敗',
+       content: content,
+       excerpt: '無法解析WordPress參數JSON'
+     };
+   }
+   ```
+
+這種多層回退機制確保系統即使在AI回應格式異常時，仍能提取有效參數，提高系統的穩健性。實際運行日誌中的「JSON解析失敗，嘗試提取JSON部分」和「從文本中提取JSON成功」等信息，是此機制正常工作的證明。
 
 
 ## 5. 實施計劃
