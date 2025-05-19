@@ -195,17 +195,8 @@ const WordPressPublishComponent = ({
       return;
     }
     
-    publishToWordPress({
-      title: formData.title,
-      categories: formData.categories || undefined,
-      tags: formData.tags || undefined,
-      status: formData.status,
-      isPrivate: formData.isPrivate,
-      slug: formData.slug || undefined,
-      author: formData.author || undefined,
-      featured_media: formData.featured_media || undefined,
-      date: formData.status === 'future' ? formData.date : undefined
-    });
+    // 使用publishToWordPress發布，內容將自動使用initialContent
+    publishToWordPress(formData);
   };
   
   // 顯示成功或錯誤訊息
@@ -260,7 +251,7 @@ const WordPressPublishComponent = ({
     
     return null;
   };
-  
+
   return (
     <div className="mt-2 pl-8 pr-0">
       {renderPublishStatus()}
@@ -312,6 +303,7 @@ const WordPressPublishComponent = ({
               formData={formData}
               onChange={setFormData}
               error={publishResult?.error}
+              extractedParams={wordpressParams}
             />
           </div>
         )}

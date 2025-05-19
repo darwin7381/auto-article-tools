@@ -27,6 +27,11 @@ interface WordPressSettingsProps {
   }>>;
   error?: string;
   detailedError?: string;
+  extractedParams?: {
+    categories?: Array<{ id: number; name?: string }>;
+    tags?: Array<{ id: number; name?: string }>;
+    slug?: string;
+  };
 }
 
 export interface WordPressPublishData {
@@ -48,7 +53,8 @@ export function WordPressSettings({
   formData,
   onChange,
   error,
-  detailedError
+  detailedError,
+  extractedParams
 }: WordPressSettingsProps) {
   // 處理表單字段的更新
   const handleChange = (field: string, value: string | boolean) => {
@@ -56,6 +62,19 @@ export function WordPressSettings({
       ...prev,
       [field]: value
     }));
+  };
+  
+  // 格式化分類或標籤顯示，如果有名稱則顯示，否則只顯示ID
+  const formatEntityDisplay = (entities?: Array<{ id: number; name?: string }>) => {
+    if (!entities || !entities.length) return null;
+    
+    return (
+      <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+        自動提取: {entities.map(entity => 
+          entity.name ? `${entity.name} (${entity.id})` : `ID: ${entity.id}`
+        ).join(', ')}
+      </div>
+    );
   };
   
   return (
@@ -102,6 +121,11 @@ export function WordPressSettings({
             placeholder="例如: my-custom-article-url"
           />
           <p className="text-xs text-gray-700">不填寫時將自動根據標題生成</p>
+          {extractedParams?.slug && (
+            <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+              自動提取: {extractedParams.slug}
+            </div>
+          )}
         </div>
         
         {/* 指定作者 */}
@@ -149,6 +173,7 @@ export function WordPressSettings({
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             placeholder="例如: 1,4,7"
           />
+          {extractedParams?.categories && formatEntityDisplay(extractedParams.categories)}
         </div>
         
         {/* 標籤 */}
@@ -164,6 +189,7 @@ export function WordPressSettings({
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             placeholder="例如: 新聞,科技,區塊鏈"
           />
+          {extractedParams?.tags && formatEntityDisplay(extractedParams.tags)}
         </div>
         
         {/* 發布狀態 */}
