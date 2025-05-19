@@ -8,6 +8,24 @@ export interface StageResult {
   [key: string]: unknown;
 }
 
+// 處理模式類型
+export type ProcessingMode = 'auto' | 'manual';
+
+// 處理參數類型，用於未來擴展
+export interface ProcessingParams {
+  mode: ProcessingMode;
+  useWatermark?: boolean;        // 使用浮水印
+  autoGenerateFeaturedImage?: boolean; // 自動生成首圖
+  editorLabel?: string;          // 廣編標示
+  autoSEO?: boolean;             // 自動SEO優化
+  imageSources?: string[];       // 圖像來源
+  pdfOptions?: {                 // PDF處理選項
+    extractTables?: boolean;     // 提取表格
+    extractImages?: boolean;     // 提取圖片
+  };
+  // 未來可添加更多參數
+}
+
 interface ProcessingContextType {
   processState: ProcessState | null;
   updateProcessState: (newState: Partial<ProcessState>) => void;
@@ -23,6 +41,9 @@ interface ProcessingContextType {
   // 新增的方法
   saveStageResult: (stageId: string, result: StageResult) => void;
   getStageResult: (stageId: string) => StageResult | undefined;
+  // 處理模式相關
+  processingParams: ProcessingParams;
+  updateProcessingParams: (newParams: Partial<ProcessingParams>) => void;
 }
 
 // 階段群組定義
@@ -69,11 +90,21 @@ type ProcessStatusType = 'idle' | 'processing' | 'completed' | 'error';
 
 const ProcessingContext = createContext<ProcessingContextType | undefined>(undefined);
 
+// 默認處理參數
+const defaultProcessingParams: ProcessingParams = {
+  mode: 'manual',               // 默認為手動模式
+  useWatermark: false,
+  autoGenerateFeaturedImage: false,
+  autoSEO: false
+};
+
 export function ProcessingProvider({ children }: { children: React.ReactNode }) {
   const [processState, setProcessState] = useState<ProcessState | null>(null);
   const [subscribers, setSubscribers] = useState<Map<string, (state: ProcessState | null) => void>>(new Map());
   // 階段結果存儲，key是處理ID+階段ID，如 "file-123-process"
   const [stageResults, setStageResults] = useState<Map<string, StageResult>>(new Map());
+  // 處理參數狀態
+  const [processingParams, setProcessingParams] = useState<ProcessingParams>(defaultProcessingParams);
 
   // 通知所有訂閱者
   const notifySubscribers = useCallback((state: ProcessState | null) => {
@@ -431,6 +462,14 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     return result as StageResult | undefined;
   }, [processState, stageResults]);
 
+  // 更新處理參數的方法
+  const updateProcessingParams = useCallback((newParams: Partial<ProcessingParams>) => {
+    setProcessingParams(prev => ({
+      ...prev,
+      ...newParams
+    }));
+  }, []);
+
   const value = {
     processState,
     updateProcessState,
@@ -445,7 +484,10 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     stageGroups,
     // 新增的方法
     saveStageResult,
-    getStageResult
+    getStageResult,
+    // 處理模式相關
+    processingParams,
+    updateProcessingParams
   };
 
   return (

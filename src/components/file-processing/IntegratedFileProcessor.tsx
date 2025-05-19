@@ -10,6 +10,7 @@ import { Button } from '../ui/button/Button';
 import EditorIntegration from '@/components/ui/editor-integration';
 import WordPressSettings from '@/components/ui/wordpress-settings';
 import { useSimplifiedWPIntegration } from '@/hooks/useSimplifiedWPIntegration';
+import ProcessingModeSelector from '@/components/ui/ProcessingModeSelector';
 
 // 擴展ProcessingResult類型以包含markdownContent和wordpressParams
 interface ExtendedProcessingResult extends BaseProcessingResult {
@@ -56,7 +57,8 @@ const PrepPublishingComponent = ({ fileId, htmlContent, markdownUrl, onContentCh
 // 替換舊的WordPress發布設置組件
 const WordPressPublishComponent = ({ 
   htmlContent, 
-  wordpressParams 
+  wordpressParams,
+  processingParams
 }: { 
   htmlContent?: string, 
   wordpressParams?: {
@@ -66,7 +68,10 @@ const WordPressPublishComponent = ({
     slug?: string;
     categories?: Array<{ id: number }>;
     tags?: Array<{ id: number }>;
-  } 
+  },
+  processingParams?: {
+    mode: 'auto' | 'manual'
+  }
 }) => {
   // 確保htmlContent有值且為字符串
   const sanitizedHtmlContent = typeof htmlContent === 'string' && htmlContent.trim() ? 
@@ -229,6 +234,8 @@ const WordPressPublishComponent = ({
   // 顯示成功或錯誤訊息
   const renderPublishStatus = () => {
     if (publishResult?.success) {
+      // 删除手动DOM更新代码，由ProcessingContext管理状态
+      
       return (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
           <div className="flex items-center gap-2">
@@ -278,6 +285,43 @@ const WordPressPublishComponent = ({
     
     return null;
   };
+
+  // 上架新聞階段的自動確認邏輯
+  useEffect(() => {
+    // 僅在自動模式下執行
+    if (processingParams?.mode === 'auto' && 
+        !isSubmitting && 
+        !publishResult) {
+      
+      // 自動點擊發布按鈕
+      setTimeout(() => {
+        console.log("自動模式：上架新聞階段自動確認");
+        if (formData.title.trim()) {
+          handlePublish();
+        } else {
+          console.warn("自動發布失敗：文章標題為空");
+        }
+      }, 1500);
+    }
+  }, [processingParams?.mode, isSubmitting, publishResult, formData.title]);
+
+  // 發布完成後自動更新階段狀態
+  useEffect(() => {
+    if (processingParams?.mode === 'auto' && 
+        publishResult?.success && 
+        !isSubmitting) {
+      // 通知父組件或上下文，發布已完成
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          // 使用一個自定義事件通知上下文
+          const event = new CustomEvent('wordpress-publish-completed', {
+            detail: { success: true, postUrl: publishResult.postUrl }
+          });
+          window.dispatchEvent(event);
+        }
+      }, 1000);
+    }
+  }, [processingParams?.mode, publishResult, isSubmitting]);
 
   return (
     <div className="mt-2 pl-8 pr-0">
@@ -352,13 +396,33 @@ export default function IntegratedFileProcessor() {
   const [markdownUrl, setMarkdownUrl] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [processSuccess, setProcessSuccess] = useState(false);
+  // 處理模式狀態
+  const [isAutoMode, setIsAutoMode] = useState(false);
   
   // 階段查看結果
   const [viewingStage, setViewingStage] = useState<StageView | null>(null);
   
   // 獲取處理上下文
-  const { processState, resetProcessState, saveStageResult, updateStageProgress, updateProcessState } = useProcessing();
+  const { 
+    processState, 
+    resetProcessState, 
+    saveStageResult, 
+    updateStageProgress, 
+    updateProcessState,
+    processingParams,
+    updateProcessingParams,
+    moveToNextStage,
+    completeStage
+  } = useProcessing();
 
+  // 更新處理模式
+  const handleModeChange = useCallback((isAuto: boolean) => {
+    setIsAutoMode(isAuto);
+    updateProcessingParams({ 
+      mode: isAuto ? 'auto' : 'manual' 
+    });
+  }, [updateProcessingParams]);
+  
   // 處理流程hook
   const { processFile, processUrl, cleanup } = useProcessingFlow({
     onProcessSuccess: (processResult) => {
@@ -459,6 +523,37 @@ export default function IntegratedFileProcessor() {
     }
   }, [processState, activeTab, updateStageProgress, updateProcessState]);
 
+  // 上稿準備階段的自動確認邏輯
+  useEffect(() => {
+    // 僅在自動模式下執行
+    if (processingParams?.mode === 'auto' && 
+        processState?.currentStage === 'prep-publish' && 
+        processState.stages.find(s => s.id === 'prep-publish')?.status === 'processing') {
+      
+      // 自動點擊確認按鈕，進入下一階段
+      setTimeout(() => {
+        console.log("自動模式：上稿準備階段自動確認");
+        // 先完成上稿準備階段
+        completeStage('prep-publish', '自動模式：上稿準備已完成');
+        
+        // 移動到下一階段
+        moveToNextStage();
+        
+        // 更新狀態
+        updateProcessState({
+          currentStage: 'publish-news',
+          stages: processState.stages.map(s => 
+            s.id === 'prep-publish'
+              ? { ...s, status: 'completed', progress: 100, message: '自動模式：上稿準備已完成' }
+              : s.id === 'publish-news' 
+                ? { ...s, status: 'processing', progress: 10, message: '準備WordPress發布設定...' }
+                : s
+          )
+        });
+      }, 1000); // 短暫延遲，讓用戶看到階段完成
+    }
+  }, [processingParams?.mode, processState?.currentStage, processState?.stages, moveToNextStage, updateProcessState, completeStage]);
+
   // 重置功能
   const handleReset = () => {
     setSelectedFile(null);
@@ -471,6 +566,8 @@ export default function IntegratedFileProcessor() {
     setUploadSuccess(false);
     setProcessSuccess(false);
     setActiveTab('upload');
+    setIsAutoMode(false);
+    updateProcessingParams({ mode: 'manual' }); // 重置處理模式
     resetProcessState();
     setIsProcessing(false); // 確保處理狀態被重置
   };
@@ -803,6 +900,41 @@ export default function IntegratedFileProcessor() {
     return null;
   };
 
+  // 監聽 WordPress 發布完成事件
+  useEffect(() => {
+    // 只在客戶端執行
+    if (typeof window === 'undefined') return;
+
+    const handleWordPressPublishCompleted = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail?.success && processState) {
+        console.log("WordPress 發布成功事件接收到:", detail);
+        
+        // 完成發布階段
+        completeStage('publish-news', '文章已成功發布到 WordPress');
+        
+        // 更新整體處理狀態為已完成
+        updateProcessState({
+          overall: {
+            progress: 100,
+            status: 'completed'
+          },
+          stages: processState.stages.map(s => 
+            s.id === 'publish-news' 
+              ? { ...s, status: 'completed', progress: 100, message: '文章已成功發布到 WordPress' }
+              : s
+          )
+        });
+      }
+    };
+
+    window.addEventListener('wordpress-publish-completed', handleWordPressPublishCompleted);
+    
+    return () => {
+      window.removeEventListener('wordpress-publish-completed', handleWordPressPublishCompleted);
+    };
+  }, [processState, completeStage, updateProcessState]);
+
   return (
     <div className="w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
       {/* 標籤式導航 */}
@@ -885,6 +1017,12 @@ export default function IntegratedFileProcessor() {
                 輸入連結
               </button>
             </div>
+            
+            {/* 處理模式選擇 */}
+            <ProcessingModeSelector 
+              isAutoMode={isAutoMode} 
+              onChange={handleModeChange} 
+            />
             
             {/* 文件上傳 */}
             {selectedInputType === 'file' && (
@@ -1229,6 +1367,7 @@ export default function IntegratedFileProcessor() {
                     categories?: Array<{ id: number }>;
                     tags?: Array<{ id: number }>;
                   }}
+                  processingParams={processingParams}
                 />
               );
 
