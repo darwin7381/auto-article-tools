@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useProcessing } from '@/context/ProcessingContext';
 
 // 輔助函數：轉義正則表達式中的特殊字符
 function escapeRegExp(string: string): string {
@@ -44,6 +45,7 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
+  const { completeStage } = useProcessing();
   
   // 將分類和標籤字符串轉換為適合API的格式
   const formatCategoriesAndTags = (categories?: string) => {
@@ -326,6 +328,12 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
       };
       
       setPublishResult(successResult);
+      
+      // 標記上架新聞階段為已完成
+      completeStage('publish-news', `上架新聞完成，文章ID: ${responseData.id}`);
+      
+      console.log("WordPress發布成功 - 階段已標記為完成:", responseData.id);
+      
       return successResult;
     } catch (error) {
       console.error('WordPress發布操作失敗:', error);
