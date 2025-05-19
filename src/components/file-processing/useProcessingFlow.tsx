@@ -106,9 +106,21 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         const title = result.wordpressParams?.title || '';
         const adaptedContent = result.adaptedContent || '';
         
+        // 獲取特色圖片
+        const featuredImage = result.wordpressParams?.featured_image;
+        
         // 關鍵修改：將標題作為H1添加到內容前面，以便用戶可以在編輯器中編輯標題
         const titleHtml = title ? `<h1>${title}</h1>` : '';
-        const combinedContent = titleHtml + adaptedContent;
+        
+        // 添加特色圖片HTML（如果有）
+        let featureImageHtml = '';
+        if (featuredImage && featuredImage.url) {
+          featureImageHtml = `<figure class="featured-image"><img src="${featuredImage.url}" alt="${featuredImage.alt || '文章首圖'}" /></figure>`;
+          console.log('特色圖片已添加到內容中:', featuredImage.url);
+        }
+        
+        // 組合標題、特色圖片和內容
+        const combinedContent = titleHtml + featureImageHtml + adaptedContent;
         
         // 將組合後的內容設置為htmlContent
         const resultWithHtmlContent = {
@@ -119,7 +131,7 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         };
         
         // 調試輸出
-        console.log('標題已添加到內容中，組合後的字符數:', combinedContent.length);
+        console.log('標題和特色圖片已添加到內容中，組合後的字符數:', combinedContent.length);
         console.log('處理後的WordPress參數:', resultWithHtmlContent.wordpressParams);
         
         callbacksRef.current.onStageComplete('copy-editing', resultWithHtmlContent as unknown as Record<string, unknown>);

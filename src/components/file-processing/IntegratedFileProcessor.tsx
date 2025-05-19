@@ -109,9 +109,26 @@ const WordPressPublishComponent = ({
     return '';
   }, []);
 
-  // 當HTML內容加載時立即提取並使用標題
+  // 提取HTML內容中的第一張圖片URL
+  const extractFeatureImage = useCallback((html: string): string => {
+    try {
+      // 使用正則表達式提取第一個img標籤的src屬性
+      const imgMatch = html.match(/<img[^>]+src="([^">]+)"/i);
+      if (imgMatch && imgMatch[1]) {
+        const imgSrc = imgMatch[1].trim();
+        console.log("從編輯器內容中提取首圖URL:", imgSrc);
+        return imgSrc;
+      }
+    } catch (error) {
+      console.error("提取首圖URL出錯:", error);
+    }
+    return '';
+  }, []);
+
+  // 當HTML內容加載時立即提取並使用標題與特色圖片
   useEffect(() => {
     if (sanitizedHtmlContent) {
+      // 提取並設置標題
       const extractedTitle = extractH1Title(sanitizedHtmlContent);
       if (extractedTitle) {
         setFormData(prev => ({
@@ -120,8 +137,18 @@ const WordPressPublishComponent = ({
         }));
         console.log("從編輯器提取的標題已設置:", extractedTitle);
       }
+      
+      // 提取並設置特色圖片
+      const extractedImageUrl = extractFeatureImage(sanitizedHtmlContent);
+      if (extractedImageUrl) {
+        setFormData(prev => ({
+          ...prev,
+          featured_media: extractedImageUrl
+        }));
+        console.log("從編輯器提取的特色圖片已設置:", extractedImageUrl);
+      }
     }
-  }, [sanitizedHtmlContent, extractH1Title]);
+  }, [sanitizedHtmlContent, extractH1Title, extractFeatureImage]);
 
   // 當WordPress參數變更時更新表單數據
   useEffect(() => {
