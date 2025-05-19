@@ -2,6 +2,11 @@
 
 import { useState } from 'react';
 
+// 輔助函數：轉義正則表達式中的特殊字符
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& 表示整個匹配的字符串
+}
+
 interface WordPressIntegrationOptions {
   initialContent?: string;
   fileId?: string;
@@ -143,6 +148,49 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
         // 發生錯誤時使用原始內容，不做更改
       }
       
+      // 提取並處理特色圖片
+      let featuredImageUrl = '';
+      try {
+        // 如果表單中提供了featured_media且為URL，將其保存為特色圖片URL
+        if (formData.featured_media && isURL(formData.featured_media.trim())) {
+          featuredImageUrl = formData.featured_media.trim();
+          console.log('從表單獲取到特色圖片URL:', featuredImageUrl);
+          
+          // 如果特色圖片URL存在於內容中，則從內容中移除該圖片
+          if (featuredImageUrl && content.includes(featuredImageUrl)) {
+            // 找到包含該URL的img標籤，並移除整個figure或img標籤
+            const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+            const oldContent = content;
+            content = content.replace(imgRegex, '');
+            
+            // 檢查是否成功移除
+            if (oldContent !== content) {
+              console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
+            }
+          }
+        } else if (!formData.featured_media) {
+          // 如果沒有提供特色圖片，嘗試提取第一張圖片作為特色圖片
+          const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
+          if (imgMatch && imgMatch[1]) {
+            featuredImageUrl = imgMatch[1];
+            console.log('從內容中提取特色圖片URL:', featuredImageUrl);
+            
+            // 從內容中移除該圖片
+            const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+            const oldContent = content;
+            content = content.replace(imgRegex, '');
+            
+            // 檢查是否成功移除
+            if (oldContent !== content) {
+              console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('處理特色圖片時出錯:', error);
+        // 發生錯誤時不修改內容，繼續處理
+      }
+      
       // 準備發布數據
       interface PublishRequestData {
         title: string;
@@ -214,6 +262,17 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
         } catch (imageError) {
           // 捕獲所有圖片處理錯誤，但不影響發布流程
           console.error("處理特色圖片時發生錯誤，將繼續發布文章:", imageError);
+        }
+      } else if (featuredImageUrl) {
+        // 如果表單中沒有提供但我們從內容中提取了圖片URL，則上傳該圖片
+        try {
+          const mediaId = await uploadImageFromUrl(featuredImageUrl);
+          if (mediaId) {
+            publishData.featured_media = mediaId;
+            console.log('成功上傳特色圖片並獲取ID:', mediaId);
+          }
+        } catch (imageError) {
+          console.error("上傳提取的特色圖片時發生錯誤:", imageError);
         }
       }
       

@@ -162,6 +162,140 @@ Publish-News階段包含三個關鍵功能：
    - 提供發布狀態反饋和結果確認
    - 支持發布失敗時的重試機制
 
+## 3. 實現細節與技術挑戰解決方案
+
+### 3.1 標題和內容的整合處理方案
+
+為了解決標題編輯和顯示問題，我們採用了以下方案：
+
+1. **標題與內容的統一處理**
+   - 在copy-editing階段，CopyEditorAgent會創建帶有H1標題的HTML內容
+   - H1標題作為文章正文的一部分傳遞給Tiptap編輯器，用戶可直接編輯標題
+   - 發布前，系統從編輯器的HTML內容中提取H1作為WordPress標題參數
+   - 發布時，系統自動從內容中移除H1標籤，避免WordPress頁面中標題重複顯示
+
+2. **實現代碼**
+   - 在useProcessingFlow.tsx中，copy-editing階段完成後將標題和內容組合：
+     ```typescript
+     const titleHtml = title ? `<h1>${title}</h1>` : '';
+     const combinedContent = titleHtml + adaptedContent;
+     ```
+   - 在IntegratedFileProcessor.tsx中，實現從編輯器內容提取H1標題：
+     ```typescript
+     const extractH1Title = useCallback((html: string): string => {
+       const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+       if (h1Match && h1Match[1]) {
+         const h1Content = h1Match[1].replace(/<[^>]+>/g, '').trim();
+         return h1Content;
+       }
+       return '';
+     }, []);
+     ```
+   - 在useSimplifiedWPIntegration.tsx中，發布前處理內容，移除H1標籤：
+     ```typescript
+     // 處理內容 - 移除第一個h1標籤，避免標題重複
+     if (content.match(/<h1[^>]*>.*?<\/h1>/i)) {
+       content = content.replace(/<h1[^>]*>.*?<\/h1>/i, '');
+     }
+     ```
+
+### 3.2 特色圖片(Feature Image)的提取與處理
+
+為了實現特色圖片的自動提取與處理，我們採用了類似標題處理的方法：
+
+1. **特色圖片的檢測與提取**
+   - 在copy-editing階段，CopyEditorAgent從HTML內容中提取第一張圖片的URL
+   - 提取的圖片URL被添加到wordpress_params中的featured_image參數
+   - 編輯器接收的內容結構為：H1標題 + 特色圖片 + 文章內容
+   - 用戶可以在編輯器中看到並編輯整個結構（包括特色圖片）
+
+2. **實現代碼**
+   - 在CopyEditorAgent中提取第一張圖片URL：
+     ```typescript
+     const extractFirstImageUrl = (htmlContent: string): string | null => {
+       try {
+         const imgMatch = htmlContent.match(/<img[^>]+src="([^">]+)"/i);
+         if (imgMatch && imgMatch[1]) {
+           return imgMatch[1];
+         }
+       } catch (error) {
+         console.error("提取圖片URL出錯:", error);
+       }
+       return null;
+     };
+     
+     // 將提取的圖片URL添加到參數中
+     if (firstImageUrl) {
+       wordpress_params.featured_image = {
+         url: firstImageUrl,
+         alt: "文章首圖"
+       };
+     }
+     ```
+   - 在useProcessingFlow.tsx中，組合標題、特色圖片和內容：
+     ```typescript
+     // 組合標題
+     const titleHtml = title ? `<h1>${title}</h1>` : '';
+     
+     // 添加特色圖片（如果有）
+     let featureImageHtml = '';
+     if (featuredImageUrl) {
+       featureImageHtml = `<figure class="featured-image"><img src="${featuredImageUrl}" alt="文章首圖" /></figure>`;
+     }
+     
+     // 組合完整內容
+     const combinedContent = titleHtml + featureImageHtml + adaptedContent;
+     ```
+   - 在IntegratedFileProcessor.tsx中，提取編輯器中的特色圖片URL：
+     ```typescript
+     const extractFeatureImage = useCallback((html: string): string => {
+       try {
+         // 使用正則表達式提取第一個img標籤的src屬性
+         const imgMatch = html.match(/<img[^>]+src="([^">]+)"/i);
+         if (imgMatch && imgMatch[1]) {
+           const imgSrc = imgMatch[1].trim();
+           console.log("從編輯器內容中提取首圖URL:", imgSrc);
+           return imgSrc;
+         }
+       } catch (error) {
+         console.error("提取首圖URL出錯:", error);
+       }
+       return '';
+     }, []);
+     ```
+
+3. **特色圖片處理的重要考量**
+   - 與標題不同，特色圖片無需從HTML內容中移除，保留在文章內容中
+   - 支持多種圖片URL格式（絕對路徑、相對路徑、base64編碼等）
+   - 實現從URL自動上傳到WordPress媒體庫的功能
+   - 提供容錯機制，確保圖片提取或上傳失敗不影響整體發布流程
+
+### 3.3 WordPress參數表單預填充與顯示
+
+1. **參數傳遞流程**
+   - CopyEditorAgent產生的參數→copy-editing階段→useProcessingFlow→IntegratedFileProcessor→WordPressPublishComponent→WordPressSettings
+   - 所有預提取的參數均顯示在表單下方，但不會覆蓋用戶手動輸入的值
+
+2. **參數顯示改進**
+   - 優化了WordPressSettings組件，添加extractedParams屬性展示自動提取的參數
+   - 為分類、標籤和slug等重要字段添加信息提示，提高用戶體驗
+   - 自動提取的參數以灰色小字顯示在表單字段下方，不干擾用戶輸入
+
+```typescript
+// WordPressSettings組件中顯示自動提取的參數
+const formatEntityDisplay = (entities?: Array<{ id: number; name?: string }>) => {
+  if (!entities || !entities.length) return null;
+  
+  return (
+    <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+      自動提取: {entities.map(entity => 
+        entity.name ? `${entity.name} (${entity.id})` : `ID: ${entity.id}`
+      ).join(', ')}
+    </div>
+  );
+};
+```
+
 ## 4. 錯誤處理與降級策略
 
 ### 4.1 參數提取失敗
@@ -222,6 +356,31 @@ Publish-News階段包含三個關鍵功能：
 
 這種多層回退機制確保系統即使在AI回應格式異常時，仍能提取有效參數，提高系統的穩健性。實際運行日誌中的「JSON解析失敗，嘗試提取JSON部分」和「從文本中提取JSON成功」等信息，是此機制正常工作的證明。
 
+### 4.3 標題與特色圖片處理的容錯機制
+
+在處理HTML內容中的H1標題和特色圖片時，我們實現了以下容錯機制：
+
+1. **標題提取容錯**
+   - 使用try/catch包裝正則表達式匹配過程，避免異常格式導致崩潰
+   - 使用正則提取H1標籤內容後，再次清理潛在的HTML子標籤
+   - 如提取失敗，降級使用預處理參數或允許用戶手動填寫
+
+2. **標題移除容錯**
+   - 在WordPress發布前移除H1標籤時先檢查標籤是否存在
+   - 使用try/catch包裝替換操作，確保即使替換失敗也能繼續發布流程
+   - 如移除失敗，降級使用原始內容，並記錄警告
+
+3. **特色圖片提取容錯**
+   - 使用try/catch包裝圖片URL提取過程
+   - 支持多種URL格式（相對路徑、絕對路徑、base64等）
+   - 提供默認圖片備選方案，確保必要時有可用的特色圖片
+
+4. **圖片上傳容錯**
+   - 捕獲上傳過程中的所有可能錯誤
+   - 如果上傳失敗，允許繼續發布過程，只是沒有特色圖片
+   - 記錄詳細的錯誤信息，方便診斷和修復
+
+這些容錯機制保證了即使在不規範的HTML內容情況下，系統也能處理標題和特色圖片的提取、移除和上傳操作，提高整體穩定性。
 
 ## 5. 實施計劃
 
@@ -253,4 +412,30 @@ Publish-News階段包含三個關鍵功能：
 6. **品牌風格應用** - 根據品牌要求預先適配內容格式（前言、相關閱讀等）
 7. **穩健的容錯機制** - 提供多層次的錯誤處理與降級策略
 
-通過這種設計，系統能夠在保證AI高效處理的同時，允許人工介入進行必要的檢查和調整，實現效率與品質的平衡。將copy-editing提前到用戶編輯前，能更好地準備內容，減輕用戶在編輯階段的工作量。 
+通過這種設計，系統能夠在保證AI高效處理的同時，允許人工介入進行必要的檢查和調整，實現效率與品質的平衡。將copy-editing提前到用戶編輯前，能更好地準備內容，減輕用戶在編輯階段的工作量。
+
+## 7. 實際運行效果與優化
+
+在實際實現過程中，我們發現並解決了以下關鍵問題：
+
+1. **標題與內容管理的整合挑戰**
+   - 成功實現標題與內容的統一編輯體驗，讓用戶可以在同一編輯器中修改整篇文章（包括標題）
+   - 發布時自動從HTML中提取H1作為WordPress標題，同時從內容中移除H1標籤避免重複
+   - 這種方式既保持了編輯的便利性，又確保了WordPress發布後的正確格式
+
+2. **特色圖片的自動提取與處理**
+   - 從文章內容中智能識別並提取第一張圖片作為特色圖片
+   - 在編輯器中組合顯示H1標題+特色圖片+文章內容，提供直觀的編輯體驗
+   - 編輯完成後自動提取首圖URL，支持直接URL發布或自動上傳到WordPress媒體庫
+   - 與標題處理不同，特色圖片在發布時保留在內容中，不需要移除
+
+3. **參數自動提取的穩定性**
+   - 通過多層錯誤處理和回退機制，顯著提高了AI參數提取的穩定性
+   - 即使遇到複雜格式或AI回應異常的情況，系統也能自動恢復並提供基本參數
+
+4. **表單預填充與用戶體驗優化**
+   - 優化了表單界面，使自動提取的參數清晰顯示但不干擾用戶輸入
+   - 實現WordPress參數表單與編輯器、AI提取結果的無縫整合
+   - 保留用戶完全的編輯控制權，同時減少手動填寫工作量
+
+這些優化使整個WordPress發布流程變得更加流暢、穩定和用戶友好，大大提高了內容處理效率。 

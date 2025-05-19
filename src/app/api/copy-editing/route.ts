@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getFileFromR2 } from '@/services/storage/r2Service';
+import { getFileFromR2, uploadFileToR2 } from '@/services/storage/r2Service';
 import { extractWordPressParams, CopyEditResult } from '@/agents/copyEditorAgent';
 import { withRetry } from '@/agents/common/agentUtils';
 
@@ -84,10 +84,33 @@ export async function POST(req: Request) {
       
       console.log(`文稿編輯處理成功，生成了WordPress參數`);
       
+      // 生成適合的文件名稱 (基於原始htmlKey但添加copy-edit前綴)
+      const baseName = (htmlKey || markdownKey)
+        .replace(/\.html$/, '')
+        .replace(/\.md$/, '')
+        .replace(/-html$/, '');
+      
+      // 生成新的copy-edit HTML文件名
+      const copyEditedHtmlKey = `${baseName}-copy-edited-html`;
+      const copyEditedHtmlFileName = copyEditedHtmlKey.endsWith('.html') 
+        ? copyEditedHtmlKey 
+        : `${copyEditedHtmlKey}.html`;
+      
+      // 將編輯後的內容上傳到R2
+      try {
+        const htmlBuffer = Buffer.from(copyEditResult.adaptedContent, 'utf-8');
+        await uploadFileToR2(htmlBuffer, copyEditedHtmlFileName, fileId);
+        console.log(`成功將文稿編輯後的HTML上傳到R2: ${copyEditedHtmlFileName}`);
+      } catch (uploadError) {
+        console.error(`文稿編輯HTML上傳到R2失敗: ${uploadError instanceof Error ? uploadError.message : '未知錯誤'}`);
+        throw new Error(`保存文稿編輯HTML文件失敗: ${copyEditedHtmlFileName}`);
+      }
+      
       // 在返回結果前做一次日誌輸出
       console.log('copy-editing API即將返回的結果:', {
         wordpressParams: copyEditResult.wordpressParams,
-        adaptedContentLength: copyEditResult.adaptedContent.length
+        adaptedContentLength: copyEditResult.adaptedContent.length,
+        htmlKey: copyEditedHtmlFileName
       });
       
       // 返回結果
@@ -97,8 +120,10 @@ export async function POST(req: Request) {
         adaptedContent: copyEditResult.adaptedContent,
         htmlContent: copyEditResult.adaptedContent, // 同時設置htmlContent以確保兼容性
         fileId,
-        htmlKey,
+        originalHtmlKey: htmlKey,
         markdownKey,
+        htmlKey: copyEditedHtmlFileName, // 使用新的文件名
+        htmlUrl: copyEditedHtmlFileName, // 提供URL以供前端使用
         stage: 'copy-editing',
         stageComplete: true
       });

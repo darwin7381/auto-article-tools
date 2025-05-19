@@ -86,18 +86,24 @@ export async function extractWordPressParams(
 4. slug: 網址後綴（基於標題生成的英文短語）
 5. categories: 分類ID列表，格式為[{id: 數字}]
 6. tags: 標籤ID列表，格式為[{id: 數字}]
-7. featured_image: 特色圖片信息（如果能從內容中識別）
+7. featured_image: 特色圖片信息（必須從內容中提取第一張圖片）
+
+特別要求:
+- 一定要從內容中提取第一張圖片（第一個<img>標籤）作為文章的主圖片(featured_image)，提取其src屬性作為圖片URL
+- 若成功提取出特色主圖片，請確保它原位置的同一圖片被移除，以免內容區與首圖區重複圖片；其他圖片所在位置則不變
+- 在featured_image參數中，提供url和alt屬性，url為圖片URL，alt為適當的圖片描述
+- 如果無法提取圖片URL，請將featured_image設為null
 
 注意：
 - 必須根據你分析的內容生成適合的參數值
 - 分類ID和標籤ID應為數字，請依據內容估計合適的分類和標籤ID
-- 如發現第一張圖片適合作為特色圖片，請將其URL和alt信息提取出來，但保留在內容中
 - 如果內容已有H1標題，請確保它不會在WordPress標題和內容中重複出現
+- 若成功提取出特色主圖片，請確保它原位置的同一圖片被移除，以免內容區與首圖區重複圖片
 
 你的輸出格式必須為固定的JSON格式，包含wordpress_params和adaptedContent兩個字段：`;
 
   // 用戶提示詞
-  const userPrompt = `請分析以下${contentType === 'html' ? 'HTML' : 'Markdown'}內容並生成WordPress發布參數。內容如下：
+  const userPrompt = `請分析以下${contentType === 'html' ? 'HTML' : 'Markdown'}內容並生成WordPress發布參數。特別注意提取第一張圖片作為特色圖片，並記錄其URL。內容如下：
 
 ${content}`;
 
