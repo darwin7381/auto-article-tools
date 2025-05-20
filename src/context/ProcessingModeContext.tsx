@@ -30,7 +30,7 @@ interface ProcessingModeContextType {
 
 // 默認處理參數
 const defaultProcessingParams: ProcessingParams = {
-  mode: 'manual',               // 默認為手動模式
+  mode: 'auto',               // 默認為自動模式
   useWatermark: false,
   autoGenerateFeaturedImage: false,
   autoSEO: false
