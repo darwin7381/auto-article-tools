@@ -7,9 +7,91 @@ import { useProcessing } from '@/context/ProcessingContext';
 import UploadSection from './sections/UploadSection';
 import ProcessingSection from './sections/ProcessingSection';
 import ResultSection from './sections/ResultSection';
-import PrepPublishingComponent from './components/PrepPublishingComponent';
-import WordPressPublishComponent from './components/WordPressPublishComponent';
 import StageViewDialog, { StageView } from './dialogs/StageViewDialog';
+
+// 定義PrepPublishingComponent組件
+const PrepPublishingComponent = ({ 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  fileId, 
+  htmlContent, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  markdownUrl, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onContentChange, 
+  onContinue 
+}: { 
+  fileId: string, 
+  htmlContent?: string, 
+  markdownUrl?: string, 
+  onContentChange?: (content: string) => void,
+  onContinue?: () => void
+}) => {
+  return (
+    <div className="mt-2 pl-8 pr-0">
+      {/* 使用EditorIntegration組件 */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+        <p>編輯內容組件</p>
+        {htmlContent && (
+          <div 
+            className="mt-2 p-4 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600"
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+          />
+        )}
+        {onContinue && (
+          <button 
+            onClick={onContinue}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            繼續
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 定義WordPressPublishComponent組件
+const WordPressPublishComponent = ({ 
+  htmlContent, 
+  wordpressParams,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  processingParams
+}: { 
+  htmlContent?: string, 
+  wordpressParams?: {
+    title?: string;
+    content?: string;
+    excerpt?: string;
+    slug?: string;
+    categories?: Array<{ id: number }>;
+    tags?: Array<{ id: number }>;
+  },
+  processingParams?: {
+    mode: 'auto' | 'manual'
+  }
+}) => {
+  return (
+    <div className="mt-2 pl-8 pr-0">
+      <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+        <p>WordPress發布設置</p>
+        {wordpressParams?.title && (
+          <p className="mt-2">標題: {wordpressParams.title}</p>
+        )}
+        {htmlContent && (
+          <div 
+            className="mt-2 p-4 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 max-h-40 overflow-y-auto"
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+          />
+        )}
+        <button 
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          發布到WordPress
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export default function FileProcessor() {
   const [activeTab, setActiveTab] = useState<'upload' | 'initial-process' | 'advanced-process' | 'result'>('upload');
@@ -38,7 +120,7 @@ export default function FileProcessor() {
     return () => {
       fileProcessor.cleanup();
     };
-  }, [fileProcessor.cleanup]);
+  }, [fileProcessor]);
 
   // 用於初始化上稿準備階段狀態的Effect
   useEffect(() => {
@@ -89,7 +171,7 @@ export default function FileProcessor() {
               ? { ...s, status: 'completed', progress: 100, message: '自動模式：上稿準備已完成' }
               : s.id === 'publish-news' 
                 ? { ...s, status: 'processing', progress: 10, message: '準備WordPress發布設定...' }
-                : s
+              : s
           )
         });
       }, 1000); // 短暫延遲，讓用戶看到階段完成
