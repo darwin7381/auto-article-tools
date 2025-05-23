@@ -1,13 +1,16 @@
+'use client';
+
 import { FileUploadSection } from "@/components/ui/sections/FileUploadSection";
 import { ProgressSection } from "@/components/ui/sections/ProgressSection";
 import PreviewSection from "@/components/PreviewSection";
 import WordPressSection from "@/components/WordPressSection";
 import FeaturesSection from "@/components/FeaturesSection";
 import UserNav from "@/components/UserNav";
+import { ProcessingProvider } from "@/context/ProcessingContext";
 
 export default function HomePage() {
   return (
-    <>
+    <ProcessingProvider>
       <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-primary-100 to-secondary-100 dark:from-primary-900 dark:to-secondary-900 p-4 shadow border-b border-divider backdrop-blur-sm">
         <div className="container mx-auto max-w-5xl">
           <div className="flex justify-between items-center">
@@ -49,6 +52,6 @@ export default function HomePage() {
         <p>文件處理與WordPress發布系統 © {new Date().getFullYear()}</p>
       </footer>
     </div>
-    </>
+    </ProcessingProvider>
   );
 }

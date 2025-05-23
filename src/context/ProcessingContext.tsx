@@ -14,6 +14,7 @@ export type ProcessingMode = 'auto' | 'manual';
 // 處理參數類型，用於未來擴展
 export interface ProcessingParams {
   mode: ProcessingMode;
+  defaultPublishStatus?: 'draft' | 'pending' | 'publish' | 'private' | 'future'; // WordPress發佈狀態
   useWatermark?: boolean;        // 使用浮水印
   autoGenerateFeaturedImage?: boolean; // 自動生成首圖
   editorLabel?: string;          // 廣編標示
@@ -93,6 +94,7 @@ const ProcessingContext = createContext<ProcessingContextType | undefined>(undef
 // 默認處理參數
 const defaultProcessingParams: ProcessingParams = {
   mode: 'auto',               // 默認為自動模式
+  defaultPublishStatus: 'draft', // 默認為草稿
   useWatermark: false,
   autoGenerateFeaturedImage: false,
   autoSEO: false

@@ -72,7 +72,8 @@ const WordPressPublishComponent = ({
     tags?: Array<{ id: number }>;
   },
   processingParams?: {
-    mode: 'auto' | 'manual'
+    mode: 'auto' | 'manual',
+    defaultPublishStatus?: 'draft' | 'pending' | 'publish' | 'private' | 'future'
   },
   processState?: {
     currentStage?: string;
@@ -213,7 +214,7 @@ const WordPressPublishComponent = ({
     title: '',
     categories: '',
     tags: '',
-    status: 'draft' as 'publish' | 'draft' | 'pending' | 'future' | 'private',
+    status: (processingParams?.defaultPublishStatus || 'draft') as 'publish' | 'draft' | 'pending' | 'future' | 'private',
     isPrivate: false,
     slug: '',
     author: '',
@@ -221,8 +222,19 @@ const WordPressPublishComponent = ({
     date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16) // 預設為明天的當前時間
   });
   
+  // 當processingParams.defaultPublishStatus變化時更新formData.status
+  useEffect(() => {
+    if (processingParams?.defaultPublishStatus) {
+      setFormData(prev => ({
+        ...prev,
+        status: processingParams.defaultPublishStatus as 'draft' | 'pending' | 'publish' | 'private' | 'future'
+      }));
+      console.log("更新表單發佈狀態為:", processingParams.defaultPublishStatus);
+    }
+  }, [processingParams?.defaultPublishStatus]);
+  
   // 發布處理函數
-  const handlePublish = () => {
+  const handlePublish = useCallback(() => {
     if (!formData.title.trim()) {
       alert('請輸入文章標題');
       return;
@@ -236,7 +248,7 @@ const WordPressPublishComponent = ({
     
     // 使用publishToWordPress發布，內容將自動使用initialContent
     publishToWordPress(formData);
-  };
+  }, [formData, publishToWordPress]);
   
   // 顯示成功或錯誤訊息
   const renderPublishStatus = () => {
@@ -304,6 +316,13 @@ const WordPressPublishComponent = ({
       setTimeout(() => {
         console.log("自動模式：上架新聞階段自動確認");
         if (formData.title.trim()) {
+          // 設置預設發佈狀態
+          if (processingParams?.defaultPublishStatus) {
+            setFormData(prev => ({
+              ...prev,
+              status: processingParams.defaultPublishStatus as 'draft' | 'pending' | 'publish' | 'private' | 'future'
+            }));
+          }
           handlePublish();
         } else {
           console.warn("自動發布失敗：文章標題為空");
@@ -319,7 +338,7 @@ const WordPressPublishComponent = ({
         completeStage('publish-news', '已成功發布到WordPress');
       }, 500);
     }
-  }, [processingParams?.mode, isSubmitting, publishResult, formData.title, processState?.currentStage, completeStage]);
+  }, [processingParams?.mode, processingParams?.defaultPublishStatus, isSubmitting, publishResult, formData.title, processState?.currentStage, completeStage, handlePublish]);
 
   return (
     <div className="mt-2 pl-8 pr-0">
@@ -418,6 +437,13 @@ export default function IntegratedFileProcessor() {
     setIsAutoMode(isAuto);
     updateProcessingParams({ 
       mode: isAuto ? 'auto' : 'manual' 
+    });
+  }, [updateProcessingParams]);
+  
+  // 更新發佈狀態
+  const handlePublishStatusChange = useCallback((status: 'draft' | 'pending' | 'publish' | 'private' | 'future') => {
+    updateProcessingParams({ 
+      defaultPublishStatus: status 
     });
   }, [updateProcessingParams]);
   
@@ -993,7 +1019,9 @@ export default function IntegratedFileProcessor() {
             {/* 處理模式選擇 */}
             <ProcessingModeSelector 
               isAutoMode={isAutoMode} 
+              defaultPublishStatus={processingParams?.defaultPublishStatus || 'draft'}
               onChange={handleModeChange} 
+              onPublishStatusChange={handlePublishStatusChange}
             />
             
             {/* 文件上傳 */}

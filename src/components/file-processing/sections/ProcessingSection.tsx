@@ -4,7 +4,6 @@ import React from 'react';
 import ProgressDisplay from '@/components/progress/ProgressDisplay';
 import { Button } from '@/components/ui/button/Button';
 import { ProcessState } from '@/components/progress/ProgressDisplay';
-import { StageView } from '../dialogs/StageViewDialog';
 
 interface ProcessingSectionProps {
   processState: ProcessState | null;

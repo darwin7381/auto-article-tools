@@ -131,7 +131,7 @@ export default function UploadSection({
         <FileUpload
           onFileChange={onFileChange}
           selectedFile={selectedFile}
-          onReset={() => onFileChange(null as any)}
+          onReset={() => onFileChange(null as unknown as File)}
           supportedFormatsText="支持 PDF、DOCX 和 其他文本格式"
         />
       )}
