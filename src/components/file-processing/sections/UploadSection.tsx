@@ -4,6 +4,8 @@ import React from 'react';
 import { FileUpload } from '@/components/ui/file-upload/FileUpload';
 import { Button } from '@/components/ui/button/Button';
 import ProcessingModeSelector from '@/components/ui/ProcessingModeSelector';
+import ArticleTypeSelector from '@/components/ui/ArticleTypeSelector';
+import { ArticleType } from '@/types/article-formatting';
 
 interface UploadSectionProps {
   selectedFile: File | null;
@@ -22,6 +24,8 @@ interface UploadSectionProps {
   onProcess: () => void;
   isAutoMode: boolean;
   onModeChange: (isAuto: boolean) => void;
+  selectedArticleType: ArticleType;
+  onArticleTypeChange: (type: ArticleType) => void;
 }
 
 export default function UploadSection({
@@ -40,7 +44,9 @@ export default function UploadSection({
   isProcessing,
   onProcess,
   isAutoMode,
-  onModeChange
+  onModeChange,
+  selectedArticleType,
+  onArticleTypeChange
 }: UploadSectionProps) {
   // 渲染狀態通知欄
   const renderStatusNotification = () => {
@@ -90,6 +96,18 @@ export default function UploadSection({
 
   return (
     <div className="space-y-6">
+      {/* 處理模式選擇 */}
+      <ProcessingModeSelector 
+        isAutoMode={isAutoMode} 
+        onChange={onModeChange} 
+      />
+      
+      {/* 文稿類型選擇 */}
+      <ArticleTypeSelector
+        selectedType={selectedArticleType}
+        onTypeChange={onArticleTypeChange}
+      />
+      
       {/* 輸入類型選擇 */}
       <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
         <button
@@ -119,12 +137,6 @@ export default function UploadSection({
           輸入連結
         </button>
       </div>
-      
-      {/* 處理模式選擇 */}
-      <ProcessingModeSelector 
-        isAutoMode={isAutoMode} 
-        onChange={onModeChange} 
-      />
       
       {/* 文件上傳 */}
       {selectedInputType === 'file' && (

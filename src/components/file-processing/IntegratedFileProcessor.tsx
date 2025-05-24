@@ -11,6 +11,9 @@ import EditorIntegration from '@/components/ui/editor-integration';
 import WordPressSettings from '@/components/ui/wordpress-settings';
 import { useSimplifiedWPIntegration } from '@/hooks/useSimplifiedWPIntegration';
 import ProcessingModeSelector from '@/components/ui/ProcessingModeSelector';
+import ArticleTypeSelector from '@/components/ui/ArticleTypeSelector';
+import { ArticleType, ArticleClassification } from '@/types/article-formatting';
+import { getArticleTemplate } from '@/config/article-templates';
 
 // 擴展ProcessingResult類型以包含markdownContent和wordpressParams
 interface ExtendedProcessingResult extends BaseProcessingResult {
@@ -73,7 +76,8 @@ const WordPressPublishComponent = ({
   },
   processingParams?: {
     mode: 'auto' | 'manual',
-    defaultPublishStatus?: 'draft' | 'pending' | 'publish' | 'private' | 'future'
+    defaultPublishStatus?: 'draft' | 'pending' | 'publish' | 'private' | 'future',
+    defaultAuthorId?: number
   },
   processState?: {
     currentStage?: string;
@@ -206,6 +210,17 @@ const WordPressPublishComponent = ({
       }
     }
   }, [wordpressParams]);
+
+  // 當處理參數中有預設作者ID時，自動設置到表單
+  useEffect(() => {
+    if (processingParams?.defaultAuthorId) {
+      setFormData(prev => ({
+        ...prev,
+        author: processingParams.defaultAuthorId!.toString()
+      }));
+      console.log("自動設置作者ID:", processingParams.defaultAuthorId);
+    }
+  }, [processingParams?.defaultAuthorId]);
   
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -415,6 +430,8 @@ export default function IntegratedFileProcessor() {
   const [processSuccess, setProcessSuccess] = useState(false);
   // 處理模式狀態 - 預設為自動模式
   const [isAutoMode, setIsAutoMode] = useState(true);
+  // 文稿類型狀態 - 預設為一般文章
+  const [selectedArticleType, setSelectedArticleType] = useState<ArticleType>('regular');
   
   // 階段查看結果
   const [viewingStage, setViewingStage] = useState<StageView | null>(null);
@@ -429,7 +446,8 @@ export default function IntegratedFileProcessor() {
     processingParams,
     updateProcessingParams,
     moveToNextStage,
-    completeStage
+    completeStage,
+    setArticleClassification
   } = useProcessing();
 
   // 更新處理模式
@@ -439,6 +457,33 @@ export default function IntegratedFileProcessor() {
       mode: isAuto ? 'auto' : 'manual' 
     });
   }, [updateProcessingParams]);
+  
+  // 更新文稿類型
+  const handleArticleTypeChange = useCallback((articleType: ArticleType) => {
+    setSelectedArticleType(articleType);
+    
+    // 獲取對應的模板配置
+    const template = getArticleTemplate(articleType);
+    
+    // 更新處理參數，包括作者ID
+    updateProcessingParams({ 
+      articleType,
+      defaultAuthorId: template.authorId // 添加預設作者ID
+    });
+    
+    // 創建文稿分類對象並設置到context
+    const classification: ArticleClassification = {
+      articleType,
+      author: template.author as 'BTEditor' | 'BTVerse' | 'custom',
+      authorDisplayName: template.authorDisplayName || undefined,
+      authorId: template.authorId, // 設置WordPress作者ID
+      requiresAdTemplate: articleType === 'sponsored',
+      templateVersion: 'v1.0',
+      timestamp: Date.now()
+    };
+    
+    setArticleClassification(classification);
+  }, [updateProcessingParams, setArticleClassification]);
   
   // 更新發佈狀態
   const handlePublishStatusChange = useCallback((status: 'draft' | 'pending' | 'publish' | 'private' | 'future') => {
@@ -1022,6 +1067,12 @@ export default function IntegratedFileProcessor() {
               defaultPublishStatus={processingParams?.defaultPublishStatus || 'draft'}
               onChange={handleModeChange} 
               onPublishStatusChange={handlePublishStatusChange}
+            />
+            
+            {/* 文稿類型選擇 */}
+            <ArticleTypeSelector
+              selectedType={selectedArticleType}
+              onTypeChange={handleArticleTypeChange}
             />
             
             {/* 文件上傳 */}

@@ -8,6 +8,8 @@ import UploadSection from './sections/UploadSection';
 import ProcessingSection from './sections/ProcessingSection';
 import ResultSection from './sections/ResultSection';
 import StageViewDialog, { StageView } from './dialogs/StageViewDialog';
+import { ArticleType, ArticleClassification } from '@/types/article-formatting';
+import { getArticleTemplate } from '@/config/article-templates';
 
 // 定義PrepPublishingComponent組件
 const PrepPublishingComponent = ({ 
@@ -96,6 +98,8 @@ const WordPressPublishComponent = ({
 export default function FileProcessor() {
   const [activeTab, setActiveTab] = useState<'upload' | 'initial-process' | 'advanced-process' | 'result'>('upload');
   const [viewingStage, setViewingStage] = useState<StageView | null>(null);
+  // 文稿類型狀態 - 預設為一般文章
+  const [selectedArticleType, setSelectedArticleType] = useState<ArticleType>('regular');
 
   // 使用處理模式Hook
   const { isAutoMode, handleModeChange } = useProcessingMode();
@@ -107,7 +111,9 @@ export default function FileProcessor() {
     updateStageProgress, 
     updateProcessState,
     moveToNextStage,
-    completeStage
+    completeStage,
+    updateProcessingParams,
+    setArticleClassification
   } = useProcessing();
 
   // 使用文件處理器Hook
@@ -330,6 +336,33 @@ export default function FileProcessor() {
     />
   );
 
+  // 更新文稿類型
+  const handleArticleTypeChange = (articleType: ArticleType) => {
+    setSelectedArticleType(articleType);
+    
+    // 獲取對應的模板配置
+    const template = getArticleTemplate(articleType);
+    
+    // 更新處理參數，包括作者ID
+    updateProcessingParams({ 
+      articleType,
+      defaultAuthorId: template.authorId // 添加預設作者ID
+    });
+    
+    // 創建文稿分類對象並設置到context
+    const classification: ArticleClassification = {
+      articleType,
+      author: template.author as 'BTEditor' | 'BTVerse' | 'custom',
+      authorDisplayName: template.authorDisplayName || undefined,
+      authorId: template.authorId, // 設置WordPress作者ID
+      requiresAdTemplate: articleType === 'sponsored',
+      templateVersion: 'v1.0',
+      timestamp: Date.now()
+    };
+    
+    setArticleClassification(classification);
+  };
+
   return (
     <div className="w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
       {/* 標籤式導航 */}
@@ -399,6 +432,8 @@ export default function FileProcessor() {
             onProcess={fileProcessor.handleProcess}
             isAutoMode={isAutoMode}
             onModeChange={handleModeChange}
+            selectedArticleType={selectedArticleType}
+            onArticleTypeChange={handleArticleTypeChange}
           />
         )}
 

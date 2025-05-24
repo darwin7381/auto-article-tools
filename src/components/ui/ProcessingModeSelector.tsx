@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import type { ProcessingModeSelectorProps } from '@/types/processing';
 
 /**
  * 處理模式選擇器組件
@@ -11,12 +12,7 @@ export const ProcessingModeSelector = ({
   defaultPublishStatus = 'draft',
   onChange,
   onPublishStatusChange
-}: { 
-  isAutoMode: boolean,
-  defaultPublishStatus?: 'draft' | 'pending' | 'publish' | 'private' | 'future',
-  onChange: (isAuto: boolean) => void,
-  onPublishStatusChange?: (status: 'draft' | 'pending' | 'publish' | 'private' | 'future') => void
-}) => {
+}: ProcessingModeSelectorProps) => {
   return (
     <div className="mb-4">
       <div className="flex items-center space-x-4">

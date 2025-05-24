@@ -34,6 +34,18 @@ export interface ProcessState {
     imageCount?: number;
   };
   stageResults?: Record<string, unknown>;
+  article_classification?: {
+    articleType: 'regular' | 'sponsored' | 'press-release';
+    author?: 'BTEditor' | 'BTVerse' | 'custom';
+    authorDisplayName?: string;
+    requiresAdTemplate: boolean;
+    templateVersion: string;
+    timestamp: number;
+  };
+  formatting_applied?: boolean;
+  template_version?: string;
+  related_articles_found?: number;
+  content_analysis_completed?: boolean;
 }
 
 export interface ProgressDisplayProps {

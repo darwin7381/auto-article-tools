@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Table from '@tiptap/extension-table';
@@ -101,6 +101,11 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
   const [imageUrl, setImageUrl] = useState<string>('');
   const [imageAlt, setImageAlt] = useState<string>('');
 
+  // 使用 ref 追蹤編輯器是否已初始化和最後的視圖模式
+  const isEditorInitialized = useRef(false);
+  const lastViewMode = useRef<EditorView>('visual');
+  const lastSetContent = useRef<string>('');
+
   // 初始化Tiptap編輯器，配置為保留HTML樣式屬性
   const editor = useEditor({
     extensions: [
@@ -156,24 +161,38 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
     },
   }, [currentView === 'visual', className]);
 
-  // 當視圖切換時進行處理
+  // 當編輯器初始化完成時執行一次性設置
   useEffect(() => {
-    if (currentView === 'visual' && editor) {
-      // 視覺模式下，設置編輯器內容
-      editor.commands.setContent(htmlSource);
-      
-      // 設置光標位置但不強制滾動
-      editor.commands.focus('start');
+    if (editor && !isEditorInitialized.current) {
+      isEditorInitialized.current = true;
+      lastSetContent.current = htmlSource;
+      if (currentView === 'visual') {
+        editor.commands.setContent(htmlSource);
+        editor.commands.focus('start');
+      }
     }
-  }, [currentView, editor, htmlSource]); // 添加htmlSource作為依賴項
+  }, [editor, htmlSource, currentView]);
 
-  // 單獨處理htmlSource變化的邏輯，不包含滾動
+  // 處理視圖切換 - 只在真正需要時設置內容
   useEffect(() => {
-    if (currentView === 'visual' && editor && htmlSource) {
-      // 不設置內容，避免重新渲染和光標跳轉
-      // 只在視圖切換時設置內容，而不是每次htmlSource變化都設置
+    if (editor && isEditorInitialized.current) {
+      // 檢查是否是視圖模式變化
+      const isViewModeChanged = lastViewMode.current !== currentView;
+      // 檢查是否是從 HTML 視圖切換回可視化視圖，且內容有變化
+      const isContentChanged = lastSetContent.current !== htmlSource;
+      
+      if (isViewModeChanged) {
+        lastViewMode.current = currentView;
+        
+        if (currentView === 'visual' && isContentChanged) {
+          // 只在從 HTML 視圖切換回可視化視圖且內容有變化時設置內容
+          editor.commands.setContent(htmlSource);
+          lastSetContent.current = htmlSource;
+          // 不自動聚焦，保持用戶的焦點狀態
+        }
+      }
     }
-  }, [htmlSource, currentView, editor]);
+  }, [currentView, editor, htmlSource]);
 
   // 處理HTML源碼更改
   const handleHtmlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {

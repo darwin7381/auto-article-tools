@@ -2,39 +2,16 @@
 
 import { useState } from 'react';
 import { useProcessing } from '@/context/ProcessingContext';
+import type { 
+  WordPressIntegrationOptions, 
+  WordPressPublishData, 
+  WordPressPublishResult,
+  WordPressPublishRequestData 
+} from '@/types/wordpress';
 
 // 輔助函數：轉義正則表達式中的特殊字符
 function escapeRegExp(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& 表示整個匹配的字符串
-}
-
-interface WordPressIntegrationOptions {
-  initialContent?: string;
-  fileId?: string;
-  debug?: boolean;
-}
-
-export interface WordPressPublishData {
-  title: string;
-  categories?: string;
-  tags?: string;
-  status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
-  isPrivate: boolean;
-  slug?: string;
-  author?: string;
-  featured_media?: string;
-  date?: string;
-}
-
-interface PublishResult {
-  success: boolean;
-  postId?: number;
-  postUrl?: string;
-  error?: string;
-  debugInfo?: {
-    contentSample?: string;
-    [key: string]: unknown;
-  };
 }
 
 /**
@@ -44,7 +21,7 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
   const { initialContent = '', debug = false } = options;
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
+  const [publishResult, setPublishResult] = useState<WordPressPublishResult | null>(null);
   const { completeStage } = useProcessing();
   
   // 將分類和標籤字符串轉換為適合API的格式
@@ -194,20 +171,7 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
       }
       
       // 準備發布數據
-      interface PublishRequestData {
-        title: string;
-        content: string;
-        status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
-        categories?: number[];
-        tags?: string[];
-        isPrivate: boolean;
-        slug?: string;
-        author?: number;
-        featured_media?: number;
-        date?: string;
-      }
-      
-      const publishData: PublishRequestData = {
+      const publishData: WordPressPublishRequestData = {
         title: formData.title,
         content: content,
         status: formData.status,
@@ -317,7 +281,7 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
         throw new Error(responseData.error || `WordPress發布失敗 (${response.status})`);
       }
       
-      const successResult: PublishResult = {
+      const successResult: WordPressPublishResult = {
         success: true,
         postId: responseData.id,
         postUrl: responseData.link,
@@ -340,7 +304,7 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
       
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      const errorResult: PublishResult = {
+      const errorResult: WordPressPublishResult = {
         success: false,
         error: errorMessage,
         debugInfo: debug ? { 
