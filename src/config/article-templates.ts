@@ -1,4 +1,4 @@
-import { ArticleTemplate, ContentProcessingConfig as ContentProcessingConfigType, ArticleTypeOption, ArticleType } from '@/types/article-formatting';
+import { ArticleTemplate, ContentProcessingConfig as ContentProcessingConfigType, ArticleTypeOption, ArticleType, AdvancedArticleSettings, DisclaimerType } from '@/types/article-formatting';
 
 // 文章模板配置
 export const ArticleTemplates: Record<ArticleType, ArticleTemplate> = {
@@ -221,6 +221,32 @@ export const ArticleTypeOptions: ArticleTypeOption[] = [
     }
   }
 ];
+
+// 押註選項配置
+export const DisclaimerOptions = [
+  { value: 'none' as DisclaimerType, label: '不押註' },
+  { value: 'sponsored' as DisclaimerType, label: '廣編稿押註' },
+  { value: 'press-release' as DisclaimerType, label: '新聞稿押註' }
+];
+
+// 不同文稿類型的進階設定預設值
+export const DefaultAdvancedSettings: Record<ArticleType, AdvancedArticleSettings> = {
+  regular: {
+    headerDisclaimer: 'none',
+    footerDisclaimer: 'none',
+    authorName: undefined
+  },
+  sponsored: {
+    headerDisclaimer: 'sponsored',
+    footerDisclaimer: 'sponsored',
+    authorName: undefined
+  },
+  'press-release': {
+    headerDisclaimer: 'press-release',
+    footerDisclaimer: 'none',
+    authorName: undefined
+  }
+};
 
 // 獲取文稿類型配置
 export function getArticleTemplate(articleType: ArticleType): ArticleTemplate {

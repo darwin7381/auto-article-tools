@@ -1,6 +1,16 @@
 // 文稿分類類型定義
 export type ArticleType = 'regular' | 'sponsored' | 'press-release';
 
+// 押註類型定義
+export type DisclaimerType = 'none' | 'sponsored' | 'press-release';
+
+// 進階文稿設定
+export interface AdvancedArticleSettings {
+  headerDisclaimer: DisclaimerType; // 正文開頭押註
+  footerDisclaimer: DisclaimerType; // 正文末尾押註
+  authorName?: string; // 供稿方名稱
+}
+
 // 文稿分類接口
 export interface ArticleClassification {
   articleType: ArticleType;
@@ -10,6 +20,8 @@ export interface ArticleClassification {
   requiresAdTemplate: boolean;
   templateVersion: string;
   timestamp: number; // 分類時間戳
+  // 新增進階設定
+  advancedSettings?: AdvancedArticleSettings;
 }
 
 // 文章分析結果

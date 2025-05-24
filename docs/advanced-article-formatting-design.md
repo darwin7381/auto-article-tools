@@ -1,5 +1,82 @@
 # 廣編稿/新聞稿進階格式化功能設計方案
 
+## 📋 需求實現進度追蹤
+
+### 🎯 核心功能需求 Checklist
+
+#### 1. 文稿分類與押註系統
+- [x] **廣編稿押註** - 正文前方押註模板
+- [x] **廣編稿免責聲明** - 正文文末押註模板  
+- [x] **新聞稿押註** - 僅正文前方押註（無文末聲明）
+- [x] **作者設定邏輯** - 廣編稿：「廣編頻道（BTEditor）」/ 新聞稿：「BT宙域（BTVerse）」
+- [ ] **押註內容自動替換** - 動態替換撰稿方名稱
+- [ ] **模板自動應用** - 根據文稿類型自動套用對應模板
+
+#### 2. 正文格式處理
+- [ ] **發布時間解禁敘述過濾** - 移除 "EMBARGOED TILL" 等敘述
+- [ ] **Dropcap 格式應用** - 第一段開頭第一個字自動設為 Dropcap
+- [ ] **英文數字空格處理** - 英文和數字前後空半格（段首除外）
+- [ ] **標題層級正規化** - 段落標題優先設為「標題三」，層級：標題三 > 標題四 > 段落（粗體）
+
+#### 3. 引言與關聯文章系統
+- [ ] **引言自動生成** - 有副標題直接使用，無副標題用 AI 摘要（≤100字）
+- [ ] **引言格式套用** - 使用 `intro_quote` class 格式
+- [ ] **前情提要文章搜尋** - 從 BlockTempo 搜尋相關文章
+- [ ] **背景補充文章搜尋** - 從 BlockTempo 搜尋相關文章
+- [ ] **引言區塊HTML生成** - 自動生成包含前情提要和背景補充的完整HTML
+- [ ] **文末相關閱讀** - 自動添加2-4篇相關文章連結（粗體格式）
+- [ ] **TG Banner自動插入** - 在相關閱讀前插入官方TG橫幅
+
+#### 4. 文末連結處理
+- [ ] **連結數量限制** - 最多3個連結
+- [ ] **TG/LINE連結過濾** - 自動刪除 Telegram、LINE 社群連結
+- [ ] **連結優先級排序** - 選擇排除TG/LINE後的前三個連結
+- [ ] **連結格式標準化** - 確保連結格式符合要求
+
+
+#### 6. WordPress 發布參數
+- [ ] **作者ID設定** - 根據文稿類型自動設定對應作者
+
+### 🏗️ 技術架構實現進度
+
+#### 階段1：基礎架構（已完成 ✅）
+- [x] 在upload界面增加文稿類型選擇
+- [x] 建立ArticleClassification資料結構  
+- [x] 創建基礎模板設定檔
+- [x] 修改ProcessingState支援新欄位
+
+#### 階段2：AI分析強化（進行中 🔄）
+- [ ] 實現關聯文章搜尋功能
+- [ ] 加強中文用語轉換邏輯
+- [ ] 實現撰稿方名稱識別
+- [ ] 優化永久連結英文翻譯
+
+#### 階段3：格式化處理器（待開始 ⏳）
+- [ ] 建立ArticleFormattingProcessor類
+- [ ] 實現模板化押註插入
+- [ ] 實現Dropcap自動應用
+- [ ] 實現關聯文章區塊插入
+
+#### 階段4：圖片處理強化（待開始 ⏳）
+- [ ] 實現廣編稿AD模板應用
+- [ ] 圖片尺寸檢查和壓縮建議
+- [ ] 特色圖片模板處理
+- [ ] 圖片alt文字優化
+
+#### 階段5：UI優化與測試（待開始 ⏳）
+- [ ] 格式預覽界面開發
+- [ ] 錯誤處理和降級策略
+- [ ] 全流程整合測試
+- [ ] 使用者體驗優化
+
+### 📊 完成度統計
+- **總體進度**: 15% (4/26 主要任務)
+- **基礎架構**: 100% ✅ 
+- **核心功能**: 0% ⏳
+- **技術集成**: 15% 🔄
+
+---
+
 ## 1. 現有架構分析
 
 ### 1.1 現有系統架構回顧
@@ -145,36 +222,56 @@
 - 全部小寫，單字間用 `-` 連接
 - 範例：`t-rex-raises-17m-to-reshape-web3s-attention-economy-layer`
 
-## 3. 建議架構方案：多階段分層處理
+## 3. 建議架構方案：參數驅動的靈活處理
 
 ### 3.1 核心設計原則
-1. **AI智能分析** vs **模板化格式應用** 分離
-2. **用戶控制決策點** vs **系統自動處理** 明確劃分
-3. **可靠的格式模板** vs **靈活的內容編輯** 平衡
+1. **參數驅動** vs **類型驅動**：處理邏輯基於具體的進階設定參數，而非文稿類型
+2. **預設便利性** vs **用戶自由度**：文稿類型提供預設設定，但用戶可完全自訂
+3. **模板化執行** vs **AI智能分析**：嚴格格式用模板，智能內容用AI
 
 ### 3.2 新架構流程圖
 ```
-upload (文稿分類) → extract → process → advanced-ai → format-conversion → 
-copy-editing (AI智能分析) → article-formatting (模板應用) → prep-publish → publish-news
+upload (文稿分類+進階設定) → extract → process → advanced-ai → format-conversion → 
+copy-editing (AI智能分析) → article-formatting (參數驅動模板應用) → prep-publish → publish-news
 ```
 
 ### 3.3 各階段職責重新劃分
 
-#### 階段1：文稿分類階段 (upload強化)
-**位置**：upload階段增加文稿類型選擇
+#### 階段1：文稿分類與進階設定 (upload強化)
+**位置**：upload階段增加文稿類型選擇和進階設定
 **職責**：
 - 用戶選擇文稿類型：`廣編稿` / `新聞稿` / `一般文章`
-- 記錄文稿分類資訊到處理狀態
-- 初始化對應的處理設定
+- 系統提供對應的預設進階設定
+- 用戶可調整任何進階設定，不受文稿類型限制
+- 記錄最終確定的進階設定到處理狀態
 
-**資料結構**：
+**核心概念**：
 ```typescript
-interface ArticleClassification {
-  articleType: 'sponsored' | 'press-release' | 'regular';
-  author?: 'BTEditor' | 'BTVerse' | 'custom';
-  requiresAdTemplate: boolean;
-  templateVersion: string;
+// ❌ 錯誤的類型驅動方式
+if (articleType === 'sponsored') {
+  addHeaderDisclaimer(); // 硬編碼邏輯
 }
+
+// ✅ 正確的參數驅動方式  
+if (advancedSettings.headerDisclaimer === 'sponsored') {
+  addHeaderDisclaimer(); // 基於用戶設定
+}
+```
+
+**進階設定結構**：
+```typescript
+interface AdvancedArticleSettings {
+  headerDisclaimer: DisclaimerType; // 'none' | 'sponsored' | 'press-release'
+  footerDisclaimer: DisclaimerType; // 'none' | 'sponsored' | 'press-release'  
+  authorName?: string; // 供稿方名稱，用於動態替換
+}
+
+// 使用範例：廣編稿但不押註
+const customSettings: AdvancedArticleSettings = {
+  headerDisclaimer: 'none',    // 用戶選擇不押註
+  footerDisclaimer: 'none',    // 用戶選擇不押註
+  authorName: '某某公司'       // 仍可設定供稿方
+};
 ```
 
 #### 階段2：AI智能分析階段 (copy-editing強化)
@@ -187,779 +284,646 @@ interface ArticleClassification {
 - ✅ 基礎WordPress參數提取
 - ✅ 撰稿方名稱識別
 
-**AI不應處理的任務**：
-- ❌ 嚴格格式的押註插入
-- ❌ 免責聲明模板
-- ❌ Dropcap格式化
-- ❌ HTML結構模板應用
+**重要**：AI階段不處理任何格式模板，只負責內容分析和準備數據
 
-**輸出結構**：
+#### 階段3：參數驅動格式模板應用階段 (新增 article-formatting)
+**位置**：prep-publish之前新增獨立階段
+**核心邏輯**：完全基於 `AdvancedArticleSettings` 參數決定處理
+
 ```typescript
-interface EnhancedCopyEditingResult {
-  wordpress_params: WordPressParams;
-  article_classification: ArticleClassification;
-  content_analysis: {
-    author_name?: string;
-    chinese_terminology_fixes: string[];
-    suggested_slug: string;
-    excerpt: string;
-  };
-  related_articles: {
-    background: Article[];
-    previous_context: Article[];
-    related_reading: Article[];
-  };
+class ParameterDrivenFormattingProcessor {
+  async formatArticle(
+    content: string, 
+    advancedSettings: AdvancedArticleSettings,
+    analysisResult: EnhancedCopyEditingResult
+  ) {
+    let formattedContent = content;
+    
+    // 1. 根據 headerDisclaimer 參數決定開頭押註
+    if (advancedSettings.headerDisclaimer !== 'none') {
+      const disclaimerTemplate = this.getDisclaimerTemplate(
+        advancedSettings.headerDisclaimer,
+        'header'
+      );
+      if (disclaimerTemplate && advancedSettings.authorName) {
+        const disclaimer = disclaimerTemplate.replace(
+          '［撰稿方名稱］', 
+          advancedSettings.authorName
+        );
+        formattedContent = this.insertHeaderDisclaimer(formattedContent, disclaimer);
+      }
+    }
+    
+    // 2. 根據 footerDisclaimer 參數決定結尾押註
+    if (advancedSettings.footerDisclaimer !== 'none') {
+      const disclaimerTemplate = this.getDisclaimerTemplate(
+        advancedSettings.footerDisclaimer,
+        'footer'
+      );
+      if (disclaimerTemplate) {
+        formattedContent = this.insertFooterDisclaimer(formattedContent, disclaimerTemplate);
+      }
+    }
+    
+    // 3. 其他格式處理（Dropcap、關聯文章等）
+    formattedContent = this.applyOtherFormatting(formattedContent, analysisResult);
+    
+    return {
+      formattedContent,
+      appliedSettings: advancedSettings,
+      metadata: {
+        hasHeaderDisclaimer: advancedSettings.headerDisclaimer !== 'none',
+        hasFooterDisclaimer: advancedSettings.footerDisclaimer !== 'none',
+        authorName: advancedSettings.authorName,
+        processingTime: Date.now()
+      }
+    };
+  }
+  
+  private getDisclaimerTemplate(type: DisclaimerType, position: 'header' | 'footer'): string | null {
+    const templates = {
+      sponsored: {
+        header: '<span style="color: #808080;"><em>本文為廣編稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場，亦非投資建議、購買或出售建議。詳見文末責任警示。</em></span>',
+        footer: '<div class="alert alert-warning">廣編免責聲明：本文內容為供稿者提供之廣宣稿件，供稿者與動區並無任何關係，本文亦不代表動區立場。本文無意提供任何投資、資產建議或法律意見，也不應被視為購買、出售或持有資產的要約。廣宣稿件內容所提及之任何服務、方案或工具等僅供參考，且最終實際內容或規則以供稿方之公布或說明為準，動區不對任何可能存在之風險或損失負責，提醒讀者進行任何決策或行為前務必自行謹慎查核。</div>'
+      },
+      'press-release': {
+        header: '<span style="color: #808080;"><em>本文為新聞稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場。</em></span>',
+        footer: null
+      }
+    };
+    
+    return templates[type]?.[position] || null;
+  }
 }
 ```
 
-#### 階段3：格式模板應用階段 (新增 article-formatting)
-**位置**：prep-publish之前新增獨立階段
-**職責**：
-- 根據文稿類型應用對應HTML模板
-- 插入押註和免責聲明（預定義模板）
-- 應用Dropcap格式到第一段
-- 插入關聯文章連結區塊
-- 設定對應作者
-- 應用品牌特殊樣式
+### 3.4 參數驅動的預設配置
 
-**模板系統**：
+#### 文稿類型預設值（可被用戶覆蓋）
 ```typescript
-const ArticleTemplates = {
-  sponsored: {
-    name: '廣編稿',
-    author: 'BTEditor',
-    authorDisplayName: '廣編頻道（BTEditor）',
-    requiresAdTemplate: true,
-    adTemplateUrl: 'https://www.canva.com/design/DAFvcOqDOD8/msglmQ4I-dU3Pq8R9m2mlg/edit',
-    
-    headerDisclaimer: '<span style="color: #808080;"><em>本文為廣編稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場，亦非投資建議、購買或出售建議。詳見文末責任警示。</em></span>',
-    
-    footerDisclaimer: '<div class="alert alert-warning">廣編免責聲明：本文內容為供稿者提供之廣宣稿件，供稿者與動區並無任何關係，本文亦不代表動區立場。本文無意提供任何投資、資產建議或法律意見，也不應被視為購買、出售或持有資產的要約。廣宣稿件內容所提及之任何服務、方案或工具等僅供參考，且最終實際內容或規則以供稿方之公布或說明為準，動區不對任何可能存在之風險或損失負責，提醒讀者進行任何決策或行為前務必自行謹慎查核。</div>',
-    
-    dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
-    
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
-
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
-
-    tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
-    
-    relatedArticlesHeader: '<h5>📍相關報導📍</h5>',
-    
-    relatedArticleLinkTemplate: '<strong><span style="color: #ff0000;"><a href="{url}">{title}</a></span></strong>',
-    
-    fullTemplate: `{introQuote}
-
-&nbsp;
-
-{headerDisclaimer}
-
-<hr />
-
-{dropcapContent}
-
-{mainContent}
-
-＿＿＿
-
-{footerDisclaimer}
-
-{tgBanner}
-
-{relatedArticlesHeader}
-{relatedArticles}`,
-
-    relatedArticlesCount: { min: 2, max: 4 },
-    maxExternalLinks: 3,
-    excludeLinkTypes: ['telegram', 'line'],
-    imageSize: { width: 750, height: 375 }, // 2:1 ratio
-    maxImageSizeMB: 2
-  },
-  
-  pressRelease: {
-    name: '新聞稿',
-    author: 'BTVerse',
-    authorDisplayName: 'BT宙域（BTVerse）',
-    requiresAdTemplate: false,
-    
-    headerDisclaimer: '<span style="color: #808080;"><em>本文為新聞稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場。</em></span>',
-    
-    footerDisclaimer: null,
-    
-    dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
-    
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
-
-    tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
-    
-    relatedArticlesHeader: '<h5>📍相關報導📍</h5>',
-    
-    relatedArticleLinkTemplate: '<strong><a href="{url}">{title}</a></strong>',
-    
-    fullTemplate: `{introQuote}
-
-{headerDisclaimer}
-
-<hr />
-
-<span style="font-weight: 400;">{dropcapContent}
-
-{mainContent}
-
-{tgBanner}
-{relatedArticlesHeader}
-{relatedArticles}`,
-
-    relatedArticlesCount: { min: 2, max: 4 },
-    maxExternalLinks: 3,
-    excludeLinkTypes: ['telegram', 'line'],
-    imageSize: { width: 750, height: 375 }, // 2:1 ratio
-    maxImageSizeMB: 2
-  },
-  
+export const DefaultAdvancedSettings: Record<ArticleType, AdvancedArticleSettings> = {
   regular: {
-    name: '一般文章',
-    author: 'custom',
-    authorDisplayName: null,
-    requiresAdTemplate: false,
-    
-    headerDisclaimer: null,
-    footerDisclaimer: null,
-    
-    dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
-    
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
-
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
-
-    tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
-    
-    relatedArticlesHeader: '<h5>📍相關報導📍</h5>',
-    
-    relatedArticleLinkTemplate: '<strong><a href="{url}">{title}</a></strong>',
-    
-    fullTemplate: `{introQuote}
-
-{dropcapContent}
-
-{mainContent}
-
-{tgBanner}
-{relatedArticlesHeader}
-{relatedArticles}`,
-
-    relatedArticlesCount: { min: 2, max: 4 },
-    maxExternalLinks: 3,
-    excludeLinkTypes: ['telegram', 'line'],
-    imageSize: { width: 750, height: 375 }, // 2:1 ratio
-    maxImageSizeMB: 2
+    headerDisclaimer: 'none',           // 預設不押註
+    footerDisclaimer: 'none',           // 預設不押註
+    authorName: undefined               // 無預設供稿方
+  },
+  sponsored: {
+    headerDisclaimer: 'sponsored',      // 預設廣編稿押註
+    footerDisclaimer: 'sponsored',      // 預設廣編稿押註
+    authorName: undefined               // 等待用戶輸入
+  },
+  'press-release': {
+    headerDisclaimer: 'press-release',  // 預設新聞稿押註
+    footerDisclaimer: 'none',           // 預設不押註
+    authorName: undefined               // 等待用戶輸入
   }
+};
+
+// 用戶自訂範例：廣編稿但選擇不押註
+const userCustomSettings: AdvancedArticleSettings = {
+  headerDisclaimer: 'none',      // 用戶改為不押註
+  footerDisclaimer: 'none',      // 用戶改為不押註
+  authorName: '某某科技公司'     // 用戶填入供稿方
 };
 ```
 
-**內容處理規則**：
+#### 押註模板庫（支援擴展）
 ```typescript
-const ContentProcessingRules = {
-  // 中文用語轉換規則
-  terminologyMap: {
-    '網絡': '網路',
-    '信息': '資訊', // 預設為資訊，可依上下文調整為訊息
-    '數據': '資料',
-    '網站': '網站',
-    '服務器': '伺服器',
-    '用戶': '使用者',
-    '軟件': '軟體',
-    '數字': '數位'
+export const DisclaimerTemplates = {
+  sponsored: {
+    name: '廣編稿押註',
+    header: '<span style="color: #808080;"><em>本文為廣編稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場，亦非投資建議、購買或出售建議。詳見文末責任警示。</em></span>',
+    footer: '<div class="alert alert-warning">廣編免責聲明：本文內容為供稿者提供之廣宣稿件，供稿者與動區並無任何關係，本文亦不代表動區立場。本文無意提供任何投資、資產建議或法律意見，也不應被視為購買、出售或持有資產的要約。廣宣稿件內容所提及之任何服務、方案或工具等僅供參考，且最終實際內容或規則以供稿方之公布或說明為準，動區不對任何可能存在之風險或損失負責，提醒讀者進行任何決策或行為前務必自行謹慎查核。</div>',
+    authorPlaceholder: '［撰稿方名稱］'
   },
-  
-  // 標題層級規則
-  headingHierarchy: ['h3', 'h4', 'strong'], // 標題三 > 標題四 > 粗體
-  
-  // 需要排除的內容
-  excludePatterns: [
-    /EMBARGOED\s+TILL\s+.+/gi, // 發布時間解禁敘述
-    /禁止轉載\s+.+/gi,
-    /版權所有\s+.+/gi
-  ],
-  
-  // 文末連結處理
-  linkFiltering: {
-    maxLinks: 3,
-    excludePatterns: [
-      /telegram/gi,
-      /line/gi,
-      /t\.me/gi,
-      /line\.me/gi
-    ]
+  'press-release': {
+    name: '新聞稿押註',
+    header: '<span style="color: #808080;"><em>本文為新聞稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場。</em></span>',
+    footer: null,
+    authorPlaceholder: '［撰稿方名稱］'
   },
-  
-  // 圖片處理規則
-  imageProcessing: {
-    maxSizeMB: 2,
-    recommendedDimensions: { width: 750, height: 375 },
-    supportedFormats: ['jpg', 'jpeg', 'png', 'webp'],
-    compressionSettings: {
-      quality: 0.8,
-      format: 'jpg' // PNG轉JPG減少檔案大小
-    }
+  none: {
+    name: '不押註',
+    header: null,
+    footer: null,
+    authorPlaceholder: null
   }
 };
 ```
 
-#### 階段4：圖片處理階段 (publish-news強化)
-**位置**：現有publish-news階段
-**新增功能**：
-- 自動檢測是否需要AD模板（根據文稿類型）
-- 圖片尺寸檢查和壓縮建議
-- 特色圖片模板應用
-- 圖片alt文字優化
+### 3.5 靈活性展示範例
+
+#### 範例1：標準廣編稿
+```typescript
+const standardSponsored: AdvancedArticleSettings = {
+  headerDisclaimer: 'sponsored',    // 廣編稿開頭押註
+  footerDisclaimer: 'sponsored',    // 廣編稿結尾押註
+  authorName: 'ABC科技公司'         // 供稿方名稱
+};
+// 結果：完整的廣編稿格式，包含開頭和結尾押註
+```
+
+#### 範例2：簡化廣編稿（不要結尾押註）
+```typescript
+const simplifiedSponsored: AdvancedArticleSettings = {
+  headerDisclaimer: 'sponsored',    // 保留開頭押註
+  footerDisclaimer: 'none',         // 不要結尾押註
+  authorName: 'ABC科技公司'         // 供稿方名稱
+};
+// 結果：只有開頭押註的簡化廣編稿
+```
+
+#### 範例3：無押註廣編稿（純內容）
+```typescript
+const noBrandingSponsored: AdvancedArticleSettings = {
+  headerDisclaimer: 'none',         // 不要開頭押註
+  footerDisclaimer: 'none',         // 不要結尾押註
+  authorName: 'ABC科技公司'         // 僅記錄供稿方
+};
+// 結果：純粹的文章內容，無任何押註
+```
+
+#### 範例4：混合押註（廣編稿用新聞稿押註）
+```typescript
+const hybridSponsored: AdvancedArticleSettings = {
+  headerDisclaimer: 'press-release', // 使用新聞稿押註
+  footerDisclaimer: 'none',          // 不要結尾押註
+  authorName: 'ABC科技公司'          // 供稿方名稱
+};
+// 結果：使用新聞稿押註格式的廣編稿
+```
 
 ## 4. 具體實施建議
 
 ### 4.1 前端UI改進
 
-#### 文稿分類選擇器 (upload階段)
+#### 進階文稿設定選擇器 (upload階段)
 ```typescript
-const ArticleTypeSelector = () => (
-  <div className="article-type-selection mb-4">
-    <label className="block text-sm font-medium mb-2">文稿類型：</label>
-    <select className="w-full p-2 border rounded">
-      <option value="regular">一般文章</option>
-      <option value="sponsored">廣編稿</option>
-      <option value="press-release">新聞稿</option>
-    </select>
-    <p className="text-xs text-gray-500 mt-1">
-      選擇文稿類型將自動應用對應的格式模板和發布設定
-    </p>
-  </div>
-);
-```
+const AdvancedArticleSelector = () => (
+  <div className="article-settings mb-4">
+    <div className="flex items-center space-x-4 flex-wrap gap-y-3">
+      {/* 文稿類型選擇 - 提供預設值 */}
+      <div className="flex items-center space-x-2">
+        <label className="block text-sm font-medium mb-2">文稿類型：</label>
+        <select 
+          value={selectedType}
+          onChange={handleTypeChange} // 觸發預設值載入
+          className="w-full p-2 border rounded"
+        >
+          <option value="regular">一般文章</option>
+          <option value="sponsored">廣編稿</option>
+          <option value="press-release">新聞稿</option>
+        </select>
+      </div>
 
-#### 格式預覽界面 (article-formatting階段)
-```typescript
-const FormattingPreview = () => (
-  <div className="formatting-preview">
-    <h3>格式化預覽</h3>
-    <div className="preview-sections">
-      <div className="disclaimer-preview">押註預覽</div>
-      <div className="content-preview">內容預覽</div>
-      <div className="related-articles-preview">關聯文章預覽</div>
+      {/* 開頭押註選擇 - 可自由調整 */}
+      <div className="flex items-center space-x-2">
+        <label className="text-sm font-medium">正文開頭押註：</label>
+        <select 
+          value={advancedSettings.headerDisclaimer}
+          onChange={handleHeaderDisclaimerChange}
+          className="rounded-md border px-3 py-1.5 text-sm"
+        >
+          <option value="none">不押註</option>
+          <option value="sponsored">廣編稿押註</option>
+          <option value="press-release">新聞稿押註</option>
+        </select>
+      </div>
+
+      {/* 結尾押註選擇 - 可自由調整 */}
+      <div className="flex items-center space-x-2">
+        <label className="text-sm font-medium">正文末尾押註：</label>
+        <select 
+          value={advancedSettings.footerDisclaimer}
+          onChange={handleFooterDisclaimerChange}
+          className="rounded-md border px-3 py-1.5 text-sm"
+        >
+          <option value="none">不押註</option>
+          <option value="sponsored">廣編稿押註</option>
+          <option value="press-release">新聞稿押註</option>
+        </select>
+      </div>
+    </div>
+
+    {/* 供稿方輸入 - 獨立一行 */}
+    <div className="flex items-center space-x-2 mt-3">
+      <label className="text-sm font-medium">供稿方：</label>
+      <input
+        type="text"
+        value={advancedSettings.authorName || ''}
+        onChange={handleAuthorNameChange}
+        placeholder="輸入供稿方名稱（選填）"
+        className="rounded-md border px-3 py-1.5 text-sm min-w-[200px]"
+      />
+      <span className="text-xs text-gray-500">
+        用於自動替換押註中的［撰稿方名稱］
+      </span>
+    </div>
+
+    {/* 實時預覽當前設定 */}
+    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+      <p className="text-sm text-gray-600">
+        <strong>當前設定預覽：</strong>
+        {advancedSettings.headerDisclaimer !== 'none' && (
+          <span className="text-blue-600"> 開頭押註：{getDisclaimerName(advancedSettings.headerDisclaimer)}</span>
+        )}
+        {advancedSettings.footerDisclaimer !== 'none' && (
+          <span className="text-blue-600"> 結尾押註：{getDisclaimerName(advancedSettings.footerDisclaimer)}</span>
+        )}
+        {advancedSettings.headerDisclaimer === 'none' && advancedSettings.footerDisclaimer === 'none' && (
+          <span className="text-gray-500"> 無押註，純內容格式</span>
+        )}
+        {advancedSettings.authorName && (
+          <span className="text-green-600"> 供稿方：{advancedSettings.authorName}</span>
+        )}
+      </p>
     </div>
   </div>
 );
 ```
 
-### 4.2 後端處理邏輯
+### 4.2 後端處理邏輯重構
 
-#### CopyEditorAgent擴展
+#### 參數驅動的文章格式化處理器
 ```typescript
-class EnhancedCopyEditorAgent {
-  async analyzeContent(content: string, classification: ArticleClassification) {
-    // 1. 基礎參數提取（現有功能）
-    const basicParams = await this.extractBasicParams(content);
+class ParameterDrivenArticleFormatter {
+  /**
+   * 核心格式化邏輯 - 完全基於參數決定
+   */
+  async formatArticle(
+    content: string,
+    advancedSettings: AdvancedArticleSettings,
+    analysisResult: EnhancedCopyEditingResult
+  ): Promise<ArticleFormattingResult> {
     
-    // 2. 關聯文章搜尋
-    const relatedArticles = await this.searchRelatedArticles(content);
+    let formattedContent = content;
+    const appliedRules: string[] = [];
     
-    // 3. 內容分析與改進
-    const contentAnalysis = await this.analyzeContentQuality(content);
+    // 1. 處理開頭押註 - 基於 headerDisclaimer 參數
+    if (advancedSettings.headerDisclaimer !== 'none') {
+      const headerResult = await this.applyHeaderDisclaimer(
+        formattedContent, 
+        advancedSettings.headerDisclaimer,
+        advancedSettings.authorName
+      );
+      formattedContent = headerResult.content;
+      appliedRules.push(headerResult.rule);
+    }
     
-    // 4. 撰稿方識別
-    const authorInfo = await this.identifyAuthor(content);
+    // 2. 處理結尾押註 - 基於 footerDisclaimer 參數
+    if (advancedSettings.footerDisclaimer !== 'none') {
+      const footerResult = await this.applyFooterDisclaimer(
+        formattedContent,
+        advancedSettings.footerDisclaimer
+      );
+      formattedContent = footerResult.content;
+      appliedRules.push(footerResult.rule);
+    }
+    
+    // 3. 應用其他格式處理（Dropcap、關聯文章等）
+    formattedContent = await this.applyOtherFormatting(
+      formattedContent, 
+      analysisResult
+    );
     
     return {
+      formattedContent,
+      appliedSettings: advancedSettings,
+      metadata: {
+        hasHeaderDisclaimer: advancedSettings.headerDisclaimer !== 'none',
+        hasFooterDisclaimer: advancedSettings.footerDisclaimer !== 'none',
+        authorName: advancedSettings.authorName,
+        appliedRules,
+        processingTime: Date.now()
+      }
+    };
+  }
+  
+  /**
+   * 應用開頭押註 - 參數驅動
+   */
+  private async applyHeaderDisclaimer(
+    content: string, 
+    disclaimerType: DisclaimerType,
+    authorName?: string
+  ): Promise<{content: string, rule: string}> {
+    
+    const template = DisclaimerTemplates[disclaimerType]?.header;
+    if (!template) {
+      return { content, rule: `跳過開頭押註：未找到 ${disclaimerType} 模板` };
+    }
+    
+    let disclaimer = template;
+    if (authorName && template.includes('［撰稿方名稱］')) {
+      disclaimer = template.replace(/［撰稿方名稱］/g, authorName);
+    }
+    
+    // 插入邏輯：在引言區塊後、第一個分隔線前
+    const insertedContent = this.insertHeaderDisclaimer(content, disclaimer);
+    
+    return {
+      content: insertedContent,
+      rule: `應用開頭押註：${disclaimerType}${authorName ? ` (供稿方: ${authorName})` : ''}`
+    };
+  }
+  
+  /**
+   * 應用結尾押註 - 參數驅動
+   */
+  private async applyFooterDisclaimer(
+    content: string,
+    disclaimerType: DisclaimerType
+  ): Promise<{content: string, rule: string}> {
+    
+    const template = DisclaimerTemplates[disclaimerType]?.footer;
+    if (!template) {
+      return { content, rule: `跳過結尾押註：${disclaimerType} 類型無結尾模板` };
+    }
+    
+    // 插入邏輯：在 TG Banner 前插入
+    const insertedContent = this.insertFooterDisclaimer(content, template);
+    
+    return {
+      content: insertedContent,
+      rule: `應用結尾押註：${disclaimerType}`
+    };
+  }
+  
+  /**
+   * 驗證參數合法性
+   */
+  validateSettings(settings: AdvancedArticleSettings): string[] {
+    const warnings: string[] = [];
+    
+    // 檢查押註參數合法性
+    if (!['none', 'sponsored', 'press-release'].includes(settings.headerDisclaimer)) {
+      warnings.push(`無效的開頭押註類型：${settings.headerDisclaimer}`);
+    }
+    
+    if (!['none', 'sponsored', 'press-release'].includes(settings.footerDisclaimer)) {
+      warnings.push(`無效的結尾押註類型：${settings.footerDisclaimer}`);
+    }
+    
+    // 檢查邏輯合理性
+    if (settings.headerDisclaimer !== 'none' && !settings.authorName) {
+      warnings.push('設定押註時建議填寫供稿方名稱，否則將顯示佔位符');
+    }
+    
+    if (settings.headerDisclaimer === 'sponsored' && settings.footerDisclaimer === 'none') {
+      warnings.push('廣編稿通常建議包含結尾免責聲明以符合法規要求');
+    }
+    
+    return warnings;
+  }
+}
+```
+
+#### Enhanced CopyEditorAgent - 專注內容分析
+```typescript
+class EnhancedCopyEditorAgent {
+  /**
+   * 核心分析功能 - 不處理格式模板
+   */
+  async analyzeContent(
+    content: string, 
+    articleClassification: ArticleClassification
+  ): Promise<EnhancedCopyEditingResult> {
+    
+    // 1. 基礎WordPress參數提取
+    const basicParams = await this.extractBasicParams(content);
+    
+    // 2. 智能內容分析
+    const contentAnalysis = await this.analyzeContentIntelligently(content);
+    
+    // 3. 關聯文章搜尋
+    const relatedArticles = await this.searchRelatedArticles(content);
+    
+    // 4. 撰稿方資訊識別
+    const authorInfo = await this.identifyAuthorInfo(content);
+    
+    // 注意：不處理任何格式模板，只分析和提取資訊
+    return {
       wordpress_params: basicParams,
-      article_classification: classification,
+      article_classification: articleClassification,
       content_analysis: contentAnalysis,
       related_articles: relatedArticles,
       author_info: authorInfo
     };
   }
-}
-```
-
-#### 文章格式化處理器
-```typescript
-class ArticleFormattingProcessor {
-  async formatArticle(content: string, classification: ArticleClassification, analysisResult: EnhancedCopyEditingResult) {
-    // 1. 選擇對應模板
-    const template = ArticleTemplates[classification.articleType];
-    
-    // 2. 應用內容處理規則
-    content = this.applyContentProcessingRules(content);
-    
-    // 3. 應用Dropcap格式到第一段
-    content = this.applyDropcap(content, template.dropcapStyle);
-    
-    // 4. 構建引言區塊
-    const introQuote = this.buildIntroQuote(template, analysisResult);
-    
-    // 5. 插入押註
-    const headerDisclaimer = this.insertHeaderDisclaimer(template, analysisResult.author_info);
-    
-    // 6. 插入關聯文章
-    const relatedArticles = this.buildRelatedArticles(template, analysisResult.related_articles);
-    
-    // 7. 使用完整模板組合內容
-    const formattedContent = template.fullTemplate
-      .replace('{introQuote}', introQuote)
-      .replace('{headerDisclaimer}', headerDisclaimer || '')
-      .replace('{dropcapContent}', content)
-      .replace('{mainContent}', '')
-      .replace('{footerDisclaimer}', template.footerDisclaimer || '')
-      .replace('{tgBanner}', template.tgBanner)
-      .replace('{relatedArticlesHeader}', template.relatedArticlesHeader)
-      .replace('{relatedArticles}', relatedArticles);
-    
+  
+  /**
+   * 智能內容分析 - AI擅長的任務
+   */
+  private async analyzeContentIntelligently(content: string): Promise<ContentAnalysis> {
     return {
-      formattedContent,
-      template: template,
-      metadata: {
-        author: template.authorDisplayName,
-        requiresAdTemplate: template.requiresAdTemplate,
-        adTemplateUrl: template.adTemplateUrl
-      }
+      // 中文用語自動轉換
+      chinese_terminology_fixes: await this.fixChineseTerminology(content),
+      
+      // 智能slug生成
+      suggested_slug: await this.generateEnglishSlug(content),
+      
+      // 摘要生成
+      excerpt: await this.generateExcerpt(content),
+      
+      // 閱讀時間估算
+      estimated_reading_time: this.calculateReadingTime(content),
+      
+      // 撰稿方名稱識別
+      author_name: await this.extractAuthorName(content)
     };
   }
   
-  private applyContentProcessingRules(content: string): string {
-    // 應用中文用語轉換
-    for (const [chinese, taiwanese] of Object.entries(ContentProcessingRules.terminologyMap)) {
-      content = content.replace(new RegExp(chinese, 'g'), taiwanese);
-    }
+  /**
+   * 關聯文章搜尋 - AI擅長的任務
+   */
+  private async searchRelatedArticles(content: string): Promise<RelatedArticles> {
+    // 使用AI分析內容主題，搜尋BlockTempo相關文章
+    const keywords = await this.extractKeywords(content);
     
-    // 移除發布時間解禁敘述
-    for (const pattern of ContentProcessingRules.excludePatterns) {
-      content = content.replace(pattern, '');
-    }
-    
-    // 處理英文和數字前後空格
-    content = this.addSpacesAroundEnglishAndNumbers(content);
-    
-    // 處理標題層級
-    content = this.normalizeHeadings(content);
-    
-    return content;
-  }
-  
-  private applyDropcap(content: string, dropcapStyle: string): string {
-    // 找到第一段的第一個字並應用Dropcap
-    const firstParagraph = content.match(/<p[^>]*>(.*?)<\/p>/i);
-    if (firstParagraph && firstParagraph[1]) {
-      const firstChar = firstParagraph[1].charAt(0);
-      if (firstChar && /[\u4e00-\u9fa5a-zA-Z]/.test(firstChar)) {
-        const dropcapHtml = `${dropcapStyle}${firstChar}</span>`;
-        const remainingText = firstParagraph[1].substring(1);
-        const newParagraph = `<p>${dropcapHtml}${remainingText}</p>`;
-        content = content.replace(firstParagraph[0], newParagraph);
-      }
-    }
-    return content;
-  }
-  
-  private buildIntroQuote(template: any, analysisResult: EnhancedCopyEditingResult): string {
-    const { content_analysis, related_articles } = analysisResult;
-    
-    return template.introQuoteTemplate
-      .replace('{excerpt}', content_analysis.excerpt || 'AI摘要引言')
-      .replace('{backgroundUrl}', related_articles.background[0]?.url || '#')
-      .replace('{backgroundTitle}', related_articles.background[0]?.title || '背景文章')
-      .replace('{contextUrl}', related_articles.previous_context[0]?.url || '#')
-      .replace('{contextTitle}', related_articles.previous_context[0]?.title || '前情文章');
-  }
-  
-  private insertHeaderDisclaimer(template: any, authorInfo: any): string | null {
-    if (!template.headerDisclaimer) return null;
-    
-    const authorName = authorInfo?.name || '撰稿方名稱';
-    return template.headerDisclaimer.replace('［撰稿方名稱］', authorName);
-  }
-  
-  private buildRelatedArticles(template: any, relatedArticles: any): string {
-    const articles = relatedArticles.related_reading || [];
-    const maxCount = template.relatedArticlesCount.max;
-    
-    return articles
-      .slice(0, maxCount)
-      .map((article: any) => 
-        template.relatedArticleLinkTemplate
-          .replace('{url}', article.url)
-          .replace('{title}', article.title)
-      )
-      .join('\n\n');
-  }
-  
-  private addSpacesAroundEnglishAndNumbers(content: string): string {
-    // 在中文與英文/數字之間添加空格，但段首除外
-    content = content.replace(/([\u4e00-\u9fa5])([a-zA-Z0-9])/g, '$1 $2');
-    content = content.replace(/([a-zA-Z0-9])([\u4e00-\u9fa5])/g, '$1 $2');
-    
-    // 移除段首的多餘空格
-    content = content.replace(/(<p[^>]*>)\s+/g, '$1');
-    
-    return content;
-  }
-  
-  private normalizeHeadings(content: string): string {
-    // 將標題標籤正規化為指定層級
-    const hierarchy = ContentProcessingRules.headingHierarchy;
-    
-    // 這裡可以添加標題層級正規化邏輯
-    // 例如：將所有h1, h2轉為h3，h5, h6轉為h4等
-    content = content.replace(/<h[12]([^>]*)>/gi, '<h3$1>');
-    content = content.replace(/<\/h[12]>/gi, '</h3>');
-    content = content.replace(/<h[56]([^>]*)>/gi, '<h4$1>');
-    content = content.replace(/<\/h[56]>/gi, '</h4>');
-    
-    return content;
-  }
-  
-  private filterExternalLinks(content: string, maxLinks: number, excludePatterns: RegExp[]): string {
-    // 處理文末連結過濾邏輯
-    // 這裡需要實現移除TG/LINE連結並限制連結數量的邏輯
-    
-    // 找到所有外部連結
-    const linkMatches = content.match(/<a[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/gi) || [];
-    
-    // 過濾掉不需要的連結
-    const filteredLinks = linkMatches.filter(link => {
-      return !excludePatterns.some(pattern => pattern.test(link));
-    });
-    
-    // 限制連結數量
-    const limitedLinks = filteredLinks.slice(0, maxLinks);
-    
-    // 重建內容（這裡需要更複雜的邏輯來替換原始連結）
-    return content;
+    return {
+      background: await this.searchBlockTempoArticles(keywords, 'background'),
+      previous_context: await this.searchBlockTempoArticles(keywords, 'context'),
+      related_reading: await this.searchBlockTempoArticles(keywords, 'reading')
+    };
   }
 }
 ```
 
-#### 圖片處理器擴展
+### 4.3 設定檔管理重構
+
+#### 參數驅動的模板配置
 ```typescript
-class ImageProcessor {
-  async processFeatureImage(imageUrl: string, articleType: string): Promise<ProcessedImageResult> {
-    const template = ArticleTemplates[articleType];
-    
-    if (template.requiresAdTemplate) {
-      return await this.applyAdTemplate(imageUrl, template.adTemplateUrl);
-    }
-    
-    return await this.optimizeImage(imageUrl, template.imageSize, template.maxImageSizeMB);
-  }
+// src/config/parameter-driven-templates.ts
+
+/**
+ * 押註模板庫 - 支援參數化和擴展
+ */
+export const DisclaimerTemplates: Record<DisclaimerType, DisclaimerTemplate> = {
+  none: {
+    name: '不押註',
+    description: '純內容，不添加任何押註',
+    header: null,
+    footer: null,
+    authorPlaceholder: null,
+    useCases: ['一般文章', '內部文章', '純技術內容']
+  },
   
-  private async applyAdTemplate(imageUrl: string, adTemplateUrl: string): Promise<ProcessedImageResult> {
-    // 實現AD模板應用邏輯
-    // 1. 下載原始圖片
-    // 2. 應用AD模板（右上角AD標示）
-    // 3. 調整尺寸為750x375
-    // 4. 壓縮到2MB以下
-    
-    return {
-      processedImageUrl: `${imageUrl}?ad_template=applied`,
-      originalSize: 0,
-      compressedSize: 0,
-      dimensions: { width: 750, height: 375 },
-      hasAdTemplate: true
-    };
-  }
-  
-  private async optimizeImage(imageUrl: string, targetSize: any, maxSizeMB: number): Promise<ProcessedImageResult> {
-    // 實現圖片優化邏輯
-    // 1. 檢查檔案大小
-    // 2. 如果是PNG，轉為JPG
-    // 3. 壓縮到指定大小以下
-    // 4. 調整尺寸
-    
-    return {
-      processedImageUrl: imageUrl,
-      originalSize: 0,
-      compressedSize: 0,
-      dimensions: targetSize,
-      hasAdTemplate: false
-    };
-  }
-}
-
-interface ProcessedImageResult {
-  processedImageUrl: string;
-  originalSize: number;
-  compressedSize: number;
-  dimensions: { width: number; height: number };
-  hasAdTemplate: boolean;
-}
-```
-
-### 4.3 設定檔管理
-
-#### 模板設定檔
-```typescript
-// src/config/article-templates.ts
-export const ArticleTemplates = {
   sponsored: {
-    name: '廣編稿',
-    author: 'BTEditor',
-    authorDisplayName: '廣編頻道（BTEditor）',
-    requiresAdTemplate: true,
-    adTemplateUrl: 'https://www.canva.com/design/DAFvcOqDOD8/msglmQ4I-dU3Pq8R9m2mlg/edit',
-    
-    headerDisclaimer: '<span style="color: #808080;"><em>本文為廣編稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場，亦非投資建議、購買或出售建議。詳見文末責任警示。</em></span>',
-    
-    footerDisclaimer: '<div class="alert alert-warning">廣編免責聲明：本文內容為供稿者提供之廣宣稿件，供稿者與動區並無任何關係，本文亦不代表動區立場。本文無意提供任何投資、資產建議或法律意見，也不應被視為購買、出售或持有資產的要約。廣宣稿件內容所提及之任何服務、方案或工具等僅供參考，且最終實際內容或規則以供稿方之公布或說明為準，動區不對任何可能存在之風險或損失負責，提醒讀者進行任何決策或行為前務必自行謹慎查核。</div>',
-    
-    dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
-    
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
-
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
-
-    tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
-    
-    relatedArticlesHeader: '<h5>📍相關報導📍</h5>',
-    
-    relatedArticleLinkTemplate: '<strong><span style="color: #ff0000;"><a href="{url}">{title}</a></span></strong>',
-    
-    fullTemplate: `{introQuote}
-
-&nbsp;
-
-{headerDisclaimer}
-
-<hr />
-
-{dropcapContent}
-
-{mainContent}
-
-＿＿＿
-
-{footerDisclaimer}
-
-{tgBanner}
-
-{relatedArticlesHeader}
-{relatedArticles}`,
-
-    relatedArticlesCount: { min: 2, max: 4 },
-    maxExternalLinks: 3,
-    excludeLinkTypes: ['telegram', 'line'],
-    imageSize: { width: 750, height: 375 }, // 2:1 ratio
-    maxImageSizeMB: 2
+    name: '廣編稿押註',
+    description: '完整的廣編稿免責聲明',
+    header: '<span style="color: #808080;"><em>本文為廣編稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場，亦非投資建議、購買或出售建議。詳見文末責任警示。</em></span>',
+    footer: '<div class="alert alert-warning">廣編免責聲明：本文內容為供稿者提供之廣宣稿件，供稿者與動區並無任何關係，本文亦不代表動區立場。本文無意提供任何投資、資產建議或法律意見，也不應被視為購買、出售或持有資產的要約。廣宣稿件內容所提及之任何服務、方案或工具等僅供參考，且最終實際內容或規則以供稿方之公布或說明為準，動區不對任何可能存在之風險或損失負責，提醒讀者進行任何決策或行為前務必自行謹慎查核。</div>',
+    authorPlaceholder: '［撰稿方名稱］',
+    useCases: ['贊助內容', '合作文章', '商業推廣']
   },
   
-  pressRelease: {
-    name: '新聞稿',
-    author: 'BTVerse',
-    authorDisplayName: 'BT宙域（BTVerse）',
-    requiresAdTemplate: false,
-    
-    headerDisclaimer: '<span style="color: #808080;"><em>本文為新聞稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場。</em></span>',
-    
-    footerDisclaimer: null,
-    
-    dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
-    
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
-
-    tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
-    
-    relatedArticlesHeader: '<h5>📍相關報導📍</h5>',
-    
-    relatedArticleLinkTemplate: '<strong><a href="{url}">{title}</a></strong>',
-    
-    fullTemplate: `{introQuote}
-
-{headerDisclaimer}
-
-<hr />
-
-<span style="font-weight: 400;">{dropcapContent}
-
-{mainContent}
-
-{tgBanner}
-{relatedArticlesHeader}
-{relatedArticles}`,
-
-    relatedArticlesCount: { min: 2, max: 4 },
-    maxExternalLinks: 3,
-    excludeLinkTypes: ['telegram', 'line'],
-    imageSize: { width: 750, height: 375 }, // 2:1 ratio
-    maxImageSizeMB: 2
-  },
-  
-  regular: {
-    name: '一般文章',
-    author: 'custom',
-    authorDisplayName: null,
-    requiresAdTemplate: false,
-    
-    headerDisclaimer: null,
-    footerDisclaimer: null,
-    
-    dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
-    
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
-
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
-
-    tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
-    
-    relatedArticlesHeader: '<h5>📍相關報導📍</h5>',
-    
-    relatedArticleLinkTemplate: '<strong><a href="{url}">{title}</a></strong>',
-    
-    fullTemplate: `{introQuote}
-
-{dropcapContent}
-
-{mainContent}
-
-{tgBanner}
-{relatedArticlesHeader}
-{relatedArticles}`,
-
-    relatedArticlesCount: { min: 2, max: 4 },
-    maxExternalLinks: 3,
-    excludeLinkTypes: ['telegram', 'line'],
-    imageSize: { width: 750, height: 375 }, // 2:1 ratio
-    maxImageSizeMB: 2
+  'press-release': {
+    name: '新聞稿押註',
+    description: '簡化的新聞稿聲明',
+    header: '<span style="color: #808080;"><em>本文為新聞稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場。</em></span>',
+    footer: null,
+    authorPlaceholder: '［撰稿方名稱］',
+    useCases: ['企業新聞稿', '產品發佈', '官方聲明']
   }
+};
+
+/**
+ * 文稿類型預設配置 - 僅作為便利性預設值
+ */
+export const ArticleTypeDefaults: Record<ArticleType, AdvancedArticleSettings> = {
+  regular: {
+    headerDisclaimer: 'none',
+    footerDisclaimer: 'none',
+    authorName: undefined
+  },
+  sponsored: {
+    headerDisclaimer: 'sponsored',
+    footerDisclaimer: 'sponsored', 
+    authorName: undefined
+  },
+  'press-release': {
+    headerDisclaimer: 'press-release',
+    footerDisclaimer: 'none',
+    authorName: undefined
+  }
+};
+
+/**
+ * 參數組合驗證規則
+ */
+export const SettingsValidationRules = {
+  // 推薦的參數組合
+  recommendedCombinations: [
+    {
+      name: '標準廣編稿',
+      settings: { headerDisclaimer: 'sponsored', footerDisclaimer: 'sponsored' },
+      description: '完整的廣編稿格式，包含開頭和結尾押註'
+    },
+    {
+      name: '簡化廣編稿', 
+      settings: { headerDisclaimer: 'sponsored', footerDisclaimer: 'none' },
+      description: '僅開頭押註的廣編稿，適合簡短內容'
+    },
+    {
+      name: '標準新聞稿',
+      settings: { headerDisclaimer: 'press-release', footerDisclaimer: 'none' },
+      description: '標準新聞稿格式，僅開頭押註'
+    },
+    {
+      name: '純內容',
+      settings: { headerDisclaimer: 'none', footerDisclaimer: 'none' },
+      description: '無押註的純內容格式'
+    }
+  ],
+  
+  // 警告規則
+  warningRules: [
+    {
+      condition: (s: AdvancedArticleSettings) => s.headerDisclaimer === 'sponsored' && s.footerDisclaimer === 'none',
+      warning: '廣編稿通常建議包含結尾免責聲明以符合法規要求'
+    },
+    {
+      condition: (s: AdvancedArticleSettings) => (s.headerDisclaimer !== 'none' || s.footerDisclaimer !== 'none') && !s.authorName,
+      warning: '設定押註時建議填寫供稿方名稱，否則將顯示佔位符'
+    }
+  ]
 };
 ```
 
-### 4.4 狀態管理擴展
+### 4.4 API設計更新
 
-#### 處理狀態結構
+#### 處理流程API
 ```typescript
-interface EnhancedProcessingState {
-  // 現有欄位
-  stage: ProcessingStage;
-  status: ProcessingStatus;
-  
-  // 新增欄位
-  article_classification?: ArticleClassification;
-  formatting_applied?: boolean;
-  template_version?: string;
-  related_articles_found?: number;
-  content_analysis_completed?: boolean;
-  
-  // 階段結果
-  copy_editing_result?: EnhancedCopyEditingResult;
-  formatting_result?: ArticleFormattingResult;
+// API: /api/process-article (參數驅動版本)
+interface ProcessArticleRequest {
+  content: string;
+  advancedSettings: AdvancedArticleSettings; // 核心：基於參數而非類型
+  articleType?: ArticleType; // 可選：僅用於記錄和統計
+  mode: 'auto' | 'manual';
+}
+
+interface ProcessArticleResponse {
+  success: boolean;
+  data: {
+    formattedContent: string;
+    appliedSettings: AdvancedArticleSettings;
+    appliedRules: string[];
+    wordpress_params: WordPressPublishData;
+    warnings: string[];
+  };
+  metadata: {
+    processingTime: number;
+    hasHeaderDisclaimer: boolean;
+    hasFooterDisclaimer: boolean;
+    authorName?: string;
+  };
 }
 ```
 
-## 5. 實施階段規劃
+### 4.5 用戶體驗優化
 
-### 5.1 第一階段：基礎架構 (優先級：高)
-**目標**：建立文稿分類和基礎模板系統
-**任務**：
-- [ ] 在upload界面增加文稿類型選擇
-- [ ] 建立ArticleClassification資料結構
-- [ ] 創建基礎模板設定檔
-- [ ] 修改ProcessingState支援新欄位
-
-**預估時間**：3-5天
-
-### 5.2 第二階段：AI分析強化 (優先級：高)
-**目標**：增強CopyEditorAgent的智能分析能力
-**任務**：
-- [ ] 實現關聯文章搜尋功能
-- [ ] 加強中文用語轉換邏輯
-- [ ] 實現撰稿方名稱識別
-- [ ] 優化永久連結英文翻譯
-
-**預估時間**：5-7天
-
-### 5.3 第三階段：格式化處理器 (優先級：中)
-**目標**：實現article-formatting階段
-**任務**：
-- [ ] 建立ArticleFormattingProcessor類
-- [ ] 實現模板化押註插入
-- [ ] 實現Dropcap自動應用
-- [ ] 實現關聯文章區塊插入
-
-**預估時間**：4-6天
-
-### 5.4 第四階段：圖片處理強化 (優先級：中)
-**目標**：實現AD模板和圖片優化
-**任務**：
-- [ ] 實現廣編稿AD模板應用
-- [ ] 圖片尺寸檢查和壓縮建議
-- [ ] 特色圖片模板處理
-- [ ] 圖片alt文字優化
-
-**預估時間**：3-4天
-
-### 5.5 第五階段：UI優化與測試 (優先級：低)
-**目標**：完善用戶體驗和系統穩定性
-**任務**：
-- [ ] 格式預覽界面開發
-- [ ] 錯誤處理和降級策略
-- [ ] 全流程整合測試
-- [ ] 使用者體驗優化
-
-**預估時間**：4-5天
-
-## 6. 技術考量與風險
-
-### 6.1 技術挑戰
-1. **模板與動態內容整合**：如何平衡固定模板與靈活編輯
-2. **關聯文章搜尋準確性**：需要優化搜尋算法和相關性判斷
-3. **圖片處理效能**：AD模板應用和壓縮處理的效能優化
-4. **向後相容性**：確保現有功能不受影響
-
-### 6.2 風險評估
-1. **AI分析準確性**：關聯文章搜尋可能不夠準確
-   - 緩解：提供手動調整選項
-2. **模板維護複雜性**：模板變更可能影響多個流程
-   - 緩解：版本化管理和測試覆蓋
-3. **使用者學習成本**：新的分類選擇可能造成困惑
-   - 緩解：提供清楚的說明和預設選項
-
-## 7. 成功指標
-
-### 7.1 功能指標
-- [ ] 廣編稿/新聞稿格式100%符合規範
-- [ ] 關聯文章搜尋準確率達到80%以上
-- [ ] 圖片處理成功率達到95%以上
-- [ ] 中文用語轉換準確率達到90%以上
-
-### 7.2 體驗指標
-- [ ] 完整流程處理時間不增加超過20%
-- [ ] 用戶手動調整步驟減少50%以上
-- [ ] 發布錯誤率降低70%以上
-
-## 8. 後續擴展可能
-
-### 8.1 進階功能
-- SEO優化建議
-- 多語言支援
-- 更多文稿類型支援
-- 自動化測試覆蓋
-
-### 8.2 整合機會
-- WordPress外掛深度整合
-- 社群媒體同步發布
-- 內容分析報告
-- 編輯工作流程優化
-
----
-
-**文檔版本**：v1.0
-**建立日期**：2024-01-XX
-**最後更新**：2024-01-XX
-**負責人**：開發團隊
+#### 設定預覽和驗證
+```typescript
+const SettingsPreview = ({ settings }: { settings: AdvancedArticleSettings }) => {
+  const warnings = validateSettings(settings);
+  const preview = generateSettingsPreview(settings);
+  
+  return (
+    <div className="settings-preview">
+      <h4>設定預覽</h4>
+      <div className="preview-content">
+        {preview.headerDisclaimer && (
+          <div className="preview-header">
+            <strong>開頭押註：</strong>
+            <div dangerouslySetInnerHTML={{ __html: preview.headerDisclaimer }} />
+          </div>
+        )}
+        
+        {preview.footerDisclaimer && (
+          <div className="preview-footer">
+            <strong>結尾押註：</strong>
+            <div dangerouslySetInnerHTML={{ __html: preview.footerDisclaimer }} />
+          </div>
+        )}
+        
+        {!preview.headerDisclaimer && !preview.footerDisclaimer && (
+          <div className="preview-none">
+            <em>純內容格式，無押註</em>
+          </div>
+        )}
+      </div>
+      
+      {warnings.length > 0 && (
+        <div className="warnings">
+          <h5>建議：</h5>
+          <ul>
+            {warnings.map((warning, index) => (
+              <li key={index} className="warning-item">{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+```

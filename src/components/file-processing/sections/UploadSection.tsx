@@ -5,7 +5,7 @@ import { FileUpload } from '@/components/ui/file-upload/FileUpload';
 import { Button } from '@/components/ui/button/Button';
 import ProcessingModeSelector from '@/components/ui/ProcessingModeSelector';
 import ArticleTypeSelector from '@/components/ui/ArticleTypeSelector';
-import { ArticleType } from '@/types/article-formatting';
+import { ArticleType, AdvancedArticleSettings } from '@/types/article-formatting';
 
 interface UploadSectionProps {
   selectedFile: File | null;
@@ -26,6 +26,8 @@ interface UploadSectionProps {
   onModeChange: (isAuto: boolean) => void;
   selectedArticleType: ArticleType;
   onArticleTypeChange: (type: ArticleType) => void;
+  advancedSettings: AdvancedArticleSettings;
+  onAdvancedSettingsChange: (settings: AdvancedArticleSettings) => void;
 }
 
 export default function UploadSection({
@@ -46,7 +48,9 @@ export default function UploadSection({
   isAutoMode,
   onModeChange,
   selectedArticleType,
-  onArticleTypeChange
+  onArticleTypeChange,
+  advancedSettings,
+  onAdvancedSettingsChange
 }: UploadSectionProps) {
   // 渲染狀態通知欄
   const renderStatusNotification = () => {
@@ -106,6 +110,8 @@ export default function UploadSection({
       <ArticleTypeSelector
         selectedType={selectedArticleType}
         onTypeChange={onArticleTypeChange}
+        advancedSettings={advancedSettings}
+        onAdvancedSettingsChange={onAdvancedSettingsChange}
       />
       
       {/* 輸入類型選擇 */}
