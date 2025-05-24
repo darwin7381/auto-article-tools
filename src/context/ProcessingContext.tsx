@@ -2,19 +2,19 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { ProcessState, ProcessStage } from '@/components/progress/ProgressDisplay';
+import { ArticleClassification, ArticleType } from '@/types/article-formatting';
+import type { ProcessingMode } from '@/types/processing';
+import type { WordPressPostStatus } from '@/types/wordpress';
 
 // 定義階段結果的類型
 export interface StageResult {
   [key: string]: unknown;
 }
 
-// 處理模式類型
-export type ProcessingMode = 'auto' | 'manual';
-
 // 處理參數類型，用於未來擴展
 export interface ProcessingParams {
   mode: ProcessingMode;
-  defaultPublishStatus?: 'draft' | 'pending' | 'publish' | 'private' | 'future'; // WordPress發佈狀態
+  defaultPublishStatus?: WordPressPostStatus; // WordPress發佈狀態
   useWatermark?: boolean;        // 使用浮水印
   autoGenerateFeaturedImage?: boolean; // 自動生成首圖
   editorLabel?: string;          // 廣編標示
@@ -24,6 +24,9 @@ export interface ProcessingParams {
     extractTables?: boolean;     // 提取表格
     extractImages?: boolean;     // 提取圖片
   };
+  // 文稿分類相關
+  articleType?: ArticleType;     // 文稿類型
+  defaultAuthorId?: number;      // WordPress預設作者ID
   // 未來可添加更多參數
 }
 
@@ -45,6 +48,9 @@ interface ProcessingContextType {
   // 處理模式相關
   processingParams: ProcessingParams;
   updateProcessingParams: (newParams: Partial<ProcessingParams>) => void;
+  // 文稿分類相關
+  setArticleClassification: (classification: ArticleClassification) => void;
+  getArticleClassification: () => ArticleClassification | undefined;
 }
 
 // 階段群組定義
@@ -472,6 +478,30 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     }));
   }, []);
 
+  // 設置文稿分類
+  const setArticleClassification = useCallback((classification: ArticleClassification) => {
+    setProcessState(prevState => {
+      if (!prevState) return null;
+      
+      const updated = {
+        ...prevState,
+        article_classification: classification
+      };
+      
+      // 通知所有訂閱者
+      setTimeout(() => {
+        notifySubscribers(updated);
+      }, 0);
+      
+      return updated;
+    });
+  }, [notifySubscribers]);
+
+  // 獲取文稿分類
+  const getArticleClassification = useCallback((): ArticleClassification | undefined => {
+    return processState?.article_classification;
+  }, [processState]);
+
   const value = {
     processState,
     updateProcessState,
@@ -489,7 +519,10 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     getStageResult,
     // 處理模式相關
     processingParams,
-    updateProcessingParams
+    updateProcessingParams,
+    // 文稿分類相關
+    setArticleClassification,
+    getArticleClassification
   };
 
   return (

@@ -54,7 +54,7 @@ ${markdownContent}`;
     console.log('開始使用AI處理內容...');
     
     // 使用工具函數創建API配置
-    const config = createChatConfig("gpt-4.1", {
+    const config = createChatConfig("gpt-4o", {
       temperature: 0.3,
       max_tokens: 16000,
       top_p: 0.95,

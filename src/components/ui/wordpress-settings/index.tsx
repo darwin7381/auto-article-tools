@@ -1,50 +1,6 @@
 'use client';
 
-import { Dispatch, SetStateAction } from 'react';
-
-interface WordPressSettingsProps {
-  formData: {
-    title: string;
-    categories: string;
-    tags: string;
-    status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
-    isPrivate: boolean;
-    slug: string;
-    author: string;
-    featured_media: string;
-    date: string;
-  };
-  onChange: Dispatch<SetStateAction<{
-    title: string;
-    categories: string;
-    tags: string;
-    status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
-    isPrivate: boolean;
-    slug: string;
-    author: string;
-    featured_media: string;
-    date: string;
-  }>>;
-  error?: string;
-  detailedError?: string;
-  extractedParams?: {
-    categories?: Array<{ id: number; name?: string }>;
-    tags?: Array<{ id: number; name?: string }>;
-    slug?: string;
-  };
-}
-
-export interface WordPressPublishData {
-  title: string;
-  categories?: string;
-  tags?: string;
-  status: 'publish' | 'draft' | 'pending' | 'future' | 'private';
-  isPrivate: boolean;
-  slug?: string;
-  author?: string;
-  featured_media?: string;
-  date?: string;
-}
+import type { WordPressSettingsProps } from '@/types/wordpress';
 
 /**
  * WordPress設置組件 - 簡化版，使用環境變量進行認證
@@ -58,10 +14,10 @@ export function WordPressSettings({
 }: WordPressSettingsProps) {
   // 處理表單字段的更新
   const handleChange = (field: string, value: string | boolean) => {
-    onChange(prev => ({
-      ...prev,
+    onChange({
+      ...formData,
       [field]: value
-    }));
+    });
   };
   
   // 格式化分類或標籤顯示，如果有名稱則顯示，否則只顯示ID
@@ -200,7 +156,7 @@ export function WordPressSettings({
           <select
             id="status"
             value={formData.status}
-            onChange={(e) => handleChange('status', e.target.value as 'publish' | 'draft' | 'pending' | 'future' | 'private')}
+            onChange={(e) => handleChange('status', e.target.value)}
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 bg-transparent rounded-md focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
           >
             <option value="draft">草稿</option>
