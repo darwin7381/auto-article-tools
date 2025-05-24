@@ -12,8 +12,8 @@ import WordPressSettings from '@/components/ui/wordpress-settings';
 import { useSimplifiedWPIntegration } from '@/hooks/useSimplifiedWPIntegration';
 import ProcessingModeSelector from '@/components/ui/ProcessingModeSelector';
 import ArticleTypeSelector from '@/components/ui/ArticleTypeSelector';
-import { ArticleType, ArticleClassification } from '@/types/article-formatting';
-import { getArticleTemplate } from '@/config/article-templates';
+import { ArticleType, ArticleClassification, AdvancedArticleSettings } from '@/types/article-formatting';
+import { getArticleTemplate, DefaultAdvancedSettings } from '@/config/article-templates';
 
 // 擴展ProcessingResult類型以包含markdownContent和wordpressParams
 interface ExtendedProcessingResult extends BaseProcessingResult {
@@ -430,8 +430,12 @@ export default function IntegratedFileProcessor() {
   const [processSuccess, setProcessSuccess] = useState(false);
   // 處理模式狀態 - 預設為自動模式
   const [isAutoMode, setIsAutoMode] = useState(true);
-  // 文稿類型狀態 - 預設為一般文章
-  const [selectedArticleType, setSelectedArticleType] = useState<ArticleType>('regular');
+  // 文稿類型狀態 - 預設為廣編稿
+  const [selectedArticleType, setSelectedArticleType] = useState<ArticleType>('sponsored');
+  // 進階設定狀態 - 預設為廣編稿的設定
+  const [advancedSettings, setAdvancedSettings] = useState<AdvancedArticleSettings>(
+    DefaultAdvancedSettings['sponsored']
+  );
   
   // 階段查看結果
   const [viewingStage, setViewingStage] = useState<StageView | null>(null);
@@ -479,11 +483,32 @@ export default function IntegratedFileProcessor() {
       authorId: template.authorId, // 設置WordPress作者ID
       requiresAdTemplate: articleType === 'sponsored',
       templateVersion: 'v1.0',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      advancedSettings // 包含進階設定
     };
     
     setArticleClassification(classification);
-  }, [updateProcessingParams, setArticleClassification]);
+  }, [updateProcessingParams, setArticleClassification, advancedSettings]);
+  
+  // 處理進階設定變更
+  const handleAdvancedSettingsChange = useCallback((settings: AdvancedArticleSettings) => {
+    setAdvancedSettings(settings);
+    
+    // 更新 context 中的分類信息
+    const template = getArticleTemplate(selectedArticleType);
+    const classification: ArticleClassification = {
+      articleType: selectedArticleType,
+      author: template.author as 'BTEditor' | 'BTVerse' | 'custom',
+      authorDisplayName: template.authorDisplayName || undefined,
+      authorId: template.authorId,
+      requiresAdTemplate: selectedArticleType === 'sponsored',
+      templateVersion: 'v1.0',
+      timestamp: Date.now(),
+      advancedSettings: settings
+    };
+    
+    setArticleClassification(classification);
+  }, [selectedArticleType, setArticleClassification]);
   
   // 更新發佈狀態
   const handlePublishStatusChange = useCallback((status: 'draft' | 'pending' | 'publish' | 'private' | 'future') => {
@@ -1073,6 +1098,8 @@ export default function IntegratedFileProcessor() {
             <ArticleTypeSelector
               selectedType={selectedArticleType}
               onTypeChange={handleArticleTypeChange}
+              advancedSettings={advancedSettings}
+              onAdvancedSettingsChange={handleAdvancedSettingsChange}
             />
             
             {/* 文件上傳 */}

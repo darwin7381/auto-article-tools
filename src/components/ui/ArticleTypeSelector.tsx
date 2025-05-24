@@ -1,32 +1,53 @@
 'use client';
 
 import React from 'react';
-import { ArticleType } from '@/types/article-formatting';
-import { ArticleTypeOptions } from '@/config/article-templates';
+import { ArticleType, AdvancedArticleSettings, DisclaimerType } from '@/types/article-formatting';
+import { ArticleTypeOptions, DisclaimerOptions, DefaultAdvancedSettings } from '@/config/article-templates';
 
 interface ArticleTypeSelectorProps {
   selectedType: ArticleType;
   onTypeChange: (type: ArticleType) => void;
+  advancedSettings: AdvancedArticleSettings;
+  onAdvancedSettingsChange: (settings: AdvancedArticleSettings) => void;
   className?: string;
 }
 
 export default function ArticleTypeSelector({
   selectedType,
   onTypeChange,
+  advancedSettings,
+  onAdvancedSettingsChange,
   className = ''
 }: ArticleTypeSelectorProps) {
   
+  // 處理文稿類型變更
+  const handleTypeChange = (type: ArticleType) => {
+    onTypeChange(type);
+    // 自動應用該類型的預設進階設定
+    const defaultSettings = DefaultAdvancedSettings[type];
+    onAdvancedSettingsChange(defaultSettings);
+  };
+
+  // 處理進階設定變更
+  const handleAdvancedSettingChange = (key: keyof AdvancedArticleSettings, value: DisclaimerType | string | undefined) => {
+    onAdvancedSettingsChange({
+      ...advancedSettings,
+      [key]: value
+    });
+  };
+
   return (
     <div className={`mb-4 ${className}`}>
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-4 flex-wrap gap-y-3">
+        {/* 文稿類型選擇 */}
         <div className="flex items-center space-x-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
             文稿類型：
           </label>
           <select 
-            className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm" 
+            className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm min-w-[100px]" 
             value={selectedType}
-            onChange={(e) => onTypeChange(e.target.value as ArticleType)}
+            onChange={(e) => handleTypeChange(e.target.value as ArticleType)}
             aria-label="選擇文稿類型"
           >
             {ArticleTypeOptions.map((option) => (
@@ -37,7 +58,7 @@ export default function ArticleTypeSelector({
           </select>
           <button 
             type="button"
-            className="ml-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:dark:text-gray-300"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:dark:text-gray-300"
             title="文稿類型說明"
             onClick={() => {
               const selectedOption = ArticleTypeOptions.find(opt => opt.value === selectedType);
@@ -51,6 +72,62 @@ export default function ArticleTypeSelector({
             </svg>
           </button>
         </div>
+
+        {/* 正文開頭押註 */}
+        <div className="flex items-center space-x-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+            正文開頭押註：
+          </label>
+          <select 
+            className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm min-w-[120px]"
+            value={advancedSettings.headerDisclaimer}
+            onChange={(e) => handleAdvancedSettingChange('headerDisclaimer', e.target.value as DisclaimerType)}
+            aria-label="選擇正文開頭押註"
+          >
+            {DisclaimerOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 正文末尾押註 */}
+        <div className="flex items-center space-x-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+            正文末尾押註：
+          </label>
+          <select 
+            className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm min-w-[120px]"
+            value={advancedSettings.footerDisclaimer}
+            onChange={(e) => handleAdvancedSettingChange('footerDisclaimer', e.target.value as DisclaimerType)}
+            aria-label="選擇正文末尾押註"
+          >
+            {DisclaimerOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* 供稿方輸入框 - 獨立一行以避免擠壓 */}
+      <div className="flex items-center space-x-2 mt-3">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+          供稿方：
+        </label>
+        <input
+          type="text"
+          className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm min-w-[200px] max-w-[300px]"
+          value={advancedSettings.authorName || ''}
+          onChange={(e) => handleAdvancedSettingChange('authorName', e.target.value || undefined)}
+          placeholder="輸入供稿方名稱（選填）"
+          aria-label="輸入供稿方名稱"
+        />
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          用於自動替換押註中的［撰稿方名稱］
+        </span>
       </div>
     </div>
   );
