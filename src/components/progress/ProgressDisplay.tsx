@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, ReactNode } from 'react';
 import { Progress } from '@heroui/progress';
+import { ArticleClassification } from '@/types/article-formatting';
 
 export interface ProcessStage {
   id: string;
@@ -34,14 +35,7 @@ export interface ProcessState {
     imageCount?: number;
   };
   stageResults?: Record<string, unknown>;
-  article_classification?: {
-    articleType: 'regular' | 'sponsored' | 'press-release';
-    author?: 'BTEditor' | 'BTVerse' | 'custom';
-    authorDisplayName?: string;
-    requiresAdTemplate: boolean;
-    templateVersion: string;
-    timestamp: number;
-  };
+  article_classification?: ArticleClassification;
   formatting_applied?: boolean;
   template_version?: string;
   related_articles_found?: number;

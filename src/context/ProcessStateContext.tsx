@@ -11,7 +11,7 @@ export const stageGroups = {
   },
   advanced: { 
     title: "後期處理階段",
-    stages: ['advanced-ai', 'format-conversion', 'copy-editing']
+    stages: ['advanced-ai', 'format-conversion', 'copy-editing', 'article-formatting']
   },
   final: {
     title: "上稿階段", 
@@ -27,6 +27,7 @@ export const defaultStages: ProcessStage[] = [
   { id: 'advanced-ai', name: 'PR writer處理', status: 'pending', progress: 0 },
   { id: 'format-conversion', name: '格式轉換', status: 'pending', progress: 0 },
   { id: 'copy-editing', name: 'AI上稿編修', status: 'pending', progress: 0 },
+  { id: 'article-formatting', name: '進階格式化', status: 'pending', progress: 0 },
   { id: 'prep-publish', name: '上稿準備', status: 'pending', progress: 0 },
   { id: 'publish-news', name: '上架新聞', status: 'pending', progress: 0 },
 ];

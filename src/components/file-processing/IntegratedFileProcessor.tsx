@@ -327,33 +327,65 @@ const WordPressPublishComponent = ({
         !isSubmitting && 
         !publishResult) {
       
-      // 自動點擊發布按鈕
-      setTimeout(() => {
-        console.log("自動模式：上架新聞階段自動確認");
+      console.log("自動模式檢查條件:", {
+        mode: processingParams?.mode,
+        isSubmitting,
+        hasPublishResult: !!publishResult,
+        currentTitle: formData.title.trim(),
+        titleLength: formData.title.length
+      });
+      
+      // 自動點擊發布按鈕 - 延長延遲時間確保標題提取完成
+      const autoPublishTimer = setTimeout(() => {
+        console.log("自動模式：準備執行上架新聞階段自動確認");
+        console.log("當前formData狀態:", {
+          title: formData.title,
+          titleTrimmed: formData.title.trim(),
+          hasTitle: !!formData.title.trim(),
+          author: formData.author,
+          status: formData.status
+        });
+        
         if (formData.title.trim()) {
+          console.log("自動模式：上架新聞階段自動確認 - 標題檢查通過");
+          
           // 設置預設發佈狀態
           if (processingParams?.defaultPublishStatus) {
             setFormData(prev => ({
               ...prev,
               status: processingParams.defaultPublishStatus as 'draft' | 'pending' | 'publish' | 'private' | 'future'
             }));
+            console.log("自動設置發布狀態為:", processingParams.defaultPublishStatus);
           }
+          
+          // 執行發布
+          console.log("自動模式：開始執行 handlePublish");
           handlePublish();
         } else {
-          console.warn("自動發布失敗：文章標題為空");
+          console.warn("自動發布失敗：文章標題為空", {
+            originalTitle: formData.title,
+            titleLength: formData.title.length,
+            sanitizedHtmlContentLength: sanitizedHtmlContent.length
+          });
         }
-      }, 1500);
+      }, 3000); // 延長到3秒，確保所有useEffect完成
+      
+      // 清理定時器
+      return () => {
+        clearTimeout(autoPublishTimer);
+      };
     }
     
     // 當發布完成時，確保狀態更新
     if (publishResult?.success && processState?.currentStage === 'publish-news' && completeStage) {
       // 使用setTimeout確保狀態更新在渲染週期之外
       setTimeout(() => {
+        console.log("自動模式：發布成功，完成上架新聞階段");
         // 完成上架新聞階段
         completeStage('publish-news', '已成功發布到WordPress');
       }, 500);
     }
-  }, [processingParams?.mode, processingParams?.defaultPublishStatus, isSubmitting, publishResult, formData.title, processState?.currentStage, completeStage, handlePublish]);
+  }, [processingParams?.mode, processingParams?.defaultPublishStatus, isSubmitting, publishResult, formData.title, processState?.currentStage, completeStage, handlePublish, sanitizedHtmlContent]);
 
   return (
     <div className="mt-2 pl-8 pr-0">
@@ -592,6 +624,25 @@ export default function IntegratedFileProcessor() {
     };
   }, [cleanup]);
 
+  // 初始化文稿分類設定
+  useEffect(() => {
+    // 組件初始化時設置預設的文稿分類
+    const template = getArticleTemplate(selectedArticleType);
+    const classification: ArticleClassification = {
+      articleType: selectedArticleType,
+      author: template.author as 'BTEditor' | 'BTVerse' | 'custom',
+      authorDisplayName: template.authorDisplayName || undefined,
+      authorId: template.authorId,
+      requiresAdTemplate: selectedArticleType === 'sponsored',
+      templateVersion: 'v1.0',
+      timestamp: Date.now(),
+      advancedSettings
+    };
+    
+    setArticleClassification(classification);
+    console.log('初始化文稿分類設定:', classification);
+  }, [selectedArticleType, advancedSettings, setArticleClassification]); // 添加正確的依賴項
+
   // 用於初始化上稿準備階段狀態的Effect
   useEffect(() => {
     if (processState && 
@@ -740,6 +791,22 @@ export default function IntegratedFileProcessor() {
   const handleProcess = () => {
     if (isProcessing) return;
     
+    // 重置處理狀態
+    setUploadError(null);
+    
+    // 準備文稿分類（在重置前準備好）
+    const template = getArticleTemplate(selectedArticleType);
+    const classification: ArticleClassification = {
+      articleType: selectedArticleType,
+      author: template.author as 'BTEditor' | 'BTVerse' | 'custom',
+      authorDisplayName: template.authorDisplayName || undefined,
+      authorId: template.authorId,
+      requiresAdTemplate: selectedArticleType === 'sponsored',
+      templateVersion: 'v1.0',
+      timestamp: Date.now(),
+      advancedSettings
+    };
+    
     // 如果已處理完成，需要重置狀態以啟動新的處理流程
     if (processSuccess) {
       setIsProcessing(false);
@@ -747,10 +814,17 @@ export default function IntegratedFileProcessor() {
       setResult(null);
       setMarkdownUrl(null);
       resetProcessState();
+      
+      // 重置後立即重新設置文稿分類，確保資料不丟失
+      setTimeout(() => {
+        setArticleClassification(classification);
+        console.log('重置後重新設置文稿分類:', classification);
+      }, 0);
+    } else {
+      // 正常情況下設置文稿分類
+      setArticleClassification(classification);
+      console.log('處理開始前設置文稿分類:', classification);
     }
-    
-    // 重置處理狀態
-    setUploadError(null);
     
     if (selectedInputType === 'file' && selectedFile) {
       processFile(selectedFile);
@@ -772,7 +846,7 @@ export default function IntegratedFileProcessor() {
     // 獲取階段查看URL
     const viewerUrl = getStageViewerUrl(stageId, stageResult);
     if (viewerUrl) {
-      // 直接在新窗口中打開，不再設置 viewingStage
+      // 直接在新窗口中打開
       window.open(viewerUrl, '_blank', 'noopener,noreferrer');
     }
   };
@@ -794,7 +868,7 @@ export default function IntegratedFileProcessor() {
       return `/viewer/processed/${key}?view=markdown`;
     }
     
-    if (stageId === 'format-conversion' || stageId === 'copy-editing') {
+    if (stageId === 'format-conversion' || stageId === 'copy-editing' || stageId === 'article-formatting') {
       // 如果有 HTML 文件鍵，直接使用 viewer 查看
       if (result.htmlKey) {
         const key = String(result.htmlKey).split('/').pop() || '';
@@ -848,24 +922,26 @@ export default function IntegratedFileProcessor() {
             >
               關閉
             </Button>
-            {getStageViewerUrl(id, result) && (
-              <Button
-                onClick={() => {
-                  const url = getStageViewerUrl(id, result);
-                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
-                }}
-                className="ml-2"
-                color="primary"
-                startIcon={
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                }
-              >
-                在新窗口中查看
-              </Button>
-            )}
+            {(() => {
+              const viewerUrl = getStageViewerUrl(id, result);
+              return viewerUrl && (
+                <Button
+                  onClick={() => {
+                    if (viewerUrl) window.open(viewerUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="ml-2"
+                  color="primary"
+                  startIcon={
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  }
+                >
+                  在新窗口中查看
+                </Button>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -880,6 +956,10 @@ export default function IntegratedFileProcessor() {
       'process': 'AI 初步內容處理',
       'advanced-ai': 'PR writer處理',
       'format-conversion': '格式轉換',
+      'copy-editing': 'AI上稿編修',
+      'article-formatting': '進階格式化',
+      'prep-publish': '上稿準備',
+      'publish-news': '上架新聞',
       'complete': '處理完成'
     };
     
@@ -909,7 +989,7 @@ export default function IntegratedFileProcessor() {
       );
     }
     
-    if (stageId === 'format-conversion' || stageId === 'copy-editing') {
+    if (stageId === 'format-conversion' || stageId === 'copy-editing' || stageId === 'article-formatting') {
       // 顯示HTML內容預覽
       if (result.htmlContent && typeof result.htmlContent === 'string') {
         return (
@@ -927,6 +1007,16 @@ export default function IntegratedFileProcessor() {
             <div 
               className="max-h-96 overflow-y-auto" 
               dangerouslySetInnerHTML={{ __html: result.adaptedContent.slice(0, 1000) + (result.adaptedContent.length > 1000 ? '...' : '') }}
+            />
+          </div>
+        );
+      } else if (stageId === 'article-formatting' && result.formattedContent && typeof result.formattedContent === 'string') {
+        // 如果是進階格式化階段且有formattedContent，則顯示formattedContent
+        return (
+          <div className="bg-gray-50 dark:bg-gray-900 rounded p-4">
+            <div 
+              className="max-h-96 overflow-y-auto" 
+              dangerouslySetInnerHTML={{ __html: result.formattedContent.slice(0, 1000) + (result.formattedContent.length > 1000 ? '...' : '') }}
             />
           </div>
         );
@@ -1276,7 +1366,7 @@ export default function IntegratedFileProcessor() {
                 },
                 advanced: { 
                   title: "後期處理階段",
-                  stages: ['advanced-ai', 'format-conversion', 'copy-editing']
+                  stages: ['advanced-ai', 'format-conversion', 'copy-editing', 'article-formatting']
                 },
                 final: {
                   title: "上稿階段", 
@@ -1332,7 +1422,7 @@ export default function IntegratedFileProcessor() {
                 },
                 advanced: { 
                   title: "後期處理階段",
-                  stages: ['advanced-ai', 'format-conversion', 'copy-editing']
+                  stages: ['advanced-ai', 'format-conversion', 'copy-editing', 'article-formatting']
                 },
                 final: {
                   title: "上稿階段", 

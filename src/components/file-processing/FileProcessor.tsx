@@ -8,8 +8,8 @@ import UploadSection from './sections/UploadSection';
 import ProcessingSection from './sections/ProcessingSection';
 import ResultSection from './sections/ResultSection';
 import StageViewDialog, { StageView } from './dialogs/StageViewDialog';
-import { ArticleType, ArticleClassification } from '@/types/article-formatting';
-import { getArticleTemplate } from '@/config/article-templates';
+import { ArticleType, ArticleClassification, AdvancedArticleSettings } from '@/types/article-formatting';
+import { getArticleTemplate, DefaultAdvancedSettings } from '@/config/article-templates';
 
 // 定義PrepPublishingComponent組件
 const PrepPublishingComponent = ({ 
@@ -100,6 +100,10 @@ export default function FileProcessor() {
   const [viewingStage, setViewingStage] = useState<StageView | null>(null);
   // 文稿類型狀態 - 預設為一般文章
   const [selectedArticleType, setSelectedArticleType] = useState<ArticleType>('regular');
+  // 進階設定狀態 - 預設為一般文章的設定
+  const [advancedSettings, setAdvancedSettings] = useState<AdvancedArticleSettings>(
+    DefaultAdvancedSettings['regular']
+  );
 
   // 使用處理模式Hook
   const { isAutoMode, handleModeChange } = useProcessingMode();
@@ -343,6 +347,10 @@ export default function FileProcessor() {
     // 獲取對應的模板配置
     const template = getArticleTemplate(articleType);
     
+    // 自動應用該類型的預設進階設定
+    const defaultSettings = DefaultAdvancedSettings[articleType];
+    setAdvancedSettings(defaultSettings);
+    
     // 更新處理參數，包括作者ID
     updateProcessingParams({ 
       articleType,
@@ -357,7 +365,28 @@ export default function FileProcessor() {
       authorId: template.authorId, // 設置WordPress作者ID
       requiresAdTemplate: articleType === 'sponsored',
       templateVersion: 'v1.0',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      advancedSettings: defaultSettings
+    };
+    
+    setArticleClassification(classification);
+  };
+
+  // 處理進階設定變更
+  const handleAdvancedSettingsChange = (settings: AdvancedArticleSettings) => {
+    setAdvancedSettings(settings);
+    
+    // 更新 context 中的分類信息
+    const template = getArticleTemplate(selectedArticleType);
+    const classification: ArticleClassification = {
+      articleType: selectedArticleType,
+      author: template.author as 'BTEditor' | 'BTVerse' | 'custom',
+      authorDisplayName: template.authorDisplayName || undefined,
+      authorId: template.authorId,
+      requiresAdTemplate: selectedArticleType === 'sponsored',
+      templateVersion: 'v1.0',
+      timestamp: Date.now(),
+      advancedSettings: settings
     };
     
     setArticleClassification(classification);
@@ -434,6 +463,8 @@ export default function FileProcessor() {
             onModeChange={handleModeChange}
             selectedArticleType={selectedArticleType}
             onArticleTypeChange={handleArticleTypeChange}
+            advancedSettings={advancedSettings}
+            onAdvancedSettingsChange={handleAdvancedSettingsChange}
           />
         )}
 

@@ -61,7 +61,7 @@ const stageGroups = {
   },
   advanced: { 
     title: "後期處理階段",
-    stages: ['advanced-ai', 'format-conversion', 'copy-editing']
+    stages: ['advanced-ai', 'format-conversion', 'copy-editing', 'article-formatting']
   },
   final: {
     title: "上稿階段", 
@@ -77,6 +77,7 @@ const defaultStages: ProcessStage[] = [
   { id: 'advanced-ai', name: 'PR writer處理', status: 'pending', progress: 0 },
   { id: 'format-conversion', name: '格式轉換', status: 'pending', progress: 0 },
   { id: 'copy-editing', name: 'AI上稿編修', status: 'pending', progress: 0 },
+  { id: 'article-formatting', name: '進階格式化', status: 'pending', progress: 0 },
   { id: 'prep-publish', name: '上稿準備', status: 'pending', progress: 0 },
   { id: 'publish-news', name: '上架新聞', status: 'pending', progress: 0 },
 ];
@@ -172,6 +173,9 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
 
   // 開始文件處理
   const startFileProcessing = useCallback((fileId: string, fileName: string, fileType: string, fileSize: number) => {
+    // 保留現有的文稿分類
+    const existingClassification = processState?.article_classification;
+    
     const newState: ProcessState = {
       ...JSON.parse(JSON.stringify(initialState)), // 深拷貝避免引用問題
       id: fileId,
@@ -186,6 +190,8 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
         fileType,
         fileSize,
       },
+      // 保留現有的文稿分類
+      article_classification: existingClassification
     };
 
     // 更新第一個階段狀態
@@ -200,10 +206,13 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     setTimeout(() => {
       notifySubscribers(newState);
     }, 0);
-  }, [notifySubscribers]);
+  }, [notifySubscribers, processState?.article_classification]);
 
   // 開始URL處理
   const startUrlProcessing = useCallback((url: string, urlType: string) => {
+    // 保留現有的文稿分類
+    const existingClassification = processState?.article_classification;
+    
     const newState: ProcessState = {
       ...JSON.parse(JSON.stringify(initialState)), // 深拷貝避免引用問題
       id: `url-${Date.now()}`,
@@ -217,6 +226,8 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
         url,
         urlType,
       },
+      // 保留現有的文稿分類
+      article_classification: existingClassification
     };
     
     // 更新第一個階段狀態
@@ -231,7 +242,7 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
     setTimeout(() => {
       notifySubscribers(newState);
     }, 0);
-  }, [notifySubscribers]);
+  }, [notifySubscribers, processState?.article_classification]);
 
   // 更新階段進度
   const updateStageProgress = useCallback((stageId: string, progress: number, message?: string) => {
@@ -481,21 +492,21 @@ export function ProcessingProvider({ children }: { children: React.ReactNode }) 
   // 設置文稿分類
   const setArticleClassification = useCallback((classification: ArticleClassification) => {
     setProcessState(prevState => {
-      if (!prevState) return null;
-      
-      const updated = {
+      if (!prevState) {
+        // 如果 processState 為 null，創建一個臨時狀態來存儲文稿分類
+        const tempState: ProcessState = {
+          ...JSON.parse(JSON.stringify(initialState)),
+          id: `temp-${Date.now()}`,
+          article_classification: classification
+        };
+        return tempState;
+      }
+      return {
         ...prevState,
         article_classification: classification
       };
-      
-      // 通知所有訂閱者
-      setTimeout(() => {
-        notifySubscribers(updated);
-      }, 0);
-      
-      return updated;
     });
-  }, [notifySubscribers]);
+  }, []);
 
   // 獲取文稿分類
   const getArticleClassification = useCallback((): ArticleClassification | undefined => {
