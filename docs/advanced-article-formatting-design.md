@@ -173,17 +173,17 @@
 
 ### 2.3 共同格式要求
 **內容格式要求**：
-- 不要將發布時間解禁敘述抓取進正文（如：EMBARGOED TILL 9 MAY 2025, 11:00 AM GMT+8）
+- ~~不要將發布時間解禁敘述抓取進正文（如：EMBARGOED TILL 9 MAY 2025, 11:00 AM GMT+8）~~（已在前面AI流程實現）
 - 第一段開頭第一個字使用Dropcap格式：
   ```html
   <span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">[字]</span>
   ```
-- 英文和數字前後要空半格（段首除外）
+- ~~英文和數字前後要空半格（段首除外）~~（已在前面AI流程實現）
 - 段落標題優先設為「標題三」
 - 內文標題層級：標題三 > 標題四 > 段落/Text（粗體）
-- 中國用語轉台灣用語：
-  - 網絡 → 網路
-  - 信息 → 資訊/訊息（依上下文判斷）
+- ~~中國用語轉台灣用語：~~（已在前面AI流程實現）
+  - ~~網絡 → 網路~~
+  - ~~信息 → 資訊/訊息（依上下文判斷）~~
 
 **引言與關聯文章要求**：
 - 文章有副標題：直接將副標題作為引言
@@ -209,18 +209,10 @@
   <strong><a href="[URL]">[標題]</a></strong>
   ```
 
-**圖片處理要求**：
-- 封面首圖建議尺寸：750×375 px（2:1比例）
-- 廣編稿需套入AD模板，右上角有AD標示
-- 新聞稿不需要AD模板
-- 圖片檔案大小須小於2MB
-- PNG圖檔可轉為JPG減少檔案大小
-- JPG仍過大需壓縮至2MB以下
-
-**永久連結處理**：
-- 將文章標題翻譯為英文
-- 全部小寫，單字間用 `-` 連接
-- 範例：`t-rex-raises-17m-to-reshape-web3s-attention-economy-layer`
+**永久連結處理**：（已在前面AI流程實現）
+- ~~將文章標題翻譯為英文~~
+- ~~全部小寫，單字間用 `-` 連接~~
+- ~~範例：`t-rex-raises-17m-to-reshape-web3s-attention-economy-layer`~~
 
 ## 3. 建議架構方案：參數驅動的靈活處理
 
@@ -927,3 +919,111 @@ const SettingsPreview = ({ settings }: { settings: AdvancedArticleSettings }) =>
   );
 };
 ```
+
+## 8. ArticleFormattingProcessor 功能範圍限制與修正記錄
+
+### 8.1 問題背景
+在初始實現中，ArticleFormattingProcessor 錯誤地重複實現了多個應該在前面 AI Agent 階段完成的功能，導致處理流程混亂和功能重複。
+
+### 8.2 已刪除的錯誤功能
+以下功能已從 ArticleFormattingProcessor 中完全移除，因為它們應該在前面的 AI Agent 階段處理：
+
+1. **移除發布解禁敘述** (`removeEmbargoStatements`)
+   - 原因：應該在前面的 AI Agent 階段完成
+   - 刪除方法：完全移除相關代碼和邏輯
+
+2. **中文用語轉換** (`applyChineseTerminologyConversion`)
+   - 原因：應該在前面的 AI Agent 階段完成
+   - 刪除方法：完全移除 terminologyMap 和轉換邏輯
+
+3. **英文和數字前後空格處理** (`addSpacesAroundEnglishAndNumbers`)
+   - 原因：應該在前面的 AI Agent 階段完成
+   - 刪除方法：完全移除空格添加邏輯
+
+4. **生成英文永久連結** (`generateEnglishSlug` 和 `translateToEnglish`)
+   - 原因：應該在前面的 AI Agent 階段完成
+   - 刪除方法：完全移除相關靜態方法
+
+### 8.3 修正的功能
+**標題層級正規化** (`normalizeHeadings`)
+- **修正前**：將 h1, h2 轉為 h3；將 h5, h6 轉為 h4
+- **修正後**：保持 h1 不變，只進行 h2→h3, h3→h4, h4→h5 的轉換
+- **修正原因**：避免影響文章主標題結構
+
+### 8.4 ArticleFormattingProcessor 當前職責範圍
+經過修正後，ArticleFormattingProcessor 現在只負責以下核心功能：
+
+1. **參數驅動的模板應用** - 基於用戶設定的 AdvancedArticleSettings 進行格式化
+2. **押註模板插入** - 根據 headerDisclaimer 和 footerDisclaimer 參數插入對應模板
+3. **Dropcap 格式應用** - 為文章首段第一個字符應用 Dropcap 樣式
+4. **標題層級正規化** - 僅調整 h2-h4 標題層級，不動 h1
+5. **引言區塊處理** - 應用 intro_quote 樣式和關聯文章連結
+6. **相關閱讀區塊插入** - 添加 TG Banner 和相關文章連結
+
+## 9. 技術實現問題修復記錄
+
+### 9.1 文稿分類初始化問題
+**問題描述**：組件初始化時設置了預設文稿分類值，但沒有調用 `setArticleClassification`，導致 ProcessingContext 中的文稿分類為 undefined。
+
+**錯誤訊息**：`缺少文稿分類或進階設定，無法進行格式化處理`
+
+**解決方案**：在 IntegratedFileProcessor 中添加 useEffect 來初始化文稿分類：
+```typescript
+// 初始化文稿分類設定
+useEffect(() => {
+  const template = getArticleTemplate(selectedArticleType);
+  const classification: ArticleClassification = {
+    articleType: selectedArticleType,
+    author: template.author as 'BTEditor' | 'BTVerse' | 'custom',
+    authorDisplayName: template.authorDisplayName || undefined,
+    authorId: template.authorId,
+    requiresAdTemplate: selectedArticleType === 'sponsored',
+    templateVersion: 'v1.0',
+    timestamp: Date.now(),
+    advancedSettings
+  };
+  
+  setArticleClassification(classification);
+}, []); // 只在組件初始化時執行一次
+```
+
+### 9.2 UI 階段顯示不完整問題
+**問題描述**：雖然 ProcessingContext 中定義了 `article-formatting` 階段，但 UI 上沒有顯示該階段。
+
+**根本原因**：IntegratedFileProcessor 中的 stageGroups 定義與 ProcessingContext 不一致：
+- ProcessingContext：`['advanced-ai', 'format-conversion', 'copy-editing', 'article-formatting']`
+- IntegratedFileProcessor：`['advanced-ai', 'format-conversion', 'copy-editing']` ❌
+
+**解決方案**：
+1. 修正 IntegratedFileProcessor 中的 stageGroups 定義，確保包含 `article-formatting`
+2. 在 `getStageTitle` 函數中添加缺失的階段標題映射
+3. 在 `formatStageResult` 函數中添加對 `article-formatting` 階段的支持
+4. 在 `getStageViewerUrl` 函數中添加對 `article-formatting` 階段的查看支持
+
+### 9.3 防止再次出錯的檢查清單
+在修改處理流程時，請確保以下一致性：
+
+1. **階段定義一致性**：
+   - ProcessingContext.tsx 中的 `defaultStages`
+   - ProcessingContext.tsx 中的 `stageGroups`
+   - IntegratedFileProcessor.tsx 中的 ProgressDisplay `stageGroups`
+   - 各階段處理器的 Hook 中的階段 ID
+
+2. **階段標題映射完整性**：
+   - IntegratedFileProcessor.tsx 中的 `getStageTitle` 函數
+   - 確保所有階段都有對應的中文顯示名稱
+
+3. **階段結果處理完整性**：
+   - `formatStageResult` 函數支援所有階段的結果格式
+   - `getStageViewerUrl` 函數支援所有可查看階段的 URL 生成
+
+4. **文稿分類初始化**：
+   - 確保組件初始化時正確調用 `setArticleClassification`
+   - 確保 `getArticleClassification` 能返回有效的分類數據
+
+### 9.4 修復確認
+✅ 文稿分類初始化問題已修復
+✅ UI 階段顯示問題已修復  
+✅ 階段標題映射問題已修復
+✅ 階段結果查看功能已完善
+✅ 設計文檔已更新記錄修復內容

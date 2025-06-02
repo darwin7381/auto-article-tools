@@ -167,9 +167,9 @@ export function TapEditor({ initialContent = '', onChange, placeholder = '開始
       isEditorInitialized.current = true;
       lastSetContent.current = htmlSource;
       if (currentView === 'visual') {
-        editor.commands.setContent(htmlSource);
-        editor.commands.focus('start');
-      }
+      editor.commands.setContent(htmlSource);
+      editor.commands.focus('start');
+    }
     }
   }, [editor, htmlSource, currentView]);
 

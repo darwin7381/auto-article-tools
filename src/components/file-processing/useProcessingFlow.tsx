@@ -6,6 +6,7 @@ import useAiProcessingStage, { ProcessingResult } from './useAiProcessingStage';
 import useAdvancedAiStage, { AdvancedAiResult } from './useAdvancedAiStage';
 import useFormatConversionStage, { FormatConversionResult } from './useFormatConversionStage';
 import useCopyEditingStage, { CopyEditingResult } from './useCopyEditingStage';
+import useArticleFormattingStage, { ArticleFormattingStageResult } from './useArticleFormattingStage';
 
 // 重新導出類型以保持兼容性
 export type { ExtractResult } from './useExtractStage';
@@ -13,10 +14,12 @@ export type { ProcessingResult } from './useAiProcessingStage';
 export type { AdvancedAiResult } from './useAdvancedAiStage';
 export type { FormatConversionResult } from './useFormatConversionStage';
 export type { CopyEditingResult } from './useCopyEditingStage';
+export type { ArticleFormattingStageResult } from './useArticleFormattingStage';
 
 // 定義最終處理結果類型
 export interface FinalProcessingResult extends CopyEditingResult {
   processingComplete?: boolean;
+  articleFormattingResult?: ArticleFormattingStageResult;
   [key: string]: unknown; // 添加索引簽名
 }
 
@@ -47,6 +50,11 @@ interface FormatConversionStageHandler {
 
 interface CopyEditingStageHandler {
   startCopyEditing: (result: FormatConversionResult) => Promise<CopyEditingResult>;
+  cleanup: () => void;
+}
+
+interface ArticleFormattingStageHandler {
+  startArticleFormatting: (result: CopyEditingResult) => Promise<ArticleFormattingStageResult | undefined>;
   cleanup: () => void;
 }
 
@@ -92,6 +100,71 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
   const advancedAiStageRef = useRef<AdvancedAiStageHandler | null>(null);
   const formatConversionStageRef = useRef<FormatConversionStageHandler | null>(null);
   const copyEditingStageRef = useRef<CopyEditingStageHandler | null>(null);
+  const articleFormattingStageRef = useRef<ArticleFormattingStageHandler | null>(null);
+
+  // 文章格式化階段
+  const articleFormattingStage = useArticleFormattingStage(
+    { 
+      copyEditingResult: {} as CopyEditingResult
+    },
+    {
+      onComplete: (result) => {
+        console.log('進階文章格式化階段完成:', result);
+        
+        callbacksRef.current.onStageComplete('article-formatting', result as unknown as Record<string, unknown>);
+        
+        // 從原始的 WordPress 參數重建包含標題和特色圖片的完整內容
+        const title = result.originalWordPressParams?.title || '';
+        const featuredImage = result.originalWordPressParams?.featured_image;
+        
+        // 重新組合標題和特色圖片到格式化後的內容前面
+        const titleHtml = title ? `<h1>${title}</h1>` : '';
+        let featureImageHtml = '';
+        if (featuredImage && featuredImage.url) {
+          featureImageHtml = `<figure class="featured-image"><img src="${featuredImage.url}" alt="${featuredImage.alt || '文章首圖'}" /></figure>`;
+        }
+        
+        // 組合完整的 HTML 內容：標題 + 特色圖片 + 格式化後的內容
+        const fullHtmlContent = titleHtml + featureImageHtml + result.formattedContent;
+        
+        // 構建包含格式化內容和原始WordPress參數的結果
+        const formattedResult: FinalProcessingResult = {
+          // 使用原始的 WordPress 參數（從 copy-editing 階段保存的），確保必要字段存在
+          wordpressParams: {
+            title: result.originalWordPressParams?.title || '進階格式化完成的文稿',
+            content: result.formattedContent, // WordPress content 使用純格式化內容（不包含標題和特色圖片）
+            excerpt: result.originalWordPressParams?.excerpt || '進階格式化處理完成',
+            slug: result.originalWordPressParams?.slug,
+            categories: result.originalWordPressParams?.categories,
+            tags: result.originalWordPressParams?.tags,
+            featured_image: result.originalWordPressParams?.featured_image ? {
+              url: result.originalWordPressParams.featured_image.url,
+              alt: result.originalWordPressParams.featured_image.alt || '文章首圖'
+            } : undefined,
+          },
+          adaptedContent: result.formattedContent,
+          htmlContent: fullHtmlContent, // 關鍵：編輯器使用包含標題和特色圖片的完整內容
+          articleFormattingResult: result,
+          processingComplete: true // 標記為處理完成，讓界面知道可以進入編輯階段
+        };
+        
+        // 調試輸出
+        console.log('進階格式化完成，格式化內容字符數:', result.formattedContent.length);
+        console.log('完整HTML內容字符數:', fullHtmlContent.length);
+        console.log('應用的格式化規則:', result.metadata.appliedRules);
+        console.log('使用的WordPress參數:', formattedResult.wordpressParams);
+        console.log('是否有原始參數:', !!result.originalWordPressParams);
+        
+        // 通知處理成功，界面會切換到編輯器
+        callbacksRef.current.onProcessSuccess(formattedResult);
+        
+        return formattedResult;
+      },
+      onError: (error) => {
+        callbacksRef.current.onProcessError(error, 'article-formatting');
+      }
+    }
+  );
 
   // 文稿編輯階段
   const copyEditingStage = useCopyEditingStage(
@@ -136,17 +209,12 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         
         callbacksRef.current.onStageComplete('copy-editing', resultWithHtmlContent as unknown as Record<string, unknown>);
         
-        // 標記整個處理完成
-        const finalResult: FinalProcessingResult = {
-          ...resultWithHtmlContent,
-          processingComplete: true
-        };
+        // 進入進階格式化階段，而不是直接完成
+        if (articleFormattingStageRef.current) {
+          articleFormattingStageRef.current.startArticleFormatting(resultWithHtmlContent);
+        }
         
-        // 通知處理成功
-        callbacksRef.current.onProcessSuccess(finalResult);
-        
-        // 完成處理
-        return finalResult;
+        return resultWithHtmlContent;
       },
       onError: (error) => {
         callbacksRef.current.onProcessError(error, 'copy-editing');
@@ -205,13 +273,15 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     advancedAiStageRef.current = advancedAiStage;
     formatConversionStageRef.current = formatConversionStage;
     copyEditingStageRef.current = copyEditingStage;
+    articleFormattingStageRef.current = articleFormattingStage;
     
     return () => {
       advancedAiStage.cleanup();
       formatConversionStage.cleanup();
       copyEditingStage.cleanup();
+      articleFormattingStage.cleanup();
     };
-  }, [advancedAiStage, formatConversionStage, copyEditingStage]);
+  }, [advancedAiStage, formatConversionStage, copyEditingStage, articleFormattingStage]);
 
   // AI初步處理階段
   const aiProcessingStage = useAiProcessingStage(
@@ -325,7 +395,8 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     advancedAiStage.cleanup();
     formatConversionStage.cleanup();
     copyEditingStage.cleanup();
-  }, [extractStage, aiProcessingStage, advancedAiStage, formatConversionStage, copyEditingStage]);
+    articleFormattingStage.cleanup();
+  }, [extractStage, aiProcessingStage, advancedAiStage, formatConversionStage, copyEditingStage, articleFormattingStage]);
 
   // 處理文件上傳和處理流程 - 協調器
   const processFile = useCallback(async (file: File) => {

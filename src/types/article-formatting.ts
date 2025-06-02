@@ -69,14 +69,14 @@ export interface EnhancedCopyEditingResult {
 // 文章格式化結果
 export interface ArticleFormattingResult {
   formattedContent: string;
-  template: ArticleTemplate;
+  appliedSettings: AdvancedArticleSettings;
   metadata: {
-    author: string;
-    authorId?: number; // WordPress作者ID
-    requiresAdTemplate: boolean;
-    adTemplateUrl?: string;
+    hasHeaderDisclaimer: boolean;
+    hasFooterDisclaimer: boolean;
+    authorName?: string;
     appliedRules: string[];
     processingTime: number;
+    error?: string; // 可選的錯誤信息
   };
 }
 
