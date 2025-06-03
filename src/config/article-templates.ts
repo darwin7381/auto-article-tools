@@ -10,17 +10,21 @@ export const ArticleTemplates: Record<ArticleType, ArticleTemplate> = {
     requiresAdTemplate: true,
     adTemplateUrl: 'https://www.canva.com/design/DAFvcOqDOD8/msglmQ4I-dU3Pq8R9m2mlg/edit',
     
-    headerDisclaimer: '<span style="color: #808080;"><em>本文為廣編稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場，亦非投資建議、購買或出售建議。詳見文末責任警示。</em></span>',
+    headerDisclaimer: '<span style="color: #808080;"><em>（本文為廣編稿，由［撰稿方名稱］ 撰文、提供，不代表動區立場，亦非投資建議、購買或出售建議。詳見文末責任警示。）</em></span>',
     
-    footerDisclaimer: '<div class="alert alert-warning">廣編免責聲明：本文內容為供稿者提供之廣宣稿件，供稿者與動區並無任何關係，本文亦不代表動區立場。本文無意提供任何投資、資產建議或法律意見，也不應被視為購買、出售或持有資產的要約。廣宣稿件內容所提及之任何服務、方案或工具等僅供參考，且最終實際內容或規則以供稿方之公布或說明為準，動區不對任何可能存在之風險或損失負責，提醒讀者進行任何決策或行為前務必自行謹慎查核。</div>',
+    footerDisclaimer: '<div class="alert alert-warning">（廣編免責聲明：本文內容為供稿者提供之廣宣稿件，供稿者與動區並無任何關係，本文亦不代表動區立場。本文無意提供任何投資、資產建議或法律意見，也不應被視為購買、出售或持有資產的要約。廣宣稿件內容所提及之任何服務、方案或工具等僅供參考，且最終實際內容或規則以供稿方之公布或說明為準，動區不對任何可能存在之風險或損失負責，提醒讀者進行任何決策或行為前務必自行謹慎查核。）</div>',
     
     dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
     
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
+    introQuoteTemplate: `<p class="intro_quote">{excerpt}<br>（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）<br>（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）</p>`,
 
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
+    // 預設關聯文章配置
+    defaultRelatedArticles: {
+      contextUrl: 'https://www.blocktempo.com/sample-context-article/',
+      contextTitle: '範例前情文章標題',
+      backgroundUrl: 'https://www.blocktempo.com/sample-background-article/', 
+      backgroundTitle: '範例背景文章標題'
+    },
 
     tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
     
@@ -28,6 +32,13 @@ export const ArticleTemplates: Record<ArticleType, ArticleTemplate> = {
     
     relatedArticleLinkTemplate: '<strong><span style="color: #ff0000;"><a href="{url}">{title}</a></span></strong>',
     
+    // 預設相關閱讀文章
+    defaultRelatedReading: [
+      { url: 'https://www.blocktempo.com/sample-article-1/', title: '範例相關文章標題一' },
+      { url: 'https://www.blocktempo.com/sample-article-2/', title: '範例相關文章標題二' },
+      { url: 'https://www.blocktempo.com/sample-article-3/', title: '範例相關文章標題三' }
+    ],
+
     fullTemplate: `{introQuote}
 
 &nbsp;
@@ -69,9 +80,15 @@ export const ArticleTemplates: Record<ArticleType, ArticleTemplate> = {
     
     dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
     
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
+    introQuoteTemplate: `<p class="intro_quote">{excerpt}<br>（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）<br>（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）</p>`,
+
+    // 預設關聯文章配置
+    defaultRelatedArticles: {
+      contextUrl: 'https://www.blocktempo.com/sample-context-article/',
+      contextTitle: '範例前情文章標題',
+      backgroundUrl: 'https://www.blocktempo.com/sample-background-article/', 
+      backgroundTitle: '範例背景文章標題'
+    },
 
     tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
     
@@ -79,6 +96,13 @@ export const ArticleTemplates: Record<ArticleType, ArticleTemplate> = {
     
     relatedArticleLinkTemplate: '<strong><a href="{url}">{title}</a></strong>',
     
+    // 預設相關閱讀文章
+    defaultRelatedReading: [
+      { url: 'https://www.blocktempo.com/sample-article-1/', title: '範例相關文章標題一' },
+      { url: 'https://www.blocktempo.com/sample-article-2/', title: '範例相關文章標題二' },
+      { url: 'https://www.blocktempo.com/sample-article-3/', title: '範例相關文章標題三' }
+    ],
+
     fullTemplate: `{introQuote}
 
 {headerDisclaimer}
@@ -112,11 +136,15 @@ export const ArticleTemplates: Record<ArticleType, ArticleTemplate> = {
     
     dropcapStyle: '<span class="dropcap " style="background-color: #ffffff; color: #000000; border-color: #ffffff;">',
     
-    introQuoteTemplate: `<p class="intro_quote">{excerpt}
+    introQuoteTemplate: `<p class="intro_quote">{excerpt}<br>（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）<br>（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）</p>`,
 
-（前情提要：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{backgroundUrl}" target="_blank" rel="noopener">{backgroundTitle}</a></span>）
-
-（背景補充：<span style="color: #ff6600;"><a style="color: #ff6600;" href="{contextUrl}" target="_blank" rel="noopener">{contextTitle}</a></span>）</p>`,
+    // 預設關聯文章配置
+    defaultRelatedArticles: {
+      contextUrl: 'https://www.blocktempo.com/sample-context-article/',
+      contextTitle: '範例前情文章標題',
+      backgroundUrl: 'https://www.blocktempo.com/sample-background-article/', 
+      backgroundTitle: '範例背景文章標題'
+    },
 
     tgBanner: '<a href="https://t.me/blocktemponews/"><img class="alignnone wp-image-194701 size-full" src="https://image.blocktempo.com/2022/11/動區官網tg-banner-1116.png" alt="" width="800" height="164" /></a>',
     
@@ -124,6 +152,13 @@ export const ArticleTemplates: Record<ArticleType, ArticleTemplate> = {
     
     relatedArticleLinkTemplate: '<strong><a href="{url}">{title}</a></strong>',
     
+    // 預設相關閱讀文章
+    defaultRelatedReading: [
+      { url: 'https://www.blocktempo.com/sample-article-1/', title: '範例相關文章標題一' },
+      { url: 'https://www.blocktempo.com/sample-article-2/', title: '範例相關文章標題二' },
+      { url: 'https://www.blocktempo.com/sample-article-3/', title: '範例相關文章標題三' }
+    ],
+
     fullTemplate: `{introQuote}
 
 {dropcapContent}

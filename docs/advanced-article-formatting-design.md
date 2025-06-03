@@ -14,18 +14,18 @@
 
 #### 2. 正文格式處理
 - [ ] **發布時間解禁敘述過濾** - 移除 "EMBARGOED TILL" 等敘述
-- [ ] **Dropcap 格式應用** - 第一段開頭第一個字自動設為 Dropcap
+- [x] **Dropcap 格式應用** - 第一段開頭第一個字自動設為 Dropcap
 - [ ] **英文數字空格處理** - 英文和數字前後空半格（段首除外）
-- [ ] **標題層級正規化** - 段落標題優先設為「標題三」，層級：標題三 > 標題四 > 段落（粗體）
+- [x] **標題層級正規化** - 段落標題優先設為「標題三」，層級：標題三 > 標題四 > 段落（粗體）✅ 已修復連鎖替換問題
 
 #### 3. 引言與關聯文章系統
-- [ ] **引言自動生成** - 有副標題直接使用，無副標題用 AI 摘要（≤100字）
-- [ ] **引言格式套用** - 使用 `intro_quote` class 格式
+- [x] **引言自動生成** - 有副標題直接使用，無副標題用 AI 摘要（≤100字）
+- [x] **引言格式套用** - 使用 `intro_quote` class 格式
 - [ ] **前情提要文章搜尋** - 從 BlockTempo 搜尋相關文章
 - [ ] **背景補充文章搜尋** - 從 BlockTempo 搜尋相關文章
-- [ ] **引言區塊HTML生成** - 自動生成包含前情提要和背景補充的完整HTML
-- [ ] **文末相關閱讀** - 自動添加2-4篇相關文章連結（粗體格式）
-- [ ] **TG Banner自動插入** - 在相關閱讀前插入官方TG橫幅
+- [x] **引言區塊HTML生成** - 自動生成包含前情提要和背景補充的完整HTML（使用預設模板）
+- [x] **文末相關閱讀** - 自動添加2-4篇相關文章連結（粗體格式，使用預設模板）
+- [x] **TG Banner自動插入** - 在相關閱讀前插入官方TG橫幅
 
 #### 4. 文末連結處理
 - [ ] **連結數量限制** - 最多3個連結
@@ -69,11 +69,11 @@
 - [ ] 全流程整合測試
 - [ ] 使用者體驗優化
 
-### 📊 完成度統計
-- **總體進度**: 15% (4/26 主要任務)
+### 完成度統計
+- **總體進度**: 35% (9/26 主要任務)
 - **基礎架構**: 100% ✅ 
-- **核心功能**: 0% ⏳
-- **技術集成**: 15% 🔄
+- **核心功能**: 42% 🔄 (11/26個功能項目已完成)
+- **技術集成**: 60% 🔄
 
 ---
 
@@ -1026,4 +1026,417 @@ useEffect(() => {
 ✅ UI 階段顯示問題已修復  
 ✅ 階段標題映射問題已修復
 ✅ 階段結果查看功能已完善
+✅ 標題層級正規化連鎖替換問題已修復
+✅ 開頭押註位置錯誤已修復
+✅ Article Formatting 六大核心功能已完成
 ✅ 設計文檔已更新記錄修復內容
+
+### 9.5 標題層級正規化連鎖替換問題修復
+**問題描述**：用戶反映進階格式化轉換後，h2或h3標題變成h5或丟失標題格式。
+
+**根本原因分析**：
+`normalizeHeadings` 方法存在連鎖替換問題，原始邏輯按以下順序進行：
+```typescript
+// ❌ 錯誤的替換順序（從低到高）
+normalized = normalized.replace(/<h2([^>]*)>/gi, '<h3$1>');  // h2 → h3
+normalized = normalized.replace(/<h3([^>]*)>/gi, '<h4$1>');  // h3 → h4 (包括剛轉換的h3)
+normalized = normalized.replace(/<h4([^>]*)>/gi, '<h5$1>');  // h4 → h5 (包括剛轉換的h4)
+```
+
+**連鎖替換影響**：
+- h2 → h3（第一步）
+- 剛轉換的 h3 → h4（第二步）
+- 剛轉換的 h4 → h5（第三步）
+- **結果**：h2 最終變成 h5（下降3級），h3 變成 h5（下降2級）
+
+**解決方案**：
+改為從高層級往低層級進行替換，避免影響已處理的標籤：
+```typescript
+// ✅ 正確的替換順序（從高到低）
+// 先處理 h4 → h5
+normalized = normalized.replace(/<h4([^>]*)>/gi, '<h5$1>');
+normalized = normalized.replace(/<\/h4>/gi, '</h5>');
+
+// 再處理 h3 → h4  
+normalized = normalized.replace(/<h3([^>]*)>/gi, '<h4$1>');
+normalized = normalized.replace(/<\/h3>/gi, '</h4>');
+
+// 最後處理 h2 → h3
+normalized = normalized.replace(/<h2([^>]*)>/gi, '<h3$1>');
+normalized = normalized.replace(/<\/h2>/gi, '</h3>');
+```
+
+**修復結果**：
+- h2 → h3（只下降1級）✅
+- h3 → h4（只下降1級）✅ 
+- h4 → h5（只下降1級）✅
+- h1 保持不變 ✅
+
+**學習到的教訓**：
+1. **字符串替換順序很重要**：在進行多步驟字符串替換時，必須考慮替換的順序，避免前面的替換影響後面的邏輯
+2. **正則表達式要全面測試**：特別是涉及HTML標籤處理的正則表達式，需要測試各種標籤組合和嵌套情況
+3. **要有明確的處理目標**：標題正規化的目標是讓每個標題只下降1級，而不是連續處理
+4. **代碼註釋要明確警示**：對於容易出錯的邏輯，要添加詳細註釋說明正確的處理順序
+
+**防錯檢查清單**：
+□ 多步驟字符串替換必須從高層級往低層級進行
+□ 每個替換步驟只影響目標層級，不影響已處理的層級  
+□ 添加詳細註釋說明替換順序的重要性
+□ 測試邊界情況（如連續的同級標題）
+
+### 9.6 開頭押註位置錯誤修復
+**問題描述**：用戶反映正文開頭押註並沒有出現在正文開頭的正確位置，而是出現在正文尾端、末尾押註之前。
+
+**根本原因分析**：
+在 `applyHeaderDisclaimer` 方法中，開頭押註被錯誤地加到內容的末尾：
+```typescript
+// ❌ 錯誤的插入邏輯
+const disclaimerWithSeparator = `${disclaimer}\n\n<hr />`;
+const insertedContent = content + '\n\n' + disclaimerWithSeparator;  // 加到末尾
+```
+
+**錯誤的處理順序**：
+1. 引言區塊
+2. 正文內容  
+3. 開頭押註（❌ 錯誤地放在這裡）
+4. 結尾押註
+
+**正確的處理順序應該是**：
+1. 引言區塊
+2. 開頭押註（✅ 應該在這裡）
+3. 正文內容
+4. 結尾押註
+
+**解決方案**：
+修改插入邏輯，智能尋找引言區塊的結束位置，並在其後正確插入開頭押註：
+```typescript
+// ✅ 正確的插入邏輯
+const disclaimerBlock = disclaimer;  // 移除分隔線
+
+// 尋找引言區塊的結束位置
+const introQuoteMatch = content.match(/(<p class="intro_quote">[\s\S]*?<\/p>)/);
+
+if (introQuoteMatch) {
+  // 如果找到引言區塊，在其後插入押註（用兩個br分隔）
+  const introQuote = introQuoteMatch[1];
+  const restContent = content.substring(content.indexOf(introQuote) + introQuote.length);
+  const insertedContent = introQuote + '<br><br>' + disclaimerBlock + '<br><br>' + restContent.trim();
+} else {
+  // 如果沒有引言區塊，直接在內容開頭插入押註
+  const insertedContent = disclaimerBlock + '<br><br>' + content;
+}
+```
+
+**進一步修復分隔線位置**：
+用戶反映分隔線位置不正確，需要進一步調整：
+```typescript
+// ✅ 修復末尾押註，分隔線在押註前
+const footerWithSeparator = `\n\n<hr />\n\n${template}`;
+```
+
+**修復結果**：
+- 引言區塊在最前面 ✅
+- 用兩個 `<br>` 分隔引言和開頭押註 ✅
+- 開頭押註緊跟在引言區塊後 ✅
+- 用兩個 `<br>` 分隔開頭押註和正文內容 ✅
+- 正文內容在押註之後 ✅
+- `<hr />` 分隔線在末尾押註前 ✅
+- 結尾押註在文章末尾 ✅
+
+**學習到的教訓**：
+1. **內容插入要考慮上下文**：插入內容時要分析現有結構，找到正確的插入位置
+2. **字符串操作要精確**：簡單的字符串拼接往往不足以處理複雜的HTML結構
+3. **正則表達式要處理換行**：處理HTML內容時，要考慮跨行的情況（使用 `[\s\S]*?` 而非 `.*?`）
+4. **要有降級策略**：當找不到預期結構時，要有備選的處理方案
+5. **HTML格式要精確**：`<br>` 標籤和 `\n\n` 在顯示效果上有差異，需要根據需求選擇
+6. **分隔線位置要邏輯正確**：開頭押註後不需要分隔線，末尾押註前才需要分隔線
+
+**防錯檢查清單**：
+□ 插入內容前先分析目標位置的上下文結構
+□ 使用正則表達式精確定位插入點
+□ 考慮換行和多行內容的處理
+□ 提供找不到預期結構時的降級策略
+□ 測試有無引言區塊的兩種情況
+□ 確認HTML標籤和換行符的正確使用
+□ 驗證分隔線出現在邏輯正確的位置
+
+### 9.7 模板重複定義問題重構
+**問題描述**：用戶發現 `article-templates.ts` 和 `ArticleFormattingProcessor.ts` 兩個文件中都有重複的模板定義，造成維護困難和不一致的風險。
+
+**根本原因分析**：
+系統中存在多處模板定義的重複：
+
+1. **押註模板重複**：
+   - `article-templates.ts` 中的 `headerDisclaimer` 和 `footerDisclaimer`
+   - `ArticleFormattingProcessor.ts` 中的 `getDisclaimerTemplates()`
+
+2. **引言區塊重複**：
+   - `article-templates.ts` 中的 `introQuoteTemplate`
+   - `ArticleFormattingProcessor.ts` 中的 `buildIntroQuote()`
+
+3. **TG Banner 和相關閱讀重複**：
+   - `article-templates.ts` 中的 `tgBanner` 和 `relatedArticlesHeader`
+   - `ArticleFormattingProcessor.ts` 中的硬編碼HTML
+
+4. **Dropcap 樣式重複**：
+   - `article-templates.ts` 中的 `dropcapStyle`
+   - `ArticleFormattingProcessor.ts` 中的硬編碼樣式
+
+**造成的問題**：
+- ❌ **代碼重複**：違反 DRY（Don't Repeat Yourself）原則
+- ❌ **維護困難**：修改時需要在兩個地方同步
+- ❌ **不一致風險**：用戶修改了一處但另一處未同步
+- ❌ **混淆性**：開發者不知道該修改哪個文件
+
+**解決方案**：
+進行架構重構，將 `ArticleFormattingProcessor.ts` 修改為使用統一的模板配置：
+
+```typescript
+// ✅ 重構前：重複定義
+private getDisclaimerTemplates() {
+  return {
+    sponsored: {
+      header: '<span>...</span>', // 硬編碼
+      footer: '<div>...</div>'    // 硬編碼
+    }
+  };
+}
+
+// ✅ 重構後：使用統一配置
+import { ArticleTemplates } from '@/config/article-templates';
+
+private getDisclaimerTemplates() {
+  return {
+    sponsored: {
+      header: ArticleTemplates.sponsored.headerDisclaimer,
+      footer: ArticleTemplates.sponsored.footerDisclaimer
+    },
+    'press-release': {
+      header: ArticleTemplates['press-release'].headerDisclaimer,
+      footer: ArticleTemplates['press-release'].footerDisclaimer
+    }
+  };
+}
+```
+
+**重構範圍**：
+1. **押註模板** - 使用 `ArticleTemplates.*.headerDisclaimer` 和 `footerDisclaimer`
+2. **引言區塊** - 使用 `ArticleTemplates.*.introQuoteTemplate` 並進行參數替換
+3. **TG Banner** - 使用 `ArticleTemplates.*.tgBanner`
+4. **相關閱讀** - 使用 `ArticleTemplates.*.relatedArticlesHeader` 和 `relatedArticleLinkTemplate`
+5. **Dropcap 樣式** - 使用 `ArticleTemplates.*.dropcapStyle`
+
+**重構結果**：
+- 單一真實來源（Single Source of Truth）✅
+- 移除所有重複定義 ✅
+- 統一在 `article-templates.ts` 管理模板 ✅
+- 同步用戶的自訂修改（加括號）✅
+- 保持功能完整性 ✅
+- 統一預設值配置管理 ✅
+
+**進一步改進 - 預設值統一管理**：
+用戶發現前情文章和背景文章的預設值都是硬編碼的，建議統一到配置文件中：
+
+```typescript
+// ✅ 改進前：硬編碼預設值
+return template
+  .replace('{excerpt}', defaultExcerpt)
+  .replace('{backgroundUrl}', 'https://www.blocktempo.com/sample-background-article/') // 硬編碼
+  .replace('{backgroundTitle}', '範例背景文章標題') // 硬編碼
+  .replace('{contextUrl}', 'https://www.blocktempo.com/sample-context-article/') // 硬編碼
+  .replace('{contextTitle}', '範例前情文章標題'); // 硬編碼
+
+// ✅ 改進後：使用統一配置
+const defaults = ArticleTemplates.sponsored.defaultRelatedArticles;
+return template
+  .replace('{excerpt}', defaultExcerpt)
+  .replace('{contextUrl}', defaults.contextUrl)
+  .replace('{contextTitle}', defaults.contextTitle)
+  .replace('{backgroundUrl}', defaults.backgroundUrl)
+  .replace('{backgroundTitle}', defaults.backgroundTitle);
+```
+
+**新增配置結構**：
+```typescript
+// ArticleTemplate 介面新增
+defaultRelatedArticles?: {
+  contextUrl: string;          // 前情提要連結
+  contextTitle: string;        // 前情提要標題
+  backgroundUrl: string;       // 背景補充連結
+  backgroundTitle: string;     // 背景補充標題
+};
+
+defaultRelatedReading?: Array<{
+  url: string;                 // 相關閱讀連結
+  title: string;               // 相關閱讀標題
+}>;
+```
+
+**學習到的教訓**：
+1. **DRY 原則很重要**：Don't Repeat Yourself，避免在多個地方定義相同的內容
+2. **統一配置管理**：應該有單一的配置文件作為真實來源
+3. **重構要謹慎**：確保功能不遺失，並同步所有自訂修改
+4. **架構設計要前瞻**：初期設計時就應該考慮配置的統一管理
+5. **代碼審查的重要性**：定期審查是否有重複定義的問題
+6. **預設值也需要統一管理**：不只是模板，連預設值也應該在配置文件中管理
+
+**防錯檢查清單**：
+□ 新增模板時檢查是否已有相同定義
+□ 修改模板時確認只有一個來源
+□ 定期審查代碼中的重複定義
+□ 使用統一的配置文件管理模板
+□ 重構時保持功能完整性
+□ 同步所有自訂修改到統一配置中
+□ 預設值應該在配置文件中定義，而非硬編碼
+□ 修改預設值時只需要在一個地方修改
+
+## 10. Article Formatting 階段當前功能總結
+
+### 10.1 已實現的核心功能
+
+基於參數驅動的設計，`ArticleFormattingProcessor` 目前提供以下6個主要轉換功能：
+
+#### 1. 標題層級正規化 ✅
+- **功能**：調整HTML標題層級，從 h2→h3, h3→h4, h4→h5
+- **特點**：保持 h1 主標題不變，確保標題層級結構合理
+- **技術要點**：採用從高層級往低層級的替換順序，避免連鎖替換問題
+
+#### 2. 引言區塊構建 ✅  
+- **功能**：自動插入 intro_quote 樣式的引言區塊
+- **內容包含**：
+  - AI摘要引言（來自copy-editing階段或預設文字）
+  - 前情提要連結（目前使用預設範例）
+  - 背景補充連結（目前使用預設範例）
+- **HTML格式**：`<p class="intro_quote">...</p>`
+
+#### 3. 開頭押註處理 ✅
+- **功能**：根據 `headerDisclaimer` 參數插入對應的開頭聲明
+- **支援類型**：
+  - `sponsored`: 廣編稿押註（含投資建議警示）
+  - `press-release`: 新聞稿押註（簡化版本）
+  - `none`: 不插入押註
+- **特點**：支援動態替換撰稿方名稱
+
+#### 4. Dropcap格式應用 ✅
+- **功能**：為文章第一段的第一個字符應用 Dropcap 樣式
+- **樣式**：白底黑字的放大首字母效果
+- **技術**：智能識別中文字符和英文字母
+
+#### 5. 結尾押註處理 ✅
+- **功能**：根據 `footerDisclaimer` 參數插入結尾免責聲明
+- **支援類型**：
+  - `sponsored`: 完整的廣編稿免責聲明
+  - `press-release`: 無結尾押註
+  - `none`: 不插入押註
+- **格式**：使用 `alert alert-warning` 樣式
+
+#### 6. TG Banner和相關閱讀 ✅
+- **功能**：在文章末尾自動添加固定元素
+- **包含內容**：
+  - 動區官方 Telegram 橫幅圖片
+  - 相關閱讀標題（📍相關報導📍）
+  - 2-3篇相關文章連結（目前使用預設範例）
+- **連結格式**：紅色粗體樣式
+
+### 10.2 參數驅動的靈活性
+
+系統的核心優勢在於參數驅動的設計，用戶可以：
+
+```typescript
+// 範例：自訂廣編稿（只要開頭押註）
+const customSettings: AdvancedArticleSettings = {
+  headerDisclaimer: 'sponsored',    // 廣編稿開頭押註
+  footerDisclaimer: 'none',         // 不要結尾押註
+  authorName: 'ABC科技公司'         // 供稿方名稱
+};
+
+// 範例：混合模式（廣編稿用新聞稿押註）
+const hybridSettings: AdvancedArticleSettings = {
+  headerDisclaimer: 'press-release', // 使用新聞稿押註
+  footerDisclaimer: 'none',          // 不要結尾押註
+  authorName: 'XYZ公司'              // 供稿方名稱
+};
+```
+
+### 10.3 待完善功能
+
+以下功能已規劃但尚未實現，目前使用預設內容：
+
+1. **智能關聯文章搜尋** - 目前使用預設連結，未來需整合 BlockTempo 搜尋API
+2. **撰稿方名稱自動識別** - 目前需手動輸入，未來可由AI從內容中提取
+3. **文章連結過濾邏輯** - 目前使用預設連結，未來需實現TG/LINE連結過濾
+4. **動態內容長度適配** - 目前固定格式，未來可根據文章長度調整
+
+### 10.4 技術架構優勢
+
+1. **參數驅動 vs 類型驅動**：基於具體設定而非文稿類型，提供更大靈活性
+2. **模板化處理**：嚴格格式使用模板，確保一致性和可維護性
+3. **錯誤容忍性**：即使處理失敗也會返回原始內容，確保系統穩定性
+4. **擴展性設計**：新的押註類型或格式可輕鬆添加到模板庫
+5. **單一真實來源**：統一的模板配置管理，避免重複定義問題
+
+### 9.8 Dropcap 錯誤應用到引言區塊修復
+**問題描述**：用戶對引言模板進行格式調整後，Dropcap 功能錯誤地應用到了前言區塊的第一個字，而不是正文內容的第一個字。
+
+**根本原因分析**：
+在 `applyDropcap` 方法中，原始邏輯使用簡單的查找來定位第一個段落：
+```typescript
+// ❌ 錯誤的查找邏輯
+const firstParagraphMatch = content.match(/<p[^>]*>(.*?)<\/p>/i);
+```
+
+**問題成因**：
+1. 引言區塊被插入到內容的最前面（正確的邏輯）
+2. `applyDropcap` 找到的第一個 `<p>` 標籤是引言區塊（`<p class="intro_quote">`）
+3. Dropcap 被錯誤地應用到引言文字，而不是正文
+
+**預期處理順序**：
+1. 引言區塊（不應應用 Dropcap）
+2. 開頭押註
+3. **正文第一段**（✅ 應該應用 Dropcap 的位置）
+4. 其他正文內容
+
+**解決方案**：
+修改 `applyDropcap` 方法，實現智能段落識別：
+```typescript
+// ✅ 正確的查找邏輯
+const paragraphMatches = content.match(/<p[^>]*>.*?<\/p>/gi);
+
+// 遍歷所有段落，跳過引言區塊
+let targetParagraph = null;
+for (let i = 0; i < paragraphMatches.length; i++) {
+  const paragraph = paragraphMatches[i];
+  // 跳過引言區塊（class="intro_quote"）
+  if (!paragraph.includes('class="intro_quote"')) {
+    targetParagraph = paragraph;
+    break;
+  }
+}
+```
+
+**修復特點**：
+- **智能識別**：自動跳過所有 `class="intro_quote"` 的段落
+- **精確定位**：找到第一個非引言區塊的普通段落
+- **向前兼容**：即使沒有引言區塊，仍能正常工作
+- **多段落支持**：即使有多個引言或特殊段落，也能找到正確的正文段落
+
+**修復結果**：
+- 引言區塊不再被錯誤地應用 Dropcap ✅
+- 正文第一段正確應用 Dropcap 樣式 ✅
+- 支持各種段落結構和特殊格式 ✅
+- 保持向前兼容性 ✅
+
+**學習到的教訓**：
+1. **HTML結構變化的影響**：修改模板格式時需要考慮對其他功能的影響
+2. **智能查找的重要性**：簡單的「第一個」查找往往不足以處理複雜的HTML結構
+3. **特殊元素的識別**：需要區分特殊功能段落（如引言）和普通內容段落
+4. **測試案例的完整性**：應該測試有無引言區塊的各種情況
+5. **CSS 類別的語義化**：`class="intro_quote"` 提供了清晰的語義識別標記
+
+**防錯檢查清單**：
+□ 修改模板格式時檢查是否影響其他功能
+□ 使用CSS類別或其他語義標記來識別特殊段落
+□ 實現智能查找邏輯，而非簡單的「第一個」邏輯
+□ 測試各種段落結構組合（有無引言、有無押註等）
+□ 確保功能在各種內容結構下都能正確工作
+□ 添加詳細註釋說明特殊處理邏輯
