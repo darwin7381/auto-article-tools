@@ -99,6 +99,20 @@ export interface ArticleTemplate {
   relatedArticleLinkTemplate: string;
   fullTemplate: string;
   
+  // 預設關聯文章配置
+  defaultRelatedArticles?: {
+    contextUrl: string;
+    contextTitle: string;
+    backgroundUrl: string;
+    backgroundTitle: string;
+  };
+  
+  // 預設相關閱讀文章
+  defaultRelatedReading?: Array<{
+    url: string;
+    title: string;
+  }>;
+  
   relatedArticlesCount: { min: number; max: number };
   maxExternalLinks: number;
   excludeLinkTypes: string[];
