@@ -180,15 +180,51 @@ export async function uploadMediaFromUrl(
       filename = `image-${Date.now()}.jpg`;
     }
     
+    // 🔧 修復Unicode字符編碼問題：安全處理文件名
+    // 將Unicode字符替換為安全的ASCII字符，避免ByteString轉換錯誤
+    let safeFilename = filename;
+    try {
+      // 使用正則表達式移除或替換非ASCII字符
+      safeFilename = filename.replace(/[^\x00-\x7F]/g, ''); // 移除非ASCII字符
+      
+      // 如果移除後文件名為空或太短，生成一個安全的文件名
+      if (safeFilename.length < 3) {
+        const timestamp = Date.now();
+        const extension = filename.includes('.') ? filename.split('.').pop() : 'jpg';
+        safeFilename = `image-${timestamp}.${extension}`;
+      }
+      
+      // 確保文件名不包含特殊字符
+      safeFilename = safeFilename.replace(/[^a-zA-Z0-9.\-_]/g, '-');
+      
+      console.log(`文件名安全化處理: "${filename}" -> "${safeFilename}"`);
+    } catch (filenameError) {
+      console.error('處理文件名時發生錯誤:', filenameError);
+      safeFilename = `image-${Date.now()}.jpg`;
+    }
+    
     // 創建WordPress媒體API URL
     const apiUrl = createWpApiUrl('/wp-json/wp/v2/media', wpApiBase);
     
     // 設置認證和其他頭信息
     const headers = new Headers();
     const authString = `${credentials.username}:${credentials.password}`;
-    const base64Auth = Buffer.from(authString).toString('base64');
+    
+    // 🔧 修復Unicode字符編碼問題：安全處理認證字符串
+    let base64Auth;
+    try {
+      // 使用TextEncoder確保正確的UTF-8編碼，然後轉為base64
+      const encoder = new TextEncoder();
+      const authBytes = encoder.encode(authString);
+      base64Auth = Buffer.from(authBytes).toString('base64');
+    } catch (authError) {
+      console.error('處理認證字符串時發生錯誤:', authError);
+      // 回退到原始方法（可能會有編碼問題，但至少不會崩潰）
+      base64Auth = Buffer.from(authString, 'utf8').toString('base64');
+    }
+    
     headers.append('Authorization', `Basic ${base64Auth}`);
-    headers.append('Content-Disposition', `attachment; filename="${filename}"`);
+    headers.append('Content-Disposition', `attachment; filename="${safeFilename}"`);
     headers.append('Content-Type', contentType);
     
     // 發送上傳請求
