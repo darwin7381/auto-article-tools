@@ -91,7 +91,22 @@ export default function useArticleFormattingStage(
       const requestData = {
         content: copyEditingResult.adaptedContent || '',
         advancedSettings: articleClassification.advancedSettings,
-        analysisResult: copyEditingResult.wordpressParams || {}
+        analysisResult: {
+          wordpress_params: copyEditingResult.wordpressParams,
+          content_analysis: {
+            excerpt: copyEditingResult.wordpressParams.excerpt || '',
+            author_name: copyEditingResult.wordpressParams.author ? String(copyEditingResult.wordpressParams.author) : undefined,
+            chinese_terminology_fixes: [],
+            suggested_slug: copyEditingResult.wordpressParams.slug || '',
+            estimated_reading_time: undefined
+          },
+          related_articles: {
+            background: [],
+            previous_context: [],
+            related_reading: []
+          },
+          article_classification: articleClassification
+        }
       };
       
       console.log('發送進階格式化請求，內容長度:', requestData.content.length);

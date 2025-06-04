@@ -19,7 +19,7 @@
 - [x] **標題層級正規化** - 段落標題優先設為「標題三」，層級：標題三 > 標題四 > 段落（粗體）✅ 已修復連鎖替換問題
 
 #### 3. 引言與關聯文章系統
-- [x] **引言自動生成** - 有副標題直接使用，無副標題用 AI 摘要（≤100字）
+- [x] **引言自動生成** - 有副標題直接使用，無副標題用 AI 摘要（≤100字）✅ 已修復數據傳遞問題
 - [x] **引言格式套用** - 使用 `intro_quote` class 格式
 - [ ] **前情提要文章搜尋** - 從 BlockTempo 搜尋相關文章
 - [ ] **背景補充文章搜尋** - 從 BlockTempo 搜尋相關文章
@@ -78,12 +78,12 @@
 - [x] 優化模板繼承和覆蓋機制
 
 ### 完成度統計
-- **總體進度**: 42% (11/26 主要任務) → **48%** (12/25 主要任務，移除1個無用任務) → **52%** (13/25 主要任務)
+- **總體進度**: 42% (11/26 主要任務) → **48%** (12/25 主要任務，移除1個無用任務) → **52%** (13/25 主要任務) → **56%** (14/25 主要任務) → **60%** (15/25 主要任務) → **64%** (16/25 主要任務)
 - **基礎架構**: 100% ✅ 
-- **核心功能**: 52% 🔄 (13/25個功能項目已完成)
-- **技術集成**: 80% 🔄 (新增Unicode編碼問題修復)
+- **核心功能**: 64% 🔄 (16/25個功能項目已完成)
+- **技術集成**: 95% 🔄 (新增智能字符處理改進)
 - **架構優化**: 95% ✅ (新增：職責分離和配置清理)
-- **錯誤修復**: 100% ✅ (新增：Unicode編碼、Dropcap定位、模板重複定義等問題)
+- **錯誤修復**: 100% ✅ (新增：Unicode編碼、Dropcap定位、模板重複定義、AI摘要數據傳遞、競態條件、Dropcap智能字符處理等問題)
 
 ---
 
@@ -1594,3 +1594,343 @@ try {
 □ 測試包含中文字符的文件名和URL
 □ 確保 `Buffer.from()` 正確處理UTF-8編碼
 □ 記錄文件名轉換過程，便於調試
+
+### 9.12 AI摘要數據傳遞問題修復
+**問題描述**：用戶發現引言部分顯示的是預設內容「AI 摘要引言，簡述本篇文章重點內容。」，而不是 Copy Editing 階段 AI 生成的真實摘要。
+
+**根本原因分析**：
+1. **數據結構不匹配**：Article Formatting 期望 `EnhancedCopyEditingResult.content_analysis.excerpt`，但 Copy Editing 實際返回 `CopyEditResult.wordpressParams.excerpt`
+2. **錯誤的數據傳遞**：在 `useArticleFormattingStage.tsx` 中，`analysisResult` 被設置為 `copyEditingResult.wordpressParams`，而不是完整的分析結果
+3. **數據流程缺失**：Copy Editing 生成的 AI 摘要存在於 `wordpressParams.excerpt`，但沒有正確傳遞到 Article Formatting
+
+**數據流程分析**：
+```typescript
+// ❌ 錯誤的數據流程
+Copy Editing → wordpressParams.excerpt (AI生成的摘要)
+       ↓
+Article Formatting ← analysisResult: wordpressParams (錯誤結構)
+       ↓
+buildIntroQuote(analysisResult?.content_analysis?.excerpt) → undefined
+       ↓
+使用預設文字：「AI 摘要引言，簡述本篇文章重點內容。」
+
+// ✅ 修復後的數據流程
+Copy Editing → wordpressParams.excerpt (AI生成的摘要)
+       ↓
+Article Formatting ← analysisResult: { content_analysis: { excerpt: wordpressParams.excerpt } }
+       ↓
+buildIntroQuote(analysisResult?.content_analysis?.excerpt) → AI生成的摘要
+       ↓
+顯示真實的AI摘要內容
+```
+
+**解決方案1：修復數據傳遞結構**
+在 `useArticleFormattingStage.tsx` 中重構 `analysisResult` 數據：
+```typescript
+// ✅ 修復：構建正確的數據結構
+analysisResult: {
+  wordpress_params: copyEditingResult.wordpressParams,
+  content_analysis: {
+    excerpt: copyEditingResult.wordpressParams.excerpt || '', // 🔧 關鍵修復
+    author_name: copyEditingResult.wordpressParams.author ? String(copyEditingResult.wordpressParams.author) : undefined,
+    chinese_terminology_fixes: [],
+    suggested_slug: copyEditingResult.wordpressParams.slug || '',
+    estimated_reading_time: undefined
+  },
+  related_articles: {
+    background: [],
+    previous_context: [],
+    related_reading: []
+  },
+  article_classification: articleClassification
+}
+```
+
+**解決方案2：改進摘要處理邏輯**
+在 `ArticleFormattingProcessor.ts` 中增強 `buildIntroQuote` 方法：
+```typescript
+// ✅ 改進摘要處理邏輯
+let finalExcerpt = excerpt;
+
+// 如果沒有AI生成的摘要，或摘要為空/無意義
+if (!finalExcerpt || finalExcerpt.trim() === '' || finalExcerpt.includes('此文章未經過參數生成處理')) {
+  finalExcerpt = 'AI 摘要引言，簡述本篇文章重點內容。';
+  console.warn('使用預設摘要，原因：', !excerpt ? '未提供摘要' : '摘要無效');
+} else {
+  console.log('使用AI生成的摘要:', finalExcerpt.substring(0, 100) + (finalExcerpt.length > 100 ? '...' : ''));
+}
+```
+
+**修復效果**：
+- **AI摘要正確顯示**：引言區塊現在會顯示 Copy Editing 階段生成的真實 AI 摘要
+- **數據結構統一**：修復了 Copy Editing 和 Article Formatting 間的數據結構不匹配問題
+- **調試信息完善**：添加了詳細的日誌輸出，便於追蹤摘要來源
+- **降級處理完善**：當 AI 摘要無效時，會記錄原因並使用預設文字
+
+**學習到的教訓**：
+1. **數據結構一致性很重要**：不同階段間的數據傳遞必須確保結構匹配
+2. **要檢查完整的數據流程**：從數據生成到最終使用的每個環節都要驗證
+3. **調試信息要完善**：添加詳細的日誌輸出有助於快速定位問題
+4. **要有明確的數據契約**：定義清楚各階段間傳遞的數據結構
+
+**防錯檢查清單**：
+□ 確認各階段間的數據結構匹配
+□ 驗證數據從生成到使用的完整流程
+□ 添加詳細的調試日誌輸出
+□ 測試有無AI摘要的兩種情況
+□ 確保降級處理邏輯正確
+□ 定期檢查數據契約的一致性
+
+### 9.13 文稿分類競態條件問題修復
+**問題描述**：進階格式化階段出現錯誤 "缺少文稿分類信息，請確保已正確設置文稿類型"，導致處理流程中斷。
+
+**根本原因分析**：
+這是一個**競態條件（Race Condition）**問題，發生在重新處理文件時：
+
+1. **重置邏輯有延遲**：在 `IntegratedFileProcessor.handleProcess` 中，當重新處理時會先調用 `resetProcessState()`
+2. **異步設置文稿分類**：原始代碼使用 `setTimeout(() => { setArticleClassification(classification); }, 0)` 來設置文稿分類
+3. **進階格式化階段搶跑**：由於 JavaScript 的異步特性，進階格式化階段可能在文稿分類重新設置之前就開始執行
+4. **`getArticleClassification()` 返回 undefined**：導致進階格式化階段獲取不到文稿分類信息
+
+**時序問題分析**：
+```typescript
+// ❌ 問題的時序
+1. 用戶點擊重新處理
+2. resetProcessState() → processState = null
+3. setTimeout(() => setArticleClassification(...), 0) → 延遲執行
+4. 處理流程開始 → 各階段開始執行
+5. 進階格式化階段執行 → getArticleClassification() 返回 undefined ❌
+6. 拋出錯誤："缺少文稿分類信息"
+7. setTimeout 回調執行 → 文稿分類設置完成（但已經太晚了）
+
+// ✅ 修復後的時序
+1. 用戶點擊重新處理
+2. resetProcessState() → processState = null
+3. setArticleClassification(classification) → 立即執行，創建臨時狀態 ✅
+4. 處理流程開始 → 各階段開始執行
+5. 進階格式化階段執行 → getArticleClassification() 返回正確的分類信息 ✅
+6. 處理成功完成
+```
+
+**解決方案**：
+移除 `setTimeout` 延遲，改為立即設置文稿分類：
+
+```typescript
+// ❌ 修復前：異步設置，存在競態條件
+if (processSuccess) {
+  // ... 重置邏輯
+  resetProcessState();
+  
+  // 重置後立即重新設置文稿分類，確保資料不丟失
+  setTimeout(() => {
+    setArticleClassification(classification);
+    console.log('重置後重新設置文稿分類:', classification);
+  }, 0);
+}
+
+// ✅ 修復後：同步設置，避免競態條件
+if (processSuccess) {
+  // ... 重置邏輯
+  resetProcessState();
+  
+  // 🔧 修復競態條件：立即重新設置文稿分類，而不是使用 setTimeout
+  // 確保在重置後文稿分類立即可用，避免進階格式化階段找不到分類信息
+  setArticleClassification(classification);
+  console.log('重置後立即重新設置文稿分類:', classification);
+}
+```
+
+**修復效果**：
+- **消除競態條件**：文稿分類在重置後立即可用，不存在時序問題
+- **穩定的處理流程**：進階格式化階段能穩定獲取到文稿分類信息
+- **錯誤處理改善**：避免因文稿分類缺失導致的處理中斷
+- **數據一致性**：確保處理流程中的數據狀態一致性
+
+**ProcessingContext 的保護機制**：
+`setArticleClassification` 方法已經有處理 `processState` 為 null 的保護機制：
+```typescript
+const setArticleClassification = useCallback((classification: ArticleClassification) => {
+  setProcessState(prevState => {
+    if (!prevState) {
+      // 如果 processState 為 null，創建一個臨時狀態來存儲文稿分類
+      const tempState: ProcessState = {
+        ...JSON.parse(JSON.stringify(initialState)),
+        id: `temp-${Date.now()}`,
+        article_classification: classification
+      };
+      return tempState;
+    }
+    return {
+      ...prevState,
+      article_classification: classification
+    };
+  });
+}, []);
+```
+
+**學習到的教訓**：
+1. **避免不必要的異步操作**：在狀態管理中，能同步執行的操作就不要使用異步
+2. **競態條件很難調試**：時序問題往往不容易重現，需要仔細分析代碼執行順序
+3. **狀態重置要謹慎**：重置狀態後的重新初始化邏輯要確保立即執行
+4. **保護機制要完善**：關鍵的狀態獲取方法要有容錯處理
+
+**防錯檢查清單**：
+□ 避免在狀態管理中使用不必要的 setTimeout
+□ 確保狀態重置後的重新初始化邏輯立即執行
+□ 檢查是否存在其他競態條件風險
+□ 測試重新處理文件的場景
+□ 確保關鍵狀態的獲取方法有容錯處理
+□ 添加詳細的日誌輸出幫助調試時序問題
+
+### 9.14 Dropcap 數字字符處理問題修復
+**問題描述**：用戶反映在進階格式化處理後，文章開頭的 "2025 年" 變成了只剩下 "年"，"2025 " 部分被錯誤地移除了。
+
+**根本原因分析**：
+在 `ArticleFormattingProcessor.applyDropcap` 方法中存在兩個問題：
+
+1. **正則表達式不支援數字**：
+   ```typescript
+   // ❌ 原始正則表達式不包含數字
+   const firstCharMatch = paragraphContent.match(/^[^<]*?([a-zA-Z\u4e00-\u9fa5])/);
+   ```
+   對於 "2025 年" 這樣的內容，正則表達式會跳過數字 "2025 "，直接匹配到 "年"
+
+2. **剩餘內容計算錯誤**：
+   ```typescript
+   // ❌ 使用 indexOf 會在有重複字符時定位錯誤
+   const remainingContent = paragraphContent.substring(paragraphContent.indexOf(firstChar) + 1);
+   ```
+   當 `firstChar` 為 "年" 時，會從 "年" 之後開始取剩餘內容，導致 "2025 " 被丟棄
+
+**錯誤處理流程**：
+```
+原始內容: "2025 年夏季上線，內容..."
+↓
+正則匹配: /^[^<]*?([a-zA-Z\u4e00-\u9fa5])/ → 匹配到 "年"
+↓
+firstChar = "年"
+↓
+indexOf("年") → 找到 "年" 的位置
+↓
+remainingContent = 從 "年" 之後的內容 → " 夏季上線，內容..."
+↓
+結果: <span class="dropcap">年</span> 夏季上線，內容...
+❌ "2025 " 被丟棄了！
+```
+
+**解決方案**：
+1. **擴展正則表達式支援數字**：
+   ```typescript
+   // ✅ 擴展正則表達式包含數字 0-9
+   const firstCharMatch = paragraphContent.match(/^[^<]*?([0-9a-zA-Z\u4e00-\u9fa5])/);
+   ```
+
+2. **改進剩餘內容計算邏輯**：
+   ```typescript
+   // ✅ 使用 search 方法找到第一個字符的確切位置
+   const firstCharIndex = paragraphContent.search(/[0-9a-zA-Z\u4e00-\u9fa5]/);
+   const remainingContent = paragraphContent.substring(firstCharIndex + 1);
+   ```
+
+**修復後的處理流程**：
+```
+原始內容: "2025 年夏季上線，內容..."
+↓
+正則匹配: /^[^<]*?([0-9a-zA-Z\u4e00-\u9fa5])/ → 匹配到 "2"
+↓
+firstChar = "2"
+↓
+search(/[0-9a-zA-Z\u4e00-\u9fa5]/) → 找到第一個字符 "2" 的位置 (0)
+↓
+remainingContent = 從位置 1 開始的內容 → "025 年夏季上線，內容..."
+↓
+結果: <span class="dropcap">2</span>025 年夏季上線，內容...
+✅ 完整保留所有內容！
+```
+
+**修復代碼對比**：
+```typescript
+// ❌ 修復前：不支援數字，計算錯誤
+const firstCharMatch = paragraphContent.match(/^[^<]*?([a-zA-Z\u4e00-\u9fa5])/);
+const firstChar = firstCharMatch[1];
+const remainingContent = paragraphContent.substring(paragraphContent.indexOf(firstChar) + 1);
+
+// ✅ 修復後：支援數字，精確計算
+const firstCharMatch = paragraphContent.match(/^[^<]*?([0-9a-zA-Z\u4e00-\u9fa5])/);
+const firstChar = firstCharMatch[1];
+const firstCharIndex = paragraphContent.search(/[0-9a-zA-Z\u4e00-\u9fa5]/);
+const remainingContent = paragraphContent.substring(firstCharIndex + 1);
+```
+
+**支援的字符類型擴展**：
+- **數字**: `0-9` (新增支援)
+- **英文字母**: `a-z`, `A-Z` (原有支援)
+- **中文字符**: `\u4e00-\u9fa5` (原有支援)
+
+**修復效果**：
+- ✅ **正確處理數字開頭**：如 "2025 年"、"1.5 萬"、"100% 完成" 等
+- ✅ **精確字符定位**：避免重複字符導致的位置錯誤
+- ✅ **內容完整保留**：確保沒有字符被意外丟棄
+- ✅ **向前兼容**：不影響原有的英文和中文字符處理
+
+**添加調試信息**：
+```typescript
+console.log('Dropcap 處理詳情:', {
+  originalContent: paragraphContent.substring(0, 50) + '...',
+  firstChar: firstChar,
+  firstCharIndex: firstCharIndex,
+  remainingContent: remainingContent.substring(0, 50) + '...'
+});
+```
+
+**學習到的教訓**：
+1. **正則表達式要考慮完整**：設計字符匹配時要考慮所有可能的字符類型
+2. **字符串操作要精確**：使用 `search()` 比 `indexOf()` 更適合正則表達式定位
+3. **邊界條件要測試**：需要測試數字、英文、中文等各種開頭的內容
+4. **調試信息很重要**：添加詳細日誌有助於快速定位問題
+
+**防錯檢查清單**：
+□ 正則表達式包含所有需要的字符類型（數字、英文、中文）
+□ 字符串位置計算使用精確的方法
+□ 測試各種字符開頭的內容（數字、英文、中文）
+□ 添加調試日誌幫助問題定位
+□ 確保剩餘內容計算的準確性
+□ 驗證 Dropcap 處理不會丟失任何字符
+
+### 9.15 Dropcap 智能字符處理改進（方案A實施）
+**問題描述**：用戶發現原始Dropcap功能會丟失有意義的符號，如 \"$ETH\" 變成 \"ETH\"，\"「引用」\" 變成 \"引用」\"。
+
+**根本原因重新分析**：
+原始設計使用限制性正則表達式 `/^[^<]*?([0-9a-zA-Z\\u4e00-\\u9fa5])/` 是基於以下擔心：
+
+1. **HTML標籤污染**：擔心 `<span>內容` 會變成 `<span class=\"dropcap\"><</span>span>內容`
+2. **空白字符問題**：擔心空格作為Dropcap不美觀
+3. **視覺效果考量**：認為某些符號不適合作為Dropcap
+
+但這導致了嚴重的功能缺陷，丟失重要的內容符號。
+
+**方案A：智能字符掃描算法**
+
+**技術實現**：
+```typescript
+// ✅ 新的智能掃描算法
+let searchIndex = 0;
+let firstChar = '';
+let firstCharOriginalIndex = -1;
+
+while (searchIndex < paragraphContent.length) {
+  const char = paragraphContent[searchIndex];
+  
+  // 跳過空白字符
+  if (/\\s/.test(char)) {
+    searchIndex++;\n    continue;\n  }\n  \n  // 跳過HTML標籤\n  if (char === '<') {\n    const tagEndIndex = paragraphContent.indexOf('>', searchIndex);\n    if (tagEndIndex !== -1) {\n      searchIndex = tagEndIndex + 1;\n      continue;\n    }\n  }\n  \n  // 找到第一個實際字符\n  firstChar = char;\n  firstCharOriginalIndex = searchIndex;\n  break;\n}\n\n// 只排除明確有害的字符\nconst problematicChars = ['<', '>', '&', '\\n', '\\r', '\\t'];\nif (problematicChars.includes(firstChar)) {\n  return content; // 跳過處理\n}\n```
+
+**算法優勢**：
+1. **智能掃描**：逐字符分析，精確跳過HTML和空白
+2. **符號保留**：保留所有有意義的符號
+3. **HTML安全**：正確處理嵌套HTML標籤
+4. **性能優化**：線性掃描，效率高
+
+**修復效果對比**：
+
+| 測試內容 | 修復前（限制性正則） | 修復後（智能掃描） | 狀態 |\n|---------|-------------------|-------------------|------|\n| `$ETH 價格上漲` | `<span class=\"dropcap\">E</span>TH 價格上漲` | `<span class=\"dropcap\">$</span>ETH 價格上漲` | ✅ 修復 |\n| `「這是引用」` | `<span class=\"dropcap\">這</span>是引用」` | `<span class=\"dropcap\">「</span>這是引用」` | ✅ 修復 |\n| `@username 發布` | `<span class=\"dropcap\">u</span>sername 發布` | `<span class=\"dropcap\">@</span>username 發布` | ✅ 修復 |\n| `#hashtag 內容` | `<span class=\"dropcap\">h</span>ashtag 內容` | `<span class=\"dropcap\">#</span>hashtag 內容` | ✅ 修復 |\n| `2025 年夏季` | `<span class=\"dropcap\">年</span>夏季` | `<span class=\"dropcap\">2</span>025 年夏季` | ✅ 修復 |\n| `<strong>重要</strong>` | 正常處理 | 正常處理 | ✅ 保持 |\n| `  空白開頭` | 跳過空白 | 跳過空白 | ✅ 保持 |\n\n**核心改進點**：\n1. **從限制性變為包容性**：不再限制字符類型，而是只排除有害字符\n2. **精確的HTML處理**：正確跳過完整的HTML標籤結構\n3. **位置計算改進**：使用原始索引而非search方法，避免重複字符問題\n4. **詳細調試日誌**：提供完整的處理過程記錄\n\n**技術價值**：\n- **用戶體驗提升**：保留完整的內容語義\n- **功能完整性**：支援各種現代內容格式（加密貨幣、社交媒體、標籤等）\n- **維護性改善**：算法邏輯清晰，易於理解和修改\n- **擴展性增強**：可輕易調整problematicChars列表以適應新需求
