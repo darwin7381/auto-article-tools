@@ -28,11 +28,11 @@ export class ArticleFormattingProcessor {
       formattedContent = this.normalizeHeadings(formattedContent);
       appliedRules.push('應用標題正規化（h2→h3, h3→h4, h4→h5，修復連鎖替換問題）');
       
-      // 2. 構建引言區塊（使用預設文章）
+      // 2. 構建引言區塊（使用AI生成的摘要）
       const introQuote = this.buildIntroQuote(analysisResult?.content_analysis?.excerpt);
       if (introQuote) {
         formattedContent = introQuote + '\n\n&nbsp;\n\n' + formattedContent;
-        appliedRules.push('插入引言區塊（含預設前情提要和背景補充）');
+        appliedRules.push('插入引言區塊（使用AI生成的摘要，含預設前情提要和背景補充）');
       }
       
       // 3. 處理開頭押註 - 基於 headerDisclaimer 參數
@@ -120,7 +120,16 @@ export class ArticleFormattingProcessor {
    * 構建引言區塊 - 使用統一的模板配置
    */
   private buildIntroQuote(excerpt?: string): string {
-    const defaultExcerpt = excerpt || 'AI 摘要引言，簡述本篇文章重點內容。';
+    // 🔧 改進摘要處理邏輯
+    let finalExcerpt = excerpt;
+    
+    // 如果沒有AI生成的摘要，或摘要為空/無意義
+    if (!finalExcerpt || finalExcerpt.trim() === '' || finalExcerpt.includes('此文章未經過參數生成處理')) {
+      finalExcerpt = 'AI 摘要引言，簡述本篇文章重點內容。';
+      console.warn('使用預設摘要，原因：', !excerpt ? '未提供摘要' : '摘要無效');
+    } else {
+      console.log('使用AI生成的摘要:', finalExcerpt.substring(0, 100) + (finalExcerpt.length > 100 ? '...' : ''));
+    }
     
     // 使用統一的引言模板（以 sponsored 為例，因為格式基本相同）
     const template = ArticleTemplates.sponsored.introQuoteTemplate;
@@ -128,11 +137,11 @@ export class ArticleFormattingProcessor {
     
     if (!defaults) {
       // 如果沒有預設配置，返回基本的引言
-      return `<p class="intro_quote">${defaultExcerpt}</p>`;
+      return `<p class="intro_quote">${finalExcerpt}</p>`;
     }
     
     return template
-      .replace('{excerpt}', defaultExcerpt)
+      .replace('{excerpt}', finalExcerpt)
       .replace('{contextUrl}', defaults.contextUrl)
       .replace('{contextTitle}', defaults.contextTitle)
       .replace('{backgroundUrl}', defaults.backgroundUrl)
@@ -216,18 +225,68 @@ export class ArticleFormattingProcessor {
     
     const paragraphContent = paragraphContentMatch[1];
     
-    // 提取第一個中文字符或英文字母
-    const firstCharMatch = paragraphContent.match(/^[^<]*?([a-zA-Z\u4e00-\u9fa5])/);
-    if (!firstCharMatch) return content;
+    // 🔧 方案A：智能字符匹配 - 跳過HTML標籤和空白，但保留有意義的符號
+    // 1. 尋找第一個實際的文字字符，跳過空白和HTML標籤
+    let searchIndex = 0;
+    let firstChar = '';
+    let firstCharOriginalIndex = -1;
     
-    const firstChar = firstCharMatch[1];
-    const remainingContent = paragraphContent.substring(paragraphContent.indexOf(firstChar) + 1);
+    while (searchIndex < paragraphContent.length) {
+      const char = paragraphContent[searchIndex];
+      
+      // 跳過空白字符
+      if (/\s/.test(char)) {
+        searchIndex++;
+        continue;
+      }
+      
+      // 如果遇到HTML標籤，跳過整個標籤
+      if (char === '<') {
+        const tagEndIndex = paragraphContent.indexOf('>', searchIndex);
+        if (tagEndIndex !== -1) {
+          searchIndex = tagEndIndex + 1;
+          continue;
+        } else {
+          // 如果沒有找到標籤結束，跳出循環
+          break;
+        }
+      }
+      
+      // 找到第一個實際字符
+      firstChar = char;
+      firstCharOriginalIndex = searchIndex;
+      break;
+    }
+    
+    // 如果沒有找到合適的字符
+    if (!firstChar || firstCharOriginalIndex === -1) return content;
+    
+    // 2. 排除明確不適合的字符（主要是HTML相關字符）
+    const problematicChars = ['<', '>', '&', '\n', '\r', '\t'];
+    if (problematicChars.includes(firstChar)) {
+      console.log('Dropcap 跳過不適合的字符:', firstChar);
+      return content;
+    }
+    
+    // 3. 構建新的段落內容
+    const beforeFirstChar = paragraphContent.substring(0, firstCharOriginalIndex);
+    const afterFirstChar = paragraphContent.substring(firstCharOriginalIndex + 1);
+    
+    console.log('Dropcap 智能處理詳情:', {
+      originalContent: paragraphContent.substring(0, 50) + '...',
+      firstChar: firstChar,
+      firstCharIndex: firstCharOriginalIndex,
+      beforeFirstChar: beforeFirstChar,
+      afterFirstChar: afterFirstChar.substring(0, 30) + '...'
+    });
     
     // 使用統一的 Dropcap 樣式配置
     const dropcapStyle = ArticleTemplates.sponsored.dropcapStyle;
+    const newParagraphContent = `${beforeFirstChar}${dropcapStyle}${firstChar}</span>${afterFirstChar}`;
+    
     const newParagraph = targetParagraph.replace(
       paragraphContent,
-      `${dropcapStyle}${firstChar}</span>${remainingContent}`
+      newParagraphContent
     );
     
     return content.replace(targetParagraph, newParagraph);

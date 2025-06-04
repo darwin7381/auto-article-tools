@@ -815,11 +815,10 @@ export default function IntegratedFileProcessor() {
       setMarkdownUrl(null);
       resetProcessState();
       
-      // 重置後立即重新設置文稿分類，確保資料不丟失
-      setTimeout(() => {
-        setArticleClassification(classification);
-        console.log('重置後重新設置文稿分類:', classification);
-      }, 0);
+      // 🔧 修復競態條件：立即重新設置文稿分類，而不是使用 setTimeout
+      // 確保在重置後文稿分類立即可用，避免進階格式化階段找不到分類信息
+      setArticleClassification(classification);
+      console.log('重置後立即重新設置文稿分類:', classification);
     } else {
       // 正常情況下設置文稿分類
       setArticleClassification(classification);
