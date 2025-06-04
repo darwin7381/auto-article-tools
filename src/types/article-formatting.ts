@@ -130,26 +130,6 @@ export interface ProcessedImageResult {
   processingTime: number;
 }
 
-// 內容處理規則配置
-export interface ContentProcessingConfig {
-  terminologyMap: Record<string, string>;
-  headingHierarchy: string[];
-  excludePatterns: RegExp[];
-  linkFiltering: {
-    maxLinks: number;
-    excludePatterns: RegExp[];
-  };
-  imageProcessing: {
-    maxSizeMB: number;
-    recommendedDimensions: { width: number; height: number };
-    supportedFormats: string[];
-    compressionSettings: {
-      quality: number;
-      format: string;
-    };
-  };
-}
-
 // 文稿類型選項
 export interface ArticleTypeOption {
   value: ArticleType;
