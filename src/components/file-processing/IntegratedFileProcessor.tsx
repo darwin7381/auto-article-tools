@@ -924,21 +924,21 @@ export default function IntegratedFileProcessor() {
             {(() => {
               const viewerUrl = getStageViewerUrl(id, result);
               return viewerUrl && (
-                <Button
-                  onClick={() => {
+              <Button
+                onClick={() => {
                     if (viewerUrl) window.open(viewerUrl, '_blank', 'noopener,noreferrer');
-                  }}
-                  className="ml-2"
-                  color="primary"
-                  startIcon={
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  }
-                >
-                  在新窗口中查看
-                </Button>
+                }}
+                className="ml-2"
+                color="primary"
+                startIcon={
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                }
+              >
+                在新窗口中查看
+              </Button>
               );
             })()}
           </div>
@@ -956,6 +956,7 @@ export default function IntegratedFileProcessor() {
       'advanced-ai': 'PR writer處理',
       'format-conversion': '格式轉換',
       'copy-editing': 'AI上稿編修',
+      'cover-image': '封面圖處理',
       'article-formatting': '進階格式化',
       'prep-publish': '上稿準備',
       'publish-news': '上架新聞',
@@ -988,7 +989,7 @@ export default function IntegratedFileProcessor() {
       );
     }
     
-    if (stageId === 'format-conversion' || stageId === 'copy-editing' || stageId === 'article-formatting') {
+    if (stageId === 'format-conversion' || stageId === 'copy-editing' || stageId === 'cover-image' || stageId === 'article-formatting') {
       // 顯示HTML內容預覽
       if (result.htmlContent && typeof result.htmlContent === 'string') {
         return (
@@ -1365,7 +1366,7 @@ export default function IntegratedFileProcessor() {
                 },
                 advanced: { 
                   title: "後期處理階段",
-                  stages: ['advanced-ai', 'format-conversion', 'copy-editing', 'article-formatting']
+                  stages: ['advanced-ai', 'format-conversion', 'copy-editing', 'cover-image', 'article-formatting']
                 },
                 final: {
                   title: "上稿階段", 
@@ -1421,7 +1422,7 @@ export default function IntegratedFileProcessor() {
                 },
                 advanced: { 
                   title: "後期處理階段",
-                  stages: ['advanced-ai', 'format-conversion', 'copy-editing', 'article-formatting']
+                  stages: ['advanced-ai', 'format-conversion', 'copy-editing', 'cover-image', 'article-formatting']
                 },
                 final: {
                   title: "上稿階段", 

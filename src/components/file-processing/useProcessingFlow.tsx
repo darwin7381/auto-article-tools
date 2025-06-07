@@ -6,6 +6,7 @@ import useAiProcessingStage, { ProcessingResult } from './useAiProcessingStage';
 import useAdvancedAiStage, { AdvancedAiResult } from './useAdvancedAiStage';
 import useFormatConversionStage, { FormatConversionResult } from './useFormatConversionStage';
 import useCopyEditingStage, { CopyEditingResult } from './useCopyEditingStage';
+import useCoverImageStage, { CoverImageStageResult } from './useCoverImageStage';
 import useArticleFormattingStage, { ArticleFormattingStageResult } from './useArticleFormattingStage';
 
 // 重新導出類型以保持兼容性
@@ -14,6 +15,7 @@ export type { ProcessingResult } from './useAiProcessingStage';
 export type { AdvancedAiResult } from './useAdvancedAiStage';
 export type { FormatConversionResult } from './useFormatConversionStage';
 export type { CopyEditingResult } from './useCopyEditingStage';
+export type { CoverImageStageResult } from './useCoverImageStage';
 export type { ArticleFormattingStageResult } from './useArticleFormattingStage';
 
 // 定義最終處理結果類型
@@ -50,6 +52,11 @@ interface FormatConversionStageHandler {
 
 interface CopyEditingStageHandler {
   startCopyEditing: (result: FormatConversionResult) => Promise<CopyEditingResult>;
+  cleanup: () => void;
+}
+
+interface CoverImageStageHandler {
+  startCoverImageProcessing: (result: CopyEditingResult) => Promise<CoverImageStageResult | undefined>;
   cleanup: () => void;
 }
 
@@ -100,7 +107,49 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
   const advancedAiStageRef = useRef<AdvancedAiStageHandler | null>(null);
   const formatConversionStageRef = useRef<FormatConversionStageHandler | null>(null);
   const copyEditingStageRef = useRef<CopyEditingStageHandler | null>(null);
+  const coverImageStageRef = useRef<CoverImageStageHandler | null>(null);
   const articleFormattingStageRef = useRef<ArticleFormattingStageHandler | null>(null);
+
+  // 封面圖處理階段
+  const coverImageStage = useCoverImageStage(
+    { 
+      copyEditingResult: {} as CopyEditingResult
+    },
+    {
+      onComplete: (result) => {
+        console.log('封面圖處理階段完成:', result);
+        
+        callbacksRef.current.onStageComplete('cover-image', result as unknown as Record<string, unknown>);
+        
+        // 進入進階格式化階段
+        if (articleFormattingStageRef.current) {
+                     // 將CoverImageStageResult轉換為適合ArticleFormattingStage的格式
+           const coverImageResultAsCopyEditingResult: CopyEditingResult = {
+             wordpressParams: {
+               title: result.wordpressParams.title || '',
+               content: result.wordpressParams.content || '',
+               excerpt: result.wordpressParams.excerpt,
+               slug: result.wordpressParams.slug,
+               categories: result.wordpressParams.categories,
+               tags: result.wordpressParams.tags,
+               featured_image: result.wordpressParams.featured_image ? {
+                 url: result.wordpressParams.featured_image.url,
+                 alt: result.wordpressParams.featured_image.alt || '文章首圖'
+               } : undefined
+             },
+             adaptedContent: result.adaptedContent
+           };
+          
+          articleFormattingStageRef.current.startArticleFormatting(coverImageResultAsCopyEditingResult);
+        }
+        
+        return result;
+      },
+      onError: (error) => {
+        callbacksRef.current.onProcessError(error, 'cover-image');
+      }
+    }
+  );
 
   // 文章格式化階段
   const articleFormattingStage = useArticleFormattingStage(
@@ -209,9 +258,9 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         
         callbacksRef.current.onStageComplete('copy-editing', resultWithHtmlContent as unknown as Record<string, unknown>);
         
-        // 進入進階格式化階段，而不是直接完成
-        if (articleFormattingStageRef.current) {
-          articleFormattingStageRef.current.startArticleFormatting(resultWithHtmlContent);
+        // 進入封面圖處理階段
+        if (coverImageStageRef.current) {
+          coverImageStageRef.current.startCoverImageProcessing(resultWithHtmlContent);
         }
         
         return resultWithHtmlContent;
@@ -273,15 +322,17 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     advancedAiStageRef.current = advancedAiStage;
     formatConversionStageRef.current = formatConversionStage;
     copyEditingStageRef.current = copyEditingStage;
+    coverImageStageRef.current = coverImageStage;
     articleFormattingStageRef.current = articleFormattingStage;
     
     return () => {
       advancedAiStage.cleanup();
       formatConversionStage.cleanup();
       copyEditingStage.cleanup();
+      coverImageStage.cleanup();
       articleFormattingStage.cleanup();
     };
-  }, [advancedAiStage, formatConversionStage, copyEditingStage, articleFormattingStage]);
+  }, [advancedAiStage, formatConversionStage, copyEditingStage, coverImageStage, articleFormattingStage]);
 
   // AI初步處理階段
   const aiProcessingStage = useAiProcessingStage(
@@ -395,8 +446,9 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
     advancedAiStage.cleanup();
     formatConversionStage.cleanup();
     copyEditingStage.cleanup();
+    coverImageStage.cleanup();
     articleFormattingStage.cleanup();
-  }, [extractStage, aiProcessingStage, advancedAiStage, formatConversionStage, copyEditingStage, articleFormattingStage]);
+  }, [extractStage, aiProcessingStage, advancedAiStage, formatConversionStage, copyEditingStage, coverImageStage, articleFormattingStage]);
 
   // 處理文件上傳和處理流程 - 協調器
   const processFile = useCallback(async (file: File) => {
