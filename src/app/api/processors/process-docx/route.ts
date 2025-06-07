@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { processDOCX } from '@/services/conversion/docxService';
 import { getFileFromR2 } from '@/services/storage/r2Service';
+import { apiAuth } from '@/middleware/api-auth';
 
 export async function POST(request: Request) {
+  // API 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
+
   try {
     const { fileUrl, fileId } = await request.json();
     
@@ -70,13 +75,7 @@ export async function POST(request: Request) {
     
     return NextResponse.json(
       { error: '處理 DOCX 時發生錯誤', details: errorMessage },
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json;charset=UTF-8',
-          'Content-Encoding': 'identity'
-        }
-      }
+      { status: 500 }
     );
   }
 } 

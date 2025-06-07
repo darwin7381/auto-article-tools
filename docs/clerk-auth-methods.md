@@ -1,250 +1,304 @@
-# Clerk 路由保護官方解決方案
+# Clerk 認證實現指南
 
-本文檔記錄了 Clerk 官方提供的路由保護方法，適用於 Next.js 應用程序。
+本文檔記錄了項目中成功實現的 Clerk 認證方法，包括路由保護和安全最佳實踐。
 
-## 最新發現：middleware.ts 位置問題（關鍵原因）
+## 當前成功實現：Clerk Middleware 路由保護
 
-**重要發現**: 所有先前嘗試的方法失敗，並非因為方法本身不正確，而是因為 middleware.ts 文件放置在錯誤位置！
+我們已成功實現了基於 Clerk middleware 的路由保護方案，結合雙層認證架構提供完整的安全保護。
 
-### 錯誤與解決方案
-- **錯誤位置**: 根目錄 (`/middleware.ts`)
-- **正確位置**: src 目錄下 (`/src/middleware.ts`)
-
-Next.js 與 Clerk 要求中間件文件必須放在特定位置才能被正確識別和執行。將文件從根目錄移動到 `/src/middleware.ts` 後，路由保護立即開始正常工作。
-
-### 關鍵教訓
-1. 文件位置與命名對於 Next.js 和 Clerk 中間件功能至關重要
-2. 中間件文件必須放在 `/src/middleware.ts` 位置才能被正確識別
-3. 排除 middleware 功能問題時，請先檢查文件位置是否正確
-
-## 當前採用的解決方案: 客戶端頁面級保護（暫時解法）
-
-**重要：** 由於 middleware 方法未能成功保護所有路由，我們採用了客戶端頁面級保護的解決方案。
-
-在每個需要保護的頁面中添加以下代碼：
-
-```typescript
-'use client';
-
-import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-
-export default function ProtectedPage() {
-  const { isSignedIn, isLoaded } = useUser();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.push('/sign-in');
-    }
-  }, [isLoaded, isSignedIn, router]);
-
-  if (!isLoaded || !isSignedIn) {
-    return <div className="flex justify-center items-center min-h-screen">載入中...</div>;
-  }
-
-  // 頁面內容
-}
-```
-
-### 關鍵點
-1. 使用 `'use client'` 指令標記為客戶端組件
-2. 使用 `useUser()` hook 獲取用戶登錄狀態
-3. 在 `useEffect` 中檢查登錄狀態，未登錄則重定向到 '/sign-in'
-4. 渲染時也有條件判斷，未登錄顯示載入狀態
-
-### 優點
-- 更可靠 - 不依賴 middleware 的複雜路由匹配
-- 更直接 - 在每個頁面直接檢查用戶登錄狀態
-- 更靈活 - 可以針對不同頁面定制不同的保護邏輯
-
-### 缺點
-- 需要在每個需要保護的頁面重複實現保護邏輯
-- 無法像 middleware 一樣在請求到達頁面前就進行攔截
-- 可能導致頁面短暫顯示後才重定向
-
-## 嘗試方案記錄（都未成功）
-
-以下是之前嘗試但未成功的 middleware 解決方案：
-
-### 嘗試失敗 1：使用官方標準的 auth.protect() 方法
-
-> **重要提示：** 此方法也在我們的項目中嘗試失敗，無法正確保護首頁和其他路由如 `/demo/integrated-processing`。
-
-這個方法直接使用 `auth.protect()` 而不混合手動重定向邏輯：
-
-```typescript
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-
-// 定義公開路由（只有這些路由可以不需登入訪問）
-const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)', 
-  '/api/clerk-webhook(.*)' 
-])
-
-export default clerkMiddleware(async (auth, req) => {
-  // 如果不是公開路由，則保護它
-  if (!isPublicRoute(req)) {
-    // 使用官方推薦的 auth.protect() 方法，讓 Clerk 處理重定向邏輯
-    await auth.protect()
-  }
-})
-
-export const config = {
-  matcher: [
-    // 明確匹配首頁
-    '/',
-    // 明確匹配 demo 路徑及其子路徑
-    '/demo/(.*)',
-    // 添加 demo 頁面本身
-    '/demo',
-    // 明確匹配受保護頁面及其子路徑
-    '/protected',
-    '/protected/(.*)',
-    '/viewer',
-    '/viewer/(.*)',
-    // 跳過Next.js內部文件和靜態文件
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // 總是處理API路由
-    '/(api|trpc)(.*)',
-  ],
-};
-```
-
-問題診斷：儘管使用了 Clerk 官方推薦的 `auth.protect()` 方法，系統仍然無法可靠地保護所有路由。可能的原因包括 Clerk 版本兼容性問題或與 Next.js 的特定路由處理機制衝突。
-
-### 嘗試失敗 2：使用 clerkMiddleware 和 手動重定向
-
-> **重要提示：** 此方法在我們的項目中嘗試失敗，無法正確保護首頁和其他路由如 `/demo/integrated-processing`。
-
-這個方法使用 `auth()` 獲取用戶 ID，然後手動實現重定向邏輯：
+### 核心實現 (`src/middleware.ts`)
 
 ```typescript
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
-// 定義公開路由（只有這些路由可以不需登入訪問）
+// 定義公開路由 - 只保留真正應該公開的路由
 const isPublicRoute = createRouteMatcher([
+  // 認證相關路由
   '/sign-in(.*)',
   '/sign-up(.*)', 
-  '/api/clerk-webhook(.*)' 
+  '/api/clerk-webhook(.*)',
+  
+  // 真正應該公開的 API 路由（只保留查詢類型的 API）
+  '/api/parse-url(.*)',        // URL 解析 - 用於預覽，可以保持公開
+  '/api/process-status(.*)',   // 狀態查詢 - 查詢處理狀態，可以保持公開
 ])
 
 export default clerkMiddleware(async (auth, req) => {
-  // 如果不是公開路由，則保護它
-  if (!isPublicRoute(req)) {
-    // 非公開路由必須登入
-    const { userId } = await auth()
-    if (!userId) {
-      const signInUrl = new URL('/sign-in', req.url)
-      return NextResponse.redirect(signInUrl)
-    }
+  // 如果是公開路由，直接通過
+  if (isPublicRoute(req)) {
+    return;
   }
+  
+  // 調試信息
+  console.log('==== 中間件調試信息 ====');
+  console.log('請求路徑:', req.nextUrl.pathname);
+  
+  // 檢查是否有 API Key（用於內部服務調用）
+  const apiKey = req.headers.get('x-api-key');
+  const expectedApiKey = process.env.API_SECRET_KEY;
+  
+  console.log('API Key 檢查:', apiKey ? `${apiKey.substring(0, 8)}...` : 'null');
+  console.log('期望的 API Key:', expectedApiKey ? `${expectedApiKey.substring(0, 8)}...` : 'null');
+  
+  if (apiKey && expectedApiKey && apiKey === expectedApiKey) {
+    console.log('通過 API Key 認證，允許內部調用');
+    return; // API Key 有效，允許請求通過
+  }
+  
+  // 沒有有效 API Key，檢查用戶登入狀態
+  const { userId, sessionClaims } = await auth();
+  
+  console.log('用戶ID:', userId);
+  console.log('SessionClaims:', sessionClaims);
+  
+  // 如果用戶未登入，重定向到登入頁面
+  if (!userId) {
+    console.log('未登錄且無有效 API Key，重定向到登入頁面');
+    const signInUrl = new URL('/sign-in', req.url);
+    return NextResponse.redirect(signInUrl);
+  }
+  
+  // 用戶已登入，允許訪問
+  console.log('用戶已登入，允許訪問');
+  return;
 })
 
 export const config = {
   matcher: [
-    // 明確匹配首頁
-    '/',
-    // 明確匹配 demo 路徑
-    '/demo/(.*)',
-    // 明確匹配受保護頁面
-    '/protected',
-    '/viewer/(.*)',
-    // 跳過Next.js內部文件和靜態文件
+    // Skip Next.js internals and all static files, unless found in search params
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // 總是處理API路由
+    // Always run for API routes
     '/(api|trpc)(.*)',
   ],
 };
 ```
 
-### 嘗試失敗 3：使用 auth.protect() 的簡化版本
+## 核心特性
 
-> **重要提示：** 此方法在我們的項目中嘗試失敗，無法正確保護首頁和其他路由如 `/demo/integrated-processing`。
+### 1. 🔒 **全面的路由保護**
+- **自動保護**：所有非公開路由自動需要用戶登錄
+- **智能重定向**：未登錄用戶自動重定向到 `/sign-in`
+- **靜態資源跳過**：圖片、CSS、JS 等靜態資源不需要認證
 
-這是更簡化的版本，但在我們的專案中未能正常工作：
+### 2. 🔑 **雙層認證支持**
+- **用戶認證**：前端用戶通過 Clerk session 認證
+- **API Key 認證**：內部服務通過 API Key 認證
+- **自動選擇**：middleware 自動判斷使用哪種認證方式
 
+### 3. 📋 **公開路由管理**
+- **最小化原則**：只有真正需要公開的路由才設為公開
+- **安全分類**：區分認證路由、查詢 API 和受保護資源
+
+## 環境配置
+
+### 必需的環境變量
+
+```bash
+# .env.local
+
+# Clerk 認證配置
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxx
+CLERK_SECRET_KEY=sk_test_xxx
+
+# API 內部調用密鑰
+API_SECRET_KEY=your-strong-random-key-here
+
+# 基礎 URL（生產環境）
+NEXT_PUBLIC_BASE_URL=https://your-domain.com
+```
+
+### Clerk Dashboard 配置
+
+1. **Domain 設置**：確保在 Clerk Dashboard 中正確配置域名
+2. **Redirect URLs**：設置正確的重定向 URL
+   - 開發環境：`http://localhost:3000/sign-in/[[...index]]`
+   - 生產環境：`https://your-domain.com/sign-in/[[...index]]`
+
+## 用戶體驗流程
+
+### 1. 未登錄用戶訪問受保護頁面
+```
+用戶訪問 https://your-app.com/
+      ↓
+Clerk Middleware 檢查用戶狀態
+      ↓
+未登錄 → 重定向到 /sign-in
+      ↓
+用戶登錄成功 → 重定向回原頁面
+```
+
+### 2. 已登錄用戶正常訪問
+```
+用戶訪問任何頁面
+      ↓
+Clerk Middleware 驗證 session
+      ↓
+已登錄 → 直接訪問頁面內容
+```
+
+### 3. 內部 API 調用
+```
+API A 調用 API B
+      ↓
+檢查 x-api-key header
+      ↓
+API Key 有效 → 直接處理請求
+```
+
+## 實際應用示例
+
+### 前端頁面訪問
 ```typescript
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+// 前端頁面不需要額外的認證代碼
+// Clerk middleware 自動處理認證檢查
 
-// 定義公開路由（只有這些路由可以不需登入訪問）
-const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)', 
-  '/api/clerk-webhook(.*)' 
-]);
+export default function ProtectedPage() {
+  // 如果用戶未登錄，middleware 會自動重定向
+  // 這裡的代碼只有登錄用戶才能看到
+  
+  return (
+    <div>
+      <h1>受保護的頁面內容</h1>
+      {/* 頁面內容 */}
+    </div>
+  );
+}
+```
 
-export default clerkMiddleware(async (auth, req) => {
-  // 如果不是公開路由，則保護它
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+### 前端 API 調用
+```typescript
+// 前端調用 API，自動包含 Clerk session
+const handleSubmit = async () => {
+  try {
+    const response = await fetch('/api/extract-content', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Clerk 自動添加認證信息
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      throw new Error('API 調用失敗');
+    }
+    
+    const result = await response.json();
+    // 處理結果...
+  } catch (error) {
+    console.error('錯誤:', error);
   }
-});
-
-export const config = {
-  matcher: [
-    '/',                   // 明確匹配根路徑（首頁）
-    // 跳過Next.js內部文件和靜態文件
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // 總是處理API路由
-    '/(api|trpc)(.*)',
-  ],
 };
 ```
 
-### 嘗試失敗 4：使用 authMiddleware (請勿使用)
-
-**注意：此方法在我們的項目中無法正常工作，因為它使用的是錯誤的中間件函數。**
-
-這是 **錯誤** 的實現方式，不要在項目中使用：
-
+### 獲取用戶信息
 ```typescript
-import { authMiddleware } from "@clerk/nextjs";
+'use client';
 
-// 所有不在此清單中的路由都需要驗證
-export default authMiddleware({
-  // 公開路由列表
-  publicRoutes: [
-    "/sign-in(.*)",         // 登入頁面
-    "/sign-up(.*)",         // 註冊頁面
-    "/api/clerk-webhook(.*)"// Webhook 端點
-  ]
-});
+import { useUser } from '@clerk/nextjs';
 
-export const config = {
-  matcher: [
-    // 跳過Next.js內部文件和靜態文件
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // 明確匹配首頁
-    '/',
-    // 總是處理API路由
-    '/(api|trpc)(.*)',
-  ],
-};
+export default function UserProfile() {
+  const { user, isLoaded, isSignedIn } = useUser();
+  
+  if (!isLoaded) {
+    return <div>載入中...</div>;
+  }
+  
+  if (!isSignedIn) {
+    // 這種情況通常不會發生，因為 middleware 會重定向
+    return <div>請先登錄</div>;
+  }
+  
+  return (
+    <div>
+      <h1>歡迎，{user.firstName}！</h1>
+      <p>Email: {user.primaryEmailAddress?.emailAddress}</p>
+    </div>
+  );
+}
 ```
 
-## 重要注意事項
+## 路由分類
 
-1. **matcher 配置關鍵**：
-   - 必須明確包含 `'/'` 才能保護首頁
-   - 必須包含所有需要保護的路由模式
-   - 可能需要同時包含路徑本身和路徑+通配符 (例如同時包含 `/demo` 和 `/demo/(.*)`)
+### 🔓 **公開路由**（無需登錄）
+- `/sign-in/**` - 登錄頁面
+- `/sign-up/**` - 註冊頁面
+- `/api/clerk-webhook/**` - Clerk webhooks
+- `/api/parse-url/**` - URL 解析（查詢功能）
+- `/api/process-status/**` - 處理狀態查詢
 
-2. **路由匹配順序**：
-   - Clerk middleware 按照定義順序處理路由匹配
-   - 更具體的匹配應該放在前面
+### 🔒 **受保護路由**（需要登錄）
+- `/` - 首頁
+- `/viewer/**` - 文檔查看器
+- `/protected/**` - 明確標記的受保護頁面
+- `/api/extract-content/**` - 內容提取
+- `/api/process-openai/**` - AI 處理
+- `/api/upload/**` - 文件上傳
+- 其他所有未明確設為公開的路由
 
-3. **調試技巧**：
-   - 在 middleware 中添加 `console.log(req.nextUrl.pathname)` 可以幫助調試
-   - 確保每個請求都經過 middleware 處理
+### 🔑 **內部 API**（需要 API Key）
+- `/api/processors/**` - 文檔處理器
 
-4. **API 路由考慮**：
-   - 使用 `/(api|trpc)(.*)` 匹配器確保保護所有 API 端點
-   - 將需要公開訪問的 API 添加到 公開路由列表中
+## 調試與監控
 
-5. **可能的替代解決方案**：
-   - 在頁面級別添加保護而非使用 middleware（我們當前採用的方案）
-   - 在每個需要保護的頁面使用 `useUser()` 或 `auth()` 進行檢查 
+### 調試日誌
+middleware 提供詳細的調試信息：
+
+```
+==== 中間件調試信息 ====
+請求路徑: /api/extract-content
+API Key 檢查: null
+期望的 API Key: f54bc588...
+用戶ID: user_2xxx
+SessionClaims: { ... }
+用戶已登錄，允許訪問
+```
+
+### 常見問題排查
+
+#### 1. 無限重定向循環
+```
+原因：登錄頁面本身被誤設為受保護路由
+解決：確保 /sign-in(.*) 在公開路由列表中
+```
+
+#### 2. 靜態資源被攔截
+```
+原因：matcher 配置過於寬泛
+解決：檢查 matcher 是否正確排除靜態資源
+```
+
+#### 3. API 調用返回 HTML（重定向頁面）
+```
+原因：API 路由未正確設置認證
+解決：檢查 API 是否在公開路由列表或有正確的認證
+```
+
+## 安全注意事項
+
+### ✅ **最佳實踐**
+
+1. **最小權限原則**：只有必要的路由才設為公開
+2. **環境變量安全**：API_SECRET_KEY 絕不暴露給前端
+3. **調試信息控制**：生產環境減少或移除詳細日誌
+4. **定期密鑰輪換**：定期更換 API_SECRET_KEY
+
+### ⚠️ **安全警告**
+
+1. **不要**將認證邏輯只依賴前端檢查
+2. **不要**在前端代碼中硬編碼任何密鑰
+3. **不要**過度公開 API 路由
+4. **不要**忽略 CORS 和其他安全 headers
+
+## 總結
+
+當前的 Clerk 認證實現提供了：
+
+- **🔒 全面保護**：所有非公開路由自動受保護
+- **🎯 精確控制**：靈活的公開路由配置
+- **🔑 雙重認證**：支持用戶認證和服務認證
+- **📊 完整監控**：詳細的認證日誌和調試信息
+- **🚀 無縫體驗**：用戶無感知的認證流程
+
+這種方案既確保了應用的安全性，又保持了良好的用戶體驗和開發效率。 

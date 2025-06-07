@@ -22,10 +22,20 @@ export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || 'https://files.blockte
 
 /**
  * 從R2獲取文件
- * @param fileKey 文件在R2中的鍵值
+ * @param fileKeyOrUrl 文件在R2中的鍵值或完整URL
  * @returns 文件內容的Buffer
  */
-export async function getFileFromR2(fileKey: string): Promise<Buffer> {
+export async function getFileFromR2(fileKeyOrUrl: string): Promise<Buffer> {
+  // 如果傳入的是完整URL，提取出Key
+  let fileKey = fileKeyOrUrl;
+  if (fileKeyOrUrl.startsWith('http')) {
+    // 從URL中提取Key部分
+    // 例如: "https://files.blocktempo.ai/upload/file-123.docx" -> "upload/file-123.docx"
+    const url = new URL(fileKeyOrUrl);
+    fileKey = url.pathname.substring(1); // 移除開頭的 "/"
+    console.log(`從URL提取Key: ${fileKeyOrUrl} -> ${fileKey}`);
+  }
+  
   const command = new GetObjectCommand({
     Bucket: BUCKET_NAME,
     Key: fileKey,

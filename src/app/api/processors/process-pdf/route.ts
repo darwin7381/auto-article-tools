@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { convertPdfToDocx } from '@/services/conversion/pdfService';
 import { uploadFileToR2, R2_PUBLIC_URL } from '@/services/storage/r2Service';
+import { apiAuth } from '@/middleware/api-auth';
 
 export async function POST(request: Request) {
+  // API 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
+
   try {
     const { fileUrl, fileId } = await request.json();
     

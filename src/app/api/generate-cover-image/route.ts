@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { uploadImageToR2 } from '@/services/storage/r2Service';
 import { withRetry } from '@/agents/common/agentUtils';
+import { apiAuth } from '@/middleware/api-auth';
 
 // 初始化OpenAI客戶端
 const openai = new OpenAI({
@@ -61,6 +62,10 @@ The image should be visually appealing and relevant to the article content while
 }
 
 export async function POST(request: Request) {
+  // API 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
+
   try {
     // 解析請求數據
     let requestData: GenerateCoverImageRequest;
