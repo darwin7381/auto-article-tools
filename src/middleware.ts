@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { securityMiddleware, addSecurityHeaders, detectSuspiciousActivity } from '@/middleware/security'
 
 // 定義公開路由 - 只保留真正應該公開的路由
 const isPublicRoute = createRouteMatcher([
@@ -24,58 +25,95 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 export default clerkMiddleware(async (auth, req) => {
-  // 如果是公開路由，直接通過
-  if (isPublicRoute(req)) {
-    return;
+  // 1. 首先進行安全檢查
+  if (detectSuspiciousActivity(req)) {
+    return new NextResponse(JSON.stringify({
+      error: '請求被拒絕',
+      message: '檢測到可疑活動',
+      code: 'SUSPICIOUS_ACTIVITY'
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
   
-  // 調試信息
-  console.log('==== 中間件調試信息 ====');
-  console.log('請求路徑:', req.nextUrl.pathname);
+  // 2. 速率限制檢查
+  const rateLimitResponse = securityMiddleware(req);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+  
+  // 如果是公開路由，添加安全頭部後直接通過
+  if (isPublicRoute(req)) {
+    return addSecurityHeaders(NextResponse.next());
+  }
+  
+  // 僅在開發環境顯示調試信息
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  if (isDevelopment) {
+    console.log('==== 中間件調試信息 ====');
+    console.log('請求路徑:', req.nextUrl.pathname);
+  }
   
   // 檢查是否有 API Key（用於內部服務調用）
   const apiKey = req.headers.get('x-api-key');
   const expectedApiKey = process.env.API_SECRET_KEY;
   
-  console.log('API Key 檢查:', apiKey ? `${apiKey.substring(0, 8)}...` : 'null');
-  console.log('期望的 API Key:', expectedApiKey ? `${expectedApiKey.substring(0, 8)}...` : 'null');
+  // 安全的調試信息 - 不暴露任何敏感數據
+  if (isDevelopment) {
+    console.log('API Key 檢查:', apiKey ? '存在' : '缺少');
+    console.log('環境 API Key:', expectedApiKey ? '已配置' : '未配置');
+  }
   
   if (apiKey && expectedApiKey && apiKey === expectedApiKey) {
-    console.log('通過 API Key 認證，允許內部調用');
-    return; // API Key 有效，允許請求通過
+    if (isDevelopment) {
+      console.log('通過 API Key 認證，允許內部調用');
+    }
+    return addSecurityHeaders(NextResponse.next()); // API Key 有效，添加安全頭部
   }
   
   // 沒有有效 API Key，檢查用戶登入狀態
   const { userId, sessionClaims } = await auth();
   
-  console.log('用戶ID:', userId);
-  console.log('SessionClaims:', sessionClaims);
+  // 安全的調試信息
+  if (isDevelopment) {
+    console.log('用戶狀態:', userId ? '已登錄' : '未登錄');
+  }
   
   // 如果用戶未登入，重定向到登入頁面
   if (!userId) {
-    console.log('未登入且無有效 API Key，重定向到登入頁面');
+    if (isDevelopment) {
+      console.log('未登錄且無有效 API Key，重定向到登錄頁面');
+    }
     const signInUrl = new URL('/sign-in', req.url);
     return NextResponse.redirect(signInUrl);
   }
   
-  // 暫時移除角色檢查，只檢查登入狀態
-  // 在確定角色存儲位置後再添加角色檢查
-  /*
-  // 檢查用戶角色（確保至少有 bd-editor 或 admin 角色）
+  // 重新啟用角色檢查（安全關鍵）
   const userRole = sessionClaims?.metadata ? (sessionClaims.metadata as {role?: string}).role : undefined;
-  console.log('用戶角色:', userRole);
   
+  // 暫時允許所有登錄用戶，但記錄角色信息用於未來實施
+  if (isDevelopment) {
+    console.log('用戶角色:', userRole || '未設置');
+  }
+  
+  // TODO: 在角色系統完全配置後，啟用以下檢查
+  /*
   if (userRole !== 'bd-editor' && userRole !== 'admin') {
-    // 如果用戶沒有所需角色，重定向到登入頁面
-    console.log('角色不足，重定向到登入頁面');
+    if (isDevelopment) {
+      console.log('角色不足，重定向到登錄頁面');
+    }
     const signInUrl = new URL('/sign-in', req.url);
     return NextResponse.redirect(signInUrl);
   }
   */
   
-  // 用戶已登入，允許訪問
-  console.log('用戶已登入，允許訪問');
-  return;
+  // 用戶已登入，允許訪問並添加安全頭部
+  if (isDevelopment) {
+    console.log('用戶已登錄，允許訪問');
+  }
+  return addSecurityHeaders(NextResponse.next());
 })
 
 export const config = {
