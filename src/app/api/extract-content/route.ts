@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   // API 認證檢查
   const authResponse = await apiAuth(request);
   if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
-  
+
   try {
     const { fileUrl, fileId, fileType } = await request.json();
     
@@ -19,6 +19,16 @@ export async function POST(request: Request) {
     
     console.log('收到內容提取請求:', { fileId, fileType });
     
+    // 準備內部 API 調用的認證頭部
+    const internalApiHeaders = {
+      'Content-Type': 'application/json',
+    } as Record<string, string>;
+    
+    // 如果有 API_SECRET_KEY，使用它進行內部認證
+    if (process.env.API_SECRET_KEY) {
+      internalApiHeaders['x-api-key'] = process.env.API_SECRET_KEY;
+    }
+    
     try {
       // 根據文件類型選擇處理器
       if (fileType === 'application/pdf') {
@@ -26,184 +36,99 @@ export async function POST(request: Request) {
         console.log('使用PDF處理器...');
         const pdfResponse = await fetch(getApiUrl('/api/processors/process-pdf'), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: internalApiHeaders,
           body: JSON.stringify({ fileUrl, fileId }),
         });
         
         if (!pdfResponse.ok) {
+          console.error('PDF處理器調用失敗:', pdfResponse.status, pdfResponse.statusText);
           const errorText = await pdfResponse.text();
-          console.error('PDF處理器返回錯誤:', pdfResponse.status, pdfResponse.statusText, errorText);
-          try {
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.error || 'PDF處理失敗');
-          } 
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          catch (error) {
-            throw new Error(`PDF處理失敗 (${pdfResponse.status}): ${errorText.substring(0, 200)}`);
-          }
+          console.error('PDF處理器錯誤響應:', errorText);
+          throw new Error(`PDF處理失敗: ${pdfResponse.status} ${pdfResponse.statusText}`);
         }
         
-        // 獲取PDF轉換結果（DOCX文件）
-        let pdfResult;
-        try {
-          const responseText = await pdfResponse.text();
-          console.log('PDF處理器返回原始內容:', responseText.substring(0, 500) + '...');
-          pdfResult = JSON.parse(responseText);
-          console.log('PDF處理結果:', pdfResult);
-        } 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        catch (error) {
-          console.error('解析PDF處理結果失敗');
-          throw new Error('無法解析PDF處理結果');
+        const pdfResult = await pdfResponse.json();
+        console.log('PDF處理器響應:', pdfResult);
+        
+        if (!pdfResult.success) {
+          throw new Error(pdfResult.error || 'PDF轉換失敗');
         }
         
-        // 繼續處理轉換後的DOCX
-        console.log('PDF轉換完成，繼續處理DOCX...', { docxKey: pdfResult.docxKey });
+        // 使用轉換後的DOCX URL
+        const docxFileUrl = pdfResult.docxUrl;
+        
+        // 調用DOCX處理器
+        console.log('使用DOCX處理器處理轉換後的文件...');
         const docxResponse = await fetch(getApiUrl('/api/processors/process-docx'), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            fileUrl: pdfResult.docxKey, 
-            fileId
-          }),
+          headers: internalApiHeaders,
+          body: JSON.stringify({ fileUrl: docxFileUrl, fileId }),
         });
         
         if (!docxResponse.ok) {
+          console.error('DOCX處理器調用失敗:', docxResponse.status, docxResponse.statusText);
           const errorText = await docxResponse.text();
-          console.error('DOCX處理器返回錯誤:', docxResponse.status, docxResponse.statusText, errorText);
-          try {
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.error || 'DOCX處理失敗');
-          } 
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          catch (error) {
-            throw new Error(`DOCX處理失敗 (${docxResponse.status}): ${errorText.substring(0, 200)}`);
-          }
+          console.error('DOCX處理器錯誤響應:', errorText);
+          throw new Error(`DOCX處理失敗: ${docxResponse.status} ${docxResponse.statusText}`);
         }
         
-        // 解析docxResponse，創建新的響應
-        let docxResult;
-        try {
-          const responseText = await docxResponse.text();
-          console.log('DOCX處理器返回原始內容:', responseText.substring(0, 500) + '...');
-          docxResult = JSON.parse(responseText);
-          console.log('DOCX處理結果:', docxResult);
-        } 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        catch (error) {
-          console.error('解析DOCX處理結果失敗');
-          throw new Error('無法解析DOCX處理結果');
-        }
+        const docxResult = await docxResponse.json();
+        console.log('DOCX處理器響應:', docxResult);
         
-        // 確保docxResult包含所有必要的字段
-        if (!docxResult.markdownKey && !docxResult.publicUrl) {
-          console.error('DOCX處理結果缺少必要字段:', docxResult);
-          throw new Error('處理結果缺少必要字段');
-        }
-        
-        // 返回一個統一的響應結構
         return NextResponse.json({
           success: true,
           fileId,
           markdownKey: docxResult.markdownKey,
           publicUrl: docxResult.publicUrl,
+          fileType: 'pdf-converted-to-docx',
           status: 'content-extracted'
-        }, {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json;charset=UTF-8',
-            'Content-Encoding': 'identity'
-          }
         });
-      } 
-      else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        
+      } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         // 直接使用DOCX處理器
         console.log('使用DOCX處理器...');
         const docxResponse = await fetch(getApiUrl('/api/processors/process-docx'), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: internalApiHeaders,
           body: JSON.stringify({ fileUrl, fileId }),
         });
         
         if (!docxResponse.ok) {
+          console.error('DOCX處理器調用失敗:', docxResponse.status, docxResponse.statusText);
           const errorText = await docxResponse.text();
-          console.error('DOCX處理器返回錯誤:', docxResponse.status, docxResponse.statusText, errorText);
-          try {
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.error || 'DOCX處理失敗');
-          } 
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          catch (error) {
-            throw new Error(`DOCX處理失敗 (${docxResponse.status}): ${errorText.substring(0, 200)}`);
-          }
+          console.error('DOCX處理器錯誤響應:', errorText);
+          throw new Error(`DOCX處理失敗: ${docxResponse.status} ${docxResponse.statusText}`);
         }
         
-        // 解析docxResponse，創建新的響應
-        let docxResult;
-        try {
-          const responseText = await docxResponse.text();
-          console.log('DOCX處理器返回原始內容:', responseText.substring(0, 500) + '...');
-          docxResult = JSON.parse(responseText);
-          console.log('DOCX處理結果:', docxResult);
-        } 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        catch (error) {
-          console.error('解析DOCX處理結果失敗');
-          throw new Error('無法解析DOCX處理結果');
-        }
+        const docxResult = await docxResponse.json();
+        console.log('DOCX處理器響應:', docxResult);
         
-        // 確保docxResult包含所有必要的字段
-        if (!docxResult.markdownKey && !docxResult.publicUrl) {
-          console.error('DOCX處理結果缺少必要字段:', docxResult);
-          throw new Error('處理結果缺少必要字段');
-        }
-        
-        // 返回一個統一的響應結構
         return NextResponse.json({
           success: true,
           fileId,
           markdownKey: docxResult.markdownKey,
           publicUrl: docxResult.publicUrl,
+          fileType: 'docx',
           status: 'content-extracted'
-        }, {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json;charset=UTF-8',
-            'Content-Encoding': 'identity'
-          }
         });
-      } 
-      else {
-        // 不支持的文件類型
-        return NextResponse.json(
-          { error: '不支持的文件類型，僅支持PDF和DOCX文件' },
-          { status: 400 }
-        );
+        
+      } else {
+        throw new Error(`不支持的文件類型: ${fileType}`);
       }
-    } catch (error) {
-      throw error;
+      
+    } catch (processingError) {
+      console.error('文件處理錯誤:', processingError);
+      throw processingError;
     }
-  } catch (error: unknown) {
-    console.error('內容提取錯誤:');
-    console.error(error);
     
-    const errorMessage = error instanceof Error ? error.message : '未知錯誤';
-    
+  } catch (error) {
+    console.error('內容提取失敗:', error);
     return NextResponse.json(
-      { error: '內容提取失敗', details: errorMessage },
       { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json;charset=UTF-8',
-          'Content-Encoding': 'identity'
-        }
-      }
+        error: '內容提取失敗',
+        message: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
     );
   }
 } 

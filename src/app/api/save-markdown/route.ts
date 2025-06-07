@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { saveMarkdown } from '@/services/document/markdownService';
+import { apiAuth } from '@/middleware/api-auth';
 
 export async function POST(request: Request) {
+  // API 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
+
   try {
     const { content, fileId, suffix } = await request.json();
     

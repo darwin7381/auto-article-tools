@@ -54,13 +54,33 @@ export function FileUploadSection({ className = '' }: FileUploadSectionProps) {
   const handleStageComplete = (stage: string, result: ExtractResult | Record<string, unknown>) => {
     console.log(`${stage}階段完成:`, result);
     
-    // 如果是extract階段，且處理AI階段失敗，使用extract結果作為fallback
-    if (stage === 'extract' && 'publicUrl' in result) {
+    // 如果是extract階段完成，立即設置查看URL
+    if (stage === 'extract') {
       const extractResult = result as ExtractResult;
+      
       if (extractResult.publicUrl) {
+        console.log('設置查看URL (from publicUrl):', extractResult.publicUrl);
         setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}?view=markdown`);
       } else if (extractResult.markdownKey) {
+        console.log('設置查看URL (from markdownKey):', extractResult.markdownKey);
         const key = extractResult.markdownKey.split('/').pop() || '';
+        setMarkdownUrl(`/viewer/processed/${key}?view=markdown`);
+      }
+      
+      // 即使 AI 處理失敗，也標記為部分成功，用戶可以查看提取的內容
+      setProcessSuccess(true);
+    }
+    
+    // 如果是process階段完成，更新 URL (如果有的話)
+    if (stage === 'process') {
+      const processResult = result as ProcessingResult;
+      
+      if (processResult.publicUrl) {
+        console.log('更新查看URL (from process stage):', processResult.publicUrl);
+        setMarkdownUrl(`/viewer/${encodeURIComponent(processResult.publicUrl)}?view=markdown`);
+      } else if (processResult.markdownKey) {
+        console.log('更新查看URL (from process markdownKey):', processResult.markdownKey);
+        const key = processResult.markdownKey.split('/').pop() || '';
         setMarkdownUrl(`/viewer/processed/${key}?view=markdown`);
       }
     }

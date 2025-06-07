@@ -1,252 +1,20 @@
 import { NextResponse } from 'next/server';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getApiUrl } from '@/services/utils/apiHelpers';
+import { withRetry } from '@/agents/common/agentUtils';
+import { apiAuth } from '@/middleware/api-auth';
 
-// 定義類型
-interface ScrapedImage {
-  url: string;
-  alt?: string;
-}
-
-interface ScrapedMetadata {
-  language?: string;
-  wordCount: number;
-  author?: string;
-  publishDate?: string;
-  documentId?: string;
-  markdownKey?: string;
-  publicUrl?: string;
-  processingStatus?: string;
-  aiProcessed?: boolean;
-  processingComplete?: boolean;
-}
-
-interface ScrapedData {
-  title: string;
-  content: string;
-  images: ScrapedImage[];
-  metadata: ScrapedMetadata;
-}
-
-interface ProcessedImage {
-  original: string;
-  stored: string;
-  alt?: string;
-}
-
+// 定義URL信息的接口
 interface UrlInfo {
   url: string;
   type: string;
-  processResult?: {
-    title?: string;
-    url?: string;
-    status?: string;
-    message?: string;
-    metadata?: Record<string, unknown>;
-  };
-  processTime?: string;
-}
-
-// FireScrawl 爬取功能模擬
-// 注意：實際項目中應該使用真實的FireScrawl API，這裡僅為示例
-async function scrapeWithFireScrawl(url: string, type: string, metadata?: Record<string, unknown>): Promise<ScrapedData> {
-  console.log(`處理URL: ${url}, 類型: ${type}`, metadata);
-  
-  // 針對Google Docs，使用專門的處理API
-  if (type === 'gdocs') {
-    try {
-      // 獲取文檔ID
-      const docId = (metadata?.documentId as string) || extractGoogleDocId(url);
-      if (!docId) {
-        throw new Error('無法獲取Google文檔ID');
-      }
-      
-      console.log(`調用Google Docs專門處理API，文檔ID: ${docId}`);
-      
-      // 調用專門的Google Docs處理API
-      const urlId = metadata?.urlId as string;
-      if (!urlId) {
-        throw new Error('缺少URL ID參數');
-      }
-      
-      // 調用API - 使用apiHelpers獲取正確URL
-      const apiUrl = getApiUrl('/api/processors/process-gdocs');
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          documentId: docId,
-          urlId: urlId,
-          originalUrl: url
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Google Docs處理失敗');
-      }
-      
-      const result = await response.json();
-      console.log('Google Docs 專門處理API返回結果:', result);
-      
-      // 判斷處理階段，從狀態值確定目前是內容提取還是AI處理階段
-      const processingStatus = result.status || 'content-extracted';
-      const isAiProcessed = processingStatus === 'processed-by-ai';
-      
-      // 從處理結果構建ScrapedData
-      return {
-        title: result.title || `Google Docs: ${docId}`,
-        content: `# ${result.title || 'Google Docs內容'}\n\n正在從Google Docs獲取內容，請查看最終生成的Markdown文件。`,
-        images: [],
-        metadata: {
-          language: 'zh-TW',
-          wordCount: result.metadata?.wordCount || 0,
-          author: 'Google Docs用戶',
-          publishDate: new Date().toISOString(),
-          documentId: docId,
-          markdownKey: result.markdownKey,
-          publicUrl: result.publicUrl,
-          processingStatus: processingStatus,
-          aiProcessed: isAiProcessed, // 標記是否已經完成AI處理
-          processingComplete: isAiProcessed // 標記處理是否完成
-        }
-      };
-    } catch (error) {
-      console.error('Google Docs處理失敗:', error);
-      throw error;
-    }
-  } else if (type === 'medium') {
-    return {
-      title: 'Medium文章標題',
-      content: '# Medium文章標題\n\n這是從Medium文章爬取的內容示例。\n\n## 子標題\n\n具體內容段落。',
-      images: [
-        { url: 'https://example.com/medium-img1.jpg', alt: 'Medium圖片' },
-        { url: 'https://example.com/medium-img2.jpg', alt: '文章圖片' }
-      ],
-      metadata: {
-        language: 'zh-CN',
-        wordCount: 200,
-        author: 'Medium作者',
-        publishDate: new Date().toISOString()
-      }
-    };
-  } else if (type === 'wechat') {
-    return {
-      title: '微信公眾號文章',
-      content: '# 微信公眾號文章標題\n\n這是從微信公眾號爬取的內容示例。\n\n內容段落。',
-      images: [
-        { url: 'https://example.com/wechat-header.jpg', alt: '頭圖' },
-        { url: 'https://example.com/wechat-content.jpg', alt: '內容圖片' }
-      ],
-      metadata: {
-        language: 'zh-CN',
-        wordCount: 350,
-        author: '公眾號名稱',
-        publishDate: new Date().toISOString()
-      }
-    };
-  } else {
-    // 一般網站
-    return {
-      title: '網站文章標題',
-      content: '# 網站文章標題\n\n這是從一般網站爬取的內容示例。\n\n## 段落標題\n\n詳細內容。\n\n## 另一段落\n\n更多內容。',
-      images: [
-        { url: 'https://example.com/site-img1.jpg', alt: '網站圖片1' },
-        { url: 'https://example.com/site-img2.jpg', alt: '網站圖片2' }
-      ],
-      metadata: {
-        language: 'en',
-        wordCount: 500,
-        author: '網站作者',
-        publishDate: new Date().toISOString()
-      }
-    };
-  }
-}
-
-// 從Google Docs URL提取文檔ID
-function extractGoogleDocId(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    if (url.includes('/document/d/')) {
-      // 標準Google Docs URL格式: https://docs.google.com/document/d/DOC_ID/edit
-      const pathParts = urlObj.pathname.split('/');
-      for (let i = 0; i < pathParts.length; i++) {
-        if (pathParts[i] === 'd' && i + 1 < pathParts.length) {
-          return pathParts[i + 1];
-        }
-      }
-    } else {
-      // 其他可能的Google Docs URL格式
-      const id = urlObj.searchParams.get('id');
-      if (id) return id;
-    }
-  } catch (error) {
-    console.error('解析Google Docs URL錯誤:', error);
-  }
-  
-  // 如果無法提取，返回一個預設值
-  return 'unknown-doc-id';
-}
-
-// 將爬取的圖片上傳到R2
-async function uploadScrapedImagesToR2(images: ScrapedImage[], urlId: string): Promise<ProcessedImage[]> {
-  // 實際項目中，這裡應該下載圖片並上傳到R2
-  // 當前僅模擬此過程
-  console.log(`模擬上傳${images.length}張圖片到R2`);
-  
-  // 模擬上傳結果
-  return images.map((img, index) => {
-    return {
-      original: img.url,
-      stored: `https://yourcdndomain.com/images/${urlId}-image-${index}.jpg`,
-      alt: img.alt
-    };
-  });
-}
-
-// 生成Markdown內容
-function generateMarkdown(scrapedData: ScrapedData, processedImages: ProcessedImage[], urlId: string, sourceUrl: string, type: string): string {
-  // 替換圖片連結
-  let content = scrapedData.content;
-  
-  // 替換原始圖片URL為R2存儲的URL
-  processedImages.forEach(img => {
-    content = content.replace(
-      new RegExp(img.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-      img.stored
-    );
-  });
-  
-  // 生成Front Matter元數據 - 保留為註釋而非frontmatter格式
-  // 這樣元數據不會影響Markdown渲染，但仍可作為參考
-  const metadata = {
-    source: 'url',
-    sourceType: type,
-    urlId: urlId,
-    originalUrl: sourceUrl,
-    title: scrapedData.title,
-    language: scrapedData.metadata.language || 'unknown',
-    wordCount: scrapedData.metadata.wordCount,
-    author: scrapedData.metadata.author || 'unknown',
-    publishDate: scrapedData.metadata.publishDate || 'unknown',
-    processTime: new Date().toISOString()
-  };
-  
-  // 將元數據作為JSON字符串保存到單獨的文件
-  // 實際項目中應調用相應的API來保存這些元數據
-  console.log('文章元數據:', metadata);
-  
-  // 將frontmatter格式改為標準Markdown標題
-  // 確保內容以標題開始，而不是以frontmatter開始
-  if (!content.trim().startsWith('#')) {
-    content = `# ${scrapedData.title}\n\n${content}`;
-  }
-
-  // 返回純Markdown內容，不包含frontmatter
-  return content;
+  processResult: Record<string, unknown>;
+  processTime: string;
+  uploaded?: boolean;
+  extracted?: boolean;
+  aiProcessed?: boolean;
+  publicUrl?: string;
+  timestamp?: number;
 }
 
 // R2 存儲客戶端配置
@@ -261,134 +29,140 @@ const R2 = new S3Client({
 
 // 從R2獲取URL信息
 async function getUrlInfoFromR2(urlInfoKey: string): Promise<UrlInfo> {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'auto-article-tools';
-  
-  const command = new GetObjectCommand({
-    Bucket: bucketName,
-    Key: urlInfoKey,
-  });
+  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || '';
   
   try {
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: urlInfoKey,
+    });
+    
     const response = await R2.send(command);
-    const stream = response.Body as { transformToByteArray(): Promise<Uint8Array> };
-    const buffer = Buffer.from(await stream.transformToByteArray());
-    return JSON.parse(buffer.toString()) as UrlInfo;
+    const content = await response.Body?.transformToString();
+    
+    if (!content) {
+      throw new Error('No content found in R2 object');
+    }
+    
+    return JSON.parse(content) as UrlInfo;
   } catch (error) {
-    console.error('獲取URL信息失敗:', error);
-    throw error;
+    console.error('從R2獲取URL信息失敗:', error);
+    throw new Error('獲取URL信息失敗');
   }
 }
 
-// 保存處理結果為Markdown
-async function saveMarkdownToR2(content: string, urlId: string): Promise<string> {
-  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'auto-article-tools';
-  const key = `processed/${urlId}.md`;
-  
-  const command = new PutObjectCommand({
-    Bucket: bucketName,
-    Key: key,
-    Body: content,
-    ContentType: 'text/markdown',
-  });
-  
-  await R2.send(command);
-  return key;
-}
-
-// 核心修改：不再自動調用AI處理，只負責內容提取
 export async function POST(request: Request) {
+  // API 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
+
   try {
-    const { urlId } = await request.json();
+    const { urlInfoKey } = await request.json();
     
-    if (!urlId) {
+    if (!urlInfoKey) {
       return NextResponse.json(
-        { error: '缺少必要參數' },
+        { error: '缺少必要參數：urlInfoKey' },
         { status: 400 }
       );
     }
     
-    // 從R2獲取URL信息
-    const urlInfoKey = `input/url-${urlId}.json`;
-    const urlInfo = await getUrlInfoFromR2(urlInfoKey);
+    console.log('處理URL信息，Key:', urlInfoKey);
     
-    if (!urlInfo || !urlInfo.url || !urlInfo.type) {
-      return NextResponse.json(
-        { error: 'URL信息無效或未找到' },
-        { status: 404 }
-      );
-    }
-    
-    // 獲取元數據
-    const metadata = urlInfo.processResult?.metadata || {};
-    // 確保urlId包含在metadata中
-    metadata.urlId = urlId;
-    
-    // 使用FireScrawl或專門API爬取內容
-    const scrapedData = await scrapeWithFireScrawl(urlInfo.url, urlInfo.type, metadata);
-    
-    // 如果是Google Docs等已經處理過的內容，直接返回提取結果，不再自動調用AI處理
-    if (scrapedData.metadata.markdownKey) {
-      console.log('提取內容完成，返回markdownKey:', scrapedData.metadata.markdownKey);
-      
-      // 不再檢查是否已經完成AI處理，而是統一返回內容提取完成的狀態
-      return NextResponse.json({
-        success: true,
-        urlId,
-        markdownKey: scrapedData.metadata.markdownKey,
-        publicUrl: scrapedData.metadata.publicUrl,
-        status: 'content-extracted',
-        stage: 'extract',
-        stageComplete: true,
-        metadata: {
-          title: scrapedData.title,
-          language: scrapedData.metadata.language,
-          wordCount: scrapedData.metadata.wordCount,
-          imageCount: 0,
-          processingComplete: false // 標記整體流程未完成
+    try {
+      // 從R2獲取URL信息
+      const urlInfo = await getUrlInfoFromR2(urlInfoKey);
+      console.log('成功獲取URL信息:', { 
+        url: urlInfo.url,
+        type: urlInfo.type,
+        status: {
+          uploaded: urlInfo.uploaded,
+          extracted: urlInfo.extracted,
+          aiProcessed: urlInfo.aiProcessed
         }
       });
+      
+      // 準備返回的響應數據
+      const responseData = {
+        success: true,
+        url: urlInfo.url,
+        type: urlInfo.type,
+        processTime: urlInfo.processTime,
+        uploaded: urlInfo.uploaded || false,
+        extracted: urlInfo.extracted || false,
+        aiProcessed: urlInfo.aiProcessed || false,
+        publicUrl: urlInfo.publicUrl,
+        timestamp: urlInfo.timestamp || Date.now(),
+        processResult: urlInfo.processResult || {}
+      };
+      
+      // 檢查是否需要進一步處理
+      if (!urlInfo.extracted) {
+        console.log('URL尚未提取內容，準備觸發內容提取...');
+        
+        // 準備內部 API 調用的認證頭部
+        const internalApiHeaders = {
+          'Content-Type': 'application/json',
+        } as Record<string, string>;
+        
+        // 如果有 API_SECRET_KEY，使用它進行內部認證
+        if (process.env.API_SECRET_KEY) {
+          internalApiHeaders['x-api-key'] = process.env.API_SECRET_KEY;
+        }
+        
+        // 觸發內容提取處理（如果適用）
+        try {
+          const extractResponse = await withRetry(
+            async () => {
+              return await fetch(getApiUrl('/api/extract-content'), {
+                method: 'POST',
+                headers: internalApiHeaders,
+                body: JSON.stringify({
+                  fileUrl: urlInfo.publicUrl || urlInfo.url,
+                  fileId: urlInfoKey.replace(/^input\/url-(.+)\.json$/, '$1') || 'unknown',
+                  fileType: urlInfo.type
+                }),
+              });
+            },
+            {
+              maxRetries: 2,
+              retryDelay: 1000,
+              onRetry: (error, count) => {
+                console.warn(`內容提取重試 #${count}：`, error.message);
+              }
+            }
+          );
+          
+          if (extractResponse.ok) {
+            const extractResult = await extractResponse.json();
+            console.log('內容提取結果:', extractResult);
+            
+            // 更新響應數據
+            responseData.extracted = true;
+            responseData.processResult = { ...responseData.processResult, extractResult };
+          } else {
+            console.warn('內容提取失敗:', extractResponse.status, extractResponse.statusText);
+          }
+          
+        } catch (extractError) {
+          console.warn('內容提取處理失敗:', extractError);
+          // 不中斷主流程，繼續返回基本信息
+        }
+      }
+      
+      return NextResponse.json(responseData);
+      
+    } catch (processingError) {
+      console.error('URL處理錯誤:', processingError);
+      throw processingError;
     }
     
-    // 處理爬取的圖片（上傳到R2）
-    const processedImages = await uploadScrapedImagesToR2(scrapedData.images, urlId);
-    
-    // 生成Markdown
-    const markdown = generateMarkdown(
-      scrapedData,
-      processedImages,
-      urlId,
-      urlInfo.url,
-      urlInfo.type
-    );
-    
-    // 保存Markdown到R2
-    const markdownKey = await saveMarkdownToR2(markdown, urlId);
-    
-    // 使用R2公共URL
-    const baseUrl = process.env.R2_PUBLIC_URL || '';
-    const publicUrl = baseUrl ? `${baseUrl}/${markdownKey}` : markdownKey;
-    
-    // 不再自動調用AI處理API，只返回內容提取結果
-    return NextResponse.json({
-      success: true,
-      urlId,
-      markdownKey: markdownKey,
-      publicUrl: publicUrl,
-      status: 'content-extracted',
-      stage: 'extract',  // 標記為提取階段
-      stageComplete: true, // 標記階段已完成
-      metadata: {
-        title: scrapedData.title,
-        language: scrapedData.metadata.language,
-        wordCount: scrapedData.metadata.wordCount,
-        imageCount: processedImages.length,
-        processingComplete: false // 標記整體流程未完成
-      }
-    });
   } catch (error) {
-    console.error('URL處理錯誤:', error);
+    console.error('URL處理失敗:', error);
     return NextResponse.json(
-      { error: '爬取URL內容失敗' },
+      { 
+        error: 'URL處理失敗',
+        message: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }

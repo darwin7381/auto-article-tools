@@ -1,249 +1,308 @@
 # API 安全認證指南
 
-本文檔詳細說明 API 安全認證的最佳實踐和實現方法，適用於本項目的所有 API 端點。
+本文檔詳細說明當前 API 安全認證架構的實現方法和最佳實踐。
 
-## 混合認證方案概述
+## 當前認證架構概述
 
-我們採用「會話 + API Key 混合認證」方案，同時支持兩種認證方式：
+我們採用**雙層認證架構**，確保 API 安全的同時支持不同的使用場景：
 
-1. **會話認證**：基於 Clerk 用戶會話，用於前端用戶訪問
-2. **API Key 認證**：基於預設密鑰，用於服務器間通信（如 n8n）
+### 🔒 **外層：Clerk Middleware 保護**
+- **保護範圍**：所有非公開的 API 路由
+- **認證方式**：Clerk 用戶會話
+- **適用場景**：前端用戶訪問
 
-這種混合方案確保 API 既可以安全地被前端用戶調用，也可以被其他系統和服務訪問，同時不會在前端暴露敏感密鑰。
+### 🔑 **內層：API Key 認證**
+- **保護範圍**：需要內部調用的 API
+- **認證方式**：`x-api-key` header + `API_SECRET_KEY`
+- **適用場景**：API 間的服務器通信
 
-### 降級認證機制
+## 認證流程
 
-本系統實現了自動降級認證機制，認證流程如下：
+```
+前端請求 → Clerk Middleware → API 處理邏輯
+                ↓ (如果需要調用其他API)
+               API Key 認證 → 內部 API 調用
+```
 
-1. **優先嘗試 API Key 認證**：首先檢查請求頭中的 `x-api-key` 是否與環境變量 `API_SECRET_KEY` 匹配
-2. **自動降級到會話認證**：若 API Key 認證失敗，則嘗試使用 Clerk 會話認證
-3. **雙重保障**：只有當兩種認證方式都失敗時，才會返回 401 未授權錯誤
+### 1. 前端 → API 調用
+```typescript
+// 用戶登錄後，前端直接調用，無需 API Key
+const response = await fetch('/api/extract-content', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    // Clerk 自動處理認證，無需額外 headers
+  },
+  body: JSON.stringify(data)
+});
+```
 
-這種降級機制的好處：
-- 即使未設置 `API_SECRET_KEY` 環境變量，已登入的用戶仍可正常使用 API
-- 無需為每種認證方式建立不同的端點
-- 前端和服務器調用可使用相同的 API 路徑，簡化了整體架構
+### 2. API → 內部 API 調用
+```typescript
+// 內部 API 調用需要 API Key
+const internalApiHeaders = {
+  'Content-Type': 'application/json',
+  'x-api-key': process.env.API_SECRET_KEY,
+};
 
-實際運用中，這也解釋了為什麼在部署環境中沒有設置 `API_SECRET_KEY` 的情況下，系統仍能正常運作—登入用戶的請求會自動通過 Clerk 會話認證。
+const response = await fetch('http://localhost:3000/api/processors/process-docx', {
+  method: 'POST',
+  headers: internalApiHeaders,
+  body: JSON.stringify(data)
+});
+```
 
-## 實現步驟
+## 實現詳情
 
-### 1. 建立 API 認證中間件
-
-首先，創建一個專用的 API 認證中間件，用於驗證所有 API 請求：
+### 1. Clerk Middleware 配置 (`src/middleware.ts`)
 
 ```typescript
-// src/middleware/api-auth.ts
-import { auth } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
 
-export async function apiAuth(req: Request) {
-  // 方法1: 檢查 API Key (用於服務器間通信)
+// 定義公開路由 - 只保留真正應該公開的路由
+const isPublicRoute = createRouteMatcher([
+  '/sign-in(.*)',
+  '/sign-up(.*)', 
+  '/api/clerk-webhook(.*)',
+  '/api/parse-url(.*)',        // URL 解析 - 查詢類型，可公開
+  '/api/process-status(.*)',   // 狀態查詢 - 查詢類型，可公開
+])
+
+export default clerkMiddleware(async (auth, req) => {
+  // 公開路由直接通過
+  if (isPublicRoute(req)) {
+    return;
+  }
+  
+  // 檢查 API Key（用於內部服務調用）
   const apiKey = req.headers.get('x-api-key');
-  if (apiKey === process.env.API_SECRET_KEY) {
-    return null; // API Key 有效，允許請求
+  const expectedApiKey = process.env.API_SECRET_KEY;
+  
+  if (apiKey && expectedApiKey && apiKey === expectedApiKey) {
+    console.log('通過 API Key 認證，允許內部調用');
+    return; // API Key 有效，允許請求通過
   }
   
-  // 方法2: 檢查用戶會話 (用於前端用戶請求)
-  try {
-    const { userId } = await auth();
-    if (userId) {
-      return null; // 用戶已登入，允許請求
-    }
-  } catch (error) {
-    // 會話檢查失敗，繼續處理
+  // 檢查用戶登錄狀態
+  const { userId } = await auth();
+  
+  if (!userId) {
+    console.log('未登錄且無有效 API Key，重定向到登錄頁面');
+    const signInUrl = new URL('/sign-in', req.url);
+    return NextResponse.redirect(signInUrl);
   }
   
-  // 所有認證方式都失敗，返回 401 未授權
-  return new Response(JSON.stringify({ 
-    error: '未授權訪問',
-    message: '需要有效的用戶會話或 API Key'
-  }), {
-    status: 401,
-    headers: { 'Content-Type': 'application/json' }
-  });
+  console.log('用戶已登錄，允許訪問');
+  return;
+})
+```
+
+### 2. 內層 API Key 認證 (`src/middleware/api-auth.ts`)
+
+```typescript
+import { NextResponse } from 'next/server';
+
+export async function apiAuth(request: Request) {
+  console.log('[API Auth] 開始認證檢查...');
+  console.log('[API Auth] 請求 URL:', request.url);
+  
+  // 檢查 API Key
+  console.log('[API Auth] 檢查 API Key...');
+  const apiKey = request.headers.get('x-api-key');
+  const expectedApiKey = process.env.API_SECRET_KEY;
+  
+  if (!apiKey) {
+    console.log('[API Auth] 缺少 API Key');
+    return NextResponse.json(
+      { error: '訪問被拒絕', message: '缺少必要的認證信息' },
+      { status: 401 }
+    );
+  }
+  
+  if (!expectedApiKey) {
+    console.error('[API Auth] 服務器未配置 API Key');
+    return NextResponse.json(
+      { error: '服務器配置錯誤', message: '認證服務不可用' },
+      { status: 500 }
+    );
+  }
+  
+  if (apiKey !== expectedApiKey) {
+    console.log('[API Auth] API Key 不匹配');
+    return NextResponse.json(
+      { error: '認證失敗', message: '無效的認證信息' },
+      { status: 401 }
+    );
+  }
+  
+  console.log('[API Auth] 通過 API Key 認證成功');
+  return null; // 認證成功
 }
 ```
 
-### 2. 在 API 路由中使用
+### 3. API 實現模式
 
-在每個需要保護的 API 路由中整合認證中間件：
-
+#### A. 前端直接調用的 API（如 `/api/process-openai`）
 ```typescript
-// src/app/api/extract-content/route.ts
+export async function POST(request: Request) {
+  // 此 API 已被 Clerk middleware 保護，不需要額外的 API Key 檢查
+  // 前端調用會自動包含 Clerk session 信息
+  
+  try {
+    // 處理邏輯...
+    return NextResponse.json({ success: true, data: result });
+  } catch (error) {
+    console.error('處理錯誤:', error);
+    return NextResponse.json({ error: '處理失敗' }, { status: 500 });
+  }
+}
+```
+
+#### B. 內部調用的 API（如 `/api/processors/process-docx`）
+```typescript
 import { apiAuth } from '@/middleware/api-auth';
 
-export async function POST(req: Request) {
-  // 驗證請求
-  const authResponse = await apiAuth(req);
-  if (authResponse) return authResponse; // 未通過認證，返回錯誤響應
-  
-  // 通過認證，繼續處理請求
+export async function POST(request: Request) {
+  // API 認證檢查 - 需要 API Key
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse;
+
   try {
-    // 請求處理邏輯...
-    
-    return Response.json({ success: true, data: result });
+    // 處理邏輯...
+    return NextResponse.json({ success: true, data: result });
   } catch (error) {
-    console.error('API 處理錯誤:', error);
-    return Response.json({ 
-      error: '處理請求失敗',
-      message: error instanceof Error ? error.message : '未知錯誤'
-    }, { status: 500 });
+    console.error('處理錯誤:', error);
+    return NextResponse.json({ error: '處理失敗' }, { status: 500 });
   }
 }
 ```
 
-### 3. 環境變量配置
+### 4. 內部 API 調用工具函數
 
-在項目根目錄下的 `.env.local` 文件中配置 API 密鑰（**永遠不要**以 `NEXT_PUBLIC_` 開頭）：
+```typescript
+// src/utils/api-internal.ts
+export function getApiUrl(path: string): string {
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? process.env.NEXT_PUBLIC_BASE_URL || 'https://your-domain.com'
+    : 'http://localhost:3000';
+  
+  return `${baseUrl}${path}`;
+}
 
+export const internalApiHeaders = {
+  'Content-Type': 'application/json',
+  'x-api-key': process.env.API_SECRET_KEY,
+};
+
+// 使用示例
+const response = await fetch(getApiUrl('/api/processors/process-docx'), {
+  method: 'POST',
+  headers: internalApiHeaders,
+  body: JSON.stringify(data)
+});
 ```
-# API 密鑰 (僅服務器端，不暴露給前端)
+
+## 環境變量配置
+
+### 必需的環境變量
+
+```bash
+# .env.local
+
+# Clerk 認證配置
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxx
+CLERK_SECRET_KEY=sk_test_xxx
+
+# API 內部調用密鑰（**絕不**使用 NEXT_PUBLIC_ 前綴）
 API_SECRET_KEY=your-strong-random-key-here
 
-# 可選：為不同環境設置不同密鑰
-PRODUCTION_API_KEY=your-production-only-key
-DEVELOPMENT_API_KEY=your-development-only-key
-
-# 可選：為特定服務設置專用密鑰
-N8N_API_KEY=specific-key-for-n8n-integration
+# 其他配置...
+NEXT_PUBLIC_BASE_URL=https://your-domain.com  # 生產環境
 ```
 
-### 4. 前端請求實現
+### 生成安全的 API Key
 
-前端代碼不需要任何 API Key，只依賴 Clerk 會話進行認證：
+```bash
+# 使用 Node.js 生成隨機密鑰
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
-```typescript
-// 例如在 useProcessingFlow.tsx 或其他前端代碼中
-const callApi = async (endpoint: string, data: any) => {
-  try {
-    const response = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-        // 不需要 API Key，Clerk 會自動處理會話認證
-      },
-      body: JSON.stringify(data)
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      throw new Error(
-        errorData?.message || 
-        `API 請求失敗 (${response.status}): ${response.statusText}`
-      );
-    }
-    
-    return response.json();
-  } catch (error) {
-    console.error(`調用 ${endpoint} API 失敗:`, error);
-    throw error;
-  }
-};
+# 或使用 OpenSSL
+openssl rand -hex 32
 ```
 
-### 5. 服務器間通信實現
+## 安全最佳實踐
 
-對於 n8n 或其他服務器的調用，使用 API Key 進行認證：
+### ✅ 正確做法
 
-```javascript
-// n8n HTTP 請求節點配置示例
-{
-  "url": "https://yourdomain.com/api/extract-content",
-  "method": "POST",
-  "headers": {
-    "Content-Type": "application/json",
-    "x-api-key": "{{$env.API_KEY}}"  // 使用 n8n 環境變量
-  },
-  "body": {
-    "url": "https://example.com/article",
-    "options": { /* 其他參數 */ }
-  }
-}
-```
+1. **分層認證**：外層 Clerk 保護用戶，內層 API Key 保護服務
+2. **最小權限**：只有需要內部調用的 API 才使用 API Key 認證
+3. **環境分離**：不同環境使用不同的 API Key
+4. **日誌記錄**：記錄所有認證嘗試，便於監控
+5. **HTTPS 傳輸**：所有生產環境請求必須使用 HTTPS
 
-## 安全考量
+### ❌ 避免做法
 
-### 最佳實踐
+1. **混合認證在單一 API**：不要在同一個 API 中混合兩種認證方式
+2. **前端暴露 API Key**：絕不在前端代碼中使用 API Key
+3. **硬編碼密鑰**：永遠不要在代碼中硬編碼任何密鑰
+4. **弱密鑰**：避免使用簡單或可預測的 API Key
 
-1. **密鑰輪換**：定期更換 API 密鑰，特別是在人員變動或懷疑密鑰洩露時
-2. **密鑰分離**：為不同環境和服務使用不同的 API 密鑰
-3. **最小權限**：可以根據不同的 API 密鑰賦予不同的訪問權限
-4. **日誌記錄**：記錄所有 API 訪問，包括認證方式、訪問時間和來源 IP
-5. **監控異常**：設置監控系統，檢測異常的 API 調用模式
+## 當前 API 分類
 
-### 安全警告
+### 🔓 公開 API（無需認證）
+- `/api/parse-url` - URL 解析
+- `/api/process-status` - 狀態查詢
 
-- **絕不** 在前端代碼中硬編碼 API 密鑰
-- **絕不** 使用 `NEXT_PUBLIC_` 前綴存儲 API 密鑰
-- **絕不** 在公共代碼庫中提交 API 密鑰
-- **始終** 通過 HTTPS 傳輸 API 請求
-- **考慮** 為高敏感度 API 添加請求速率限制
+### 🔒 用戶 API（Clerk 認證）
+- `/api/extract-content` - 內容提取
+- `/api/process-openai` - AI 處理
+- `/api/upload` - 文件上傳
+- `/api/save-markdown` - 保存文檔
 
-## 使用範例
-
-### 案例 1: 前端調用文件處理 API
-
-```typescript
-// 前端代碼
-async function processDocument(file) {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  try {
-    const response = await fetch('/api/process-file', {
-      method: 'POST',
-      body: formData
-      // 不需要 API Key，使用 Clerk 會話
-    });
-    
-    if (!response.ok) throw new Error('處理失敗');
-    return await response.json();
-  } catch (error) {
-    console.error('文件處理錯誤:', error);
-    throw error;
-  }
-}
-```
-
-### 案例 2: n8n 自動化工作流調用 API
-
-```json
-{
-  "node": "HTTP Request",
-  "parameters": {
-    "url": "https://yourdomain.com/api/extract-content",
-    "method": "POST",
-    "authentication": "headerAuth",
-    "headerAuth": {
-      "x-api-key": "{{$env.API_KEY}}"
-    },
-    "contentType": "json",
-    "bodyParameters": {
-      "url": "https://example.com/article"
-    }
-  }
-}
-```
+### 🔑 內部 API（API Key 認證）
+- `/api/processors/process-pdf` - PDF 處理
+- `/api/processors/process-docx` - DOCX 處理
+- `/api/processors/process-gdocs` - Google Docs 處理
 
 ## 故障排除
 
-### 常見錯誤
+### 常見問題
 
-1. **401 未授權**
-   - 檢查用戶是否已登入
-   - 確認 API Key 是否正確
-   - 驗證環境變量是否正確設置
+#### 1. 前端調用 API 返回 401
+```
+原因：用戶未登錄或 Clerk session 過期
+解決：檢查用戶登錄狀態，必要時重新登錄
+```
 
-2. **會話驗證失敗**
-   - 檢查 Clerk 配置
-   - 確保 .env.local 包含正確的 Clerk 密鑰
-   - 嘗試重新登入
+#### 2. 內部 API 調用失敗
+```
+原因：缺少 API Key 或 API Key 不正確
+解決：檢查環境變量 API_SECRET_KEY 是否設置
+```
 
-3. **API Key 不生效**
-   - 確認環境變量名稱拼寫正確
-   - 檢查 API Key 是否被正確添加到請求頭
-   - 重啟開發服務器以刷新環境變量
+#### 3. API Key 認證通過但仍然被拒絕
+```
+原因：可能是 Clerk middleware 重定向
+解決：確認該 API 是否應該在公開路由列表中
+```
+
+### 調試工具
+
+```typescript
+// 添加詳細的認證日誌
+console.log('==== 認證調試信息 ====');
+console.log('請求路徑:', req.nextUrl.pathname);
+console.log('API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'null');
+console.log('用戶ID:', userId);
+console.log('========================');
+```
 
 ## 總結
 
-這種混合認證方案為 API 提供了靈活而強大的安全保護，同時支持多種訪問場景。前端用戶可以通過 Clerk 會話無縫訪問 API，而服務器間通信則使用安全的 API Key。這種方法既確保了安全性，又保持了使用的簡便性。 
+當前的雙層認證架構提供了清晰的職責分離：
+
+- **Clerk Middleware**：保護整個應用，確保只有登錄用戶可以訪問
+- **API Key 認證**：保護內部 API，防止未授權的服務器間調用
+
+這種設計既確保了安全性，又保持了架構的清晰性和可維護性。 

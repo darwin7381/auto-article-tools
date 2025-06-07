@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { uploadFileToR2 } from '@/services/storage/r2Service';
+import { apiAuth } from '@/middleware/api-auth';
 
 export async function POST(request: Request) {
+  // API 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
+
   try {
     console.log('收到文件上傳請求');
     

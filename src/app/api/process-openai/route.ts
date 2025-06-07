@@ -5,6 +5,9 @@ import { saveMarkdown } from '@/services/document/markdownService';
 import { withRetry } from '@/agents/common/agentUtils';
 
 export async function POST(request: Request) {
+  // 此 API 已被 Clerk middleware 保護，不需要額外的 API Key 檢查
+  // 前端調用會自動包含 Clerk session 信息
+  
   try {
     // 支持直接接收markdown內容或markdown URL
     let reqBody;

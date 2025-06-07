@@ -1,142 +1,318 @@
-# API標準與Vercel部署規範
+# API 開發標準與認證規範
 
-## 背景
+本文檔定義了項目中 API 開發的標準和最佳實踐，包括認證機制、響應格式、錯誤處理等關鍵規範。
 
-我們的Next.js應用在本地開發環境正常運行，但部署到Vercel時出現了一系列問題，主要表現為內容解碼失敗和URL處理不一致。本文檔記錄了解決方案和未來開發應遵循的標準，避免再次出現類似問題。
+## 認證架構標準
 
-## 常見錯誤案例
+### 🔐 雙層認證架構
 
-以下是我們在項目中實際遇到的問題，記錄在此以避免未來重複犯錯：
+我們採用雙層認證架構，確保安全性的同時支持不同使用場景：
 
-### 1. URL字段不一致問題
+```
+外層：Clerk Middleware（用戶認證）
+  ↓
+內層：API Key 認證（服務間通信）
+```
 
-在代碼中，我們混用了多個不同的字段來表示相同的URL資源：
+### 1. API 分類與認證要求
 
+#### 🔓 **公開 API**（無需認證）
 ```typescript
-// 🔴 錯誤示例：字段混亂
-return NextResponse.json({
-  success: true,
-  fileId: fileId,
-  markdownKey: processResult.r2Key,   // 字段名不一致
-  markdownUrl: processResult.publicUrl // 多餘的重複字段
-});
-
-// 前端處理邏輯混亂
-if (processResult.markdownUrl) {
-  setMarkdownUrl(processResult.markdownUrl);
-} else if (extractResult.markdownKey) {
-  setMarkdownUrl(`/processed/${extractResult.markdownKey}`); // 構建邏輯不一致
+// 示例：URL 解析 API
+export async function POST(request: Request) {
+  // 無需認證檢查，直接處理
+  try {
+    // 處理邏輯...
+    return NextResponse.json({ success: true, data: result });
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 ```
 
-這導致了以下問題：
-- 前後端對URL字段理解不一致
-- 構建訪問路徑時邏輯混亂
-- Vercel環境中無法正確解析路徑
+**公開 API 列表：**
+- `/api/parse-url` - URL 解析
+- `/api/process-status` - 狀態查詢
+- `/api/clerk-webhook` - Clerk webhooks
 
-### 2. 內容編碼問題
-
-我們沒有明確設置`Content-Encoding`頭信息，導致以下問題：
-
+#### 🔒 **用戶 API**（Clerk 認證）
 ```typescript
-// 🔴 錯誤示例：缺少編碼頭
-return NextResponse.json({
-  success: true,
-  data: largeDataObject
-}); // 缺少headers配置
-```
-
-錯誤表現：
-- 本地環境正常顯示
-- Vercel環境顯示"ERR_CONTENT_DECODING_FAILED"
-- 網絡請求返回200但內容無法解析
-
-### 3. ESLint錯誤導致部署失敗
-
-```typescript
-try {
-  // 一些處理邏輯
-} catch (error) {
-  // 未使用的錯誤變量，但沒有處理ESLint警告
-  const parseError = "解析失敗";  // 未使用變量導致構建失敗
-  throw new Error("處理失敗");
+// 示例：內容提取 API - 已被 Clerk middleware 保護
+export async function POST(request: Request) {
+  // 此 API 已被 Clerk middleware 保護，用戶必須登錄
+  // 無需額外的認證檢查
+  
+  try {
+    // 處理邏輯...
+    return NextResponse.json({ success: true, data: result });
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 ```
 
-## API響應標準
+**用戶 API 列表：**
+- `/api/extract-content` - 內容提取
+- `/api/process-openai` - AI 處理
+- `/api/upload` - 文件上傳
+- `/api/save-markdown` - 保存文檔
 
-### 1. 響應頭設置
-
-所有API響應**必須**包含以下響應頭：
-
+#### 🔑 **內部 API**（API Key 認證）
 ```typescript
-headers: {
-  'Content-Type': 'application/json;charset=UTF-8',
-  'Content-Encoding': 'identity'
+import { apiAuth } from '@/middleware/api-auth';
+
+// 示例：文檔處理器 - 需要 API Key
+export async function POST(request: Request) {
+  // API 認證檢查 - 需要 API Key
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse;
+
+  try {
+    // 處理邏輯...
+    return NextResponse.json({ success: true, data: result });
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 ```
 
-特別說明：
-- `Content-Encoding: identity` 顯式聲明內容未壓縮，解決Vercel環境中的解碼問題
-- `Content-Type` 必須明確指定字符集，避免編碼問題
+**內部 API 列表：**
+- `/api/processors/process-pdf` - PDF 處理
+- `/api/processors/process-docx` - DOCX 處理
+- `/api/processors/process-gdocs` - Google Docs 處理
 
-### 2. 統一響應結構
+### 2. 認證實現模板
 
-所有API響應必須遵循以下統一結構：
-
+#### A. 用戶 API 模板
 ```typescript
-// 成功響應
+import { NextResponse } from 'next/server';
+
+export async function POST(request: Request) {
+  // 已被 Clerk middleware 保護，無需額外認證
+  
+  try {
+    const requestData = await request.json();
+    
+    // 參數驗證
+    if (!requestData.required_field) {
+      return NextResponse.json(
+        { error: '缺少必要參數', details: 'required_field is missing' },
+        { status: 400 }
+      );
+    }
+    
+    // 處理邏輯
+    const result = await processData(requestData);
+    
+    return NextResponse.json({
+      success: true,
+      fileId: result.fileId,
+      publicUrl: result.publicUrl,
+      status: 'completed'
+    });
+    
+  } catch (error) {
+    console.error('API處理錯誤:', error);
+    return NextResponse.json(
+      { 
+        error: '處理失敗', 
+        details: error instanceof Error ? error.message : '未知錯誤' 
+      },
+      { status: 500 }
+    );
+  }
+}
+```
+
+#### B. 內部 API 模板
+```typescript
+import { NextResponse } from 'next/server';
+import { apiAuth } from '@/middleware/api-auth';
+
+export async function POST(request: Request) {
+  // API Key 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse;
+
+  try {
+    const requestData = await request.json();
+    
+    // 處理邏輯
+    const result = await processInternalData(requestData);
+    
+    return NextResponse.json({
+      success: true,
+      fileId: result.fileId,
+      markdownKey: result.markdownKey,
+      publicUrl: result.publicUrl,
+      status: 'processed'
+    });
+    
+  } catch (error) {
+    console.error('內部API處理錯誤:', error);
+    return NextResponse.json(
+      { 
+        error: '內部處理失敗', 
+        details: error instanceof Error ? error.message : '未知錯誤' 
+      },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## API 響應標準
+
+### 1. 統一響應格式
+
+#### 成功響應
+```typescript
 {
   success: true,
   fileId: string,        // 文件唯一標識符
-  publicUrl: string,     // 統一公開URL (主要訪問路徑)
+  publicUrl: string,     // 統一公開訪問 URL
   status: string,        // 處理狀態描述
-  [其他可選字段]
-}
-
-// 錯誤響應
-{
-  error: string,         // 錯誤簡短描述
-  details: string,       // 錯誤詳細信息
-  status: string         // 處理狀態
+  [其他字段]: any       // 可選的附加字段
 }
 ```
 
-## URL字段統一規範
+#### 錯誤響應
+```typescript
+{
+  success: false,        // 明確標識失敗
+  error: string,         // 用戶友好的錯誤信息
+  details?: string,      // 技術錯誤詳情（可選）
+  code?: string         // 錯誤代碼（可選）
+}
+```
 
-### 1. 字段命名統一
+### 2. HTTP 狀態碼標準
 
-- 使用 `publicUrl` 作為前端訪問文件的唯一字段
-- 棄用舊有的混淆字段：markdownUrl、markdownKey等
-- 後端處理可保留 `r2Key` 等內部字段，但對外API必須轉換為 `publicUrl`
+| 狀態碼 | 使用場景 | 示例 |
+|--------|----------|------|
+| 200 | 成功處理 | 內容提取成功 |
+| 400 | 客戶端錯誤 | 缺少必要參數 |
+| 401 | 認證失敗 | 用戶未登錄或 API Key 無效 |
+| 403 | 權限不足 | 用戶無權限訪問特定資源 |
+| 500 | 服務器錯誤 | 內部處理異常 |
 
-### 2. URL處理優先順序
-
-前端獲取URL時必須遵循以下優先順序：
+### 3. 響應頭標準
 
 ```typescript
-// 優先使用publicUrl作為唯一訪問路徑
-if (processResult.publicUrl) {
-  setMarkdownUrl(`/viewer/${encodeURIComponent(processResult.publicUrl)}`);
-} else if (extractResult.publicUrl) {
-  setMarkdownUrl(`/viewer/${encodeURIComponent(extractResult.publicUrl)}`);
+// 必需的響應頭
+const standardHeaders = {
+  'Content-Type': 'application/json;charset=UTF-8',
+  'Content-Encoding': 'identity'
+};
+
+return NextResponse.json(data, {
+  status: 200,
+  headers: standardHeaders
+});
+```
+
+## 內部 API 調用標準
+
+### 1. 調用工具函數
+
+```typescript
+// src/utils/api-internal.ts
+export function getApiUrl(path: string): string {
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? process.env.NEXT_PUBLIC_BASE_URL || 'https://your-domain.com'
+    : 'http://localhost:3000';
+  
+  return `${baseUrl}${path}`;
 }
+
+export const internalApiHeaders = {
+  'Content-Type': 'application/json',
+  'x-api-key': process.env.API_SECRET_KEY,
+};
+
+// 使用示例
+const response = await fetch(getApiUrl('/api/processors/process-docx'), {
+  method: 'POST',
+  headers: internalApiHeaders,
+  body: JSON.stringify(data)
+});
+```
+
+### 2. 內部調用錯誤處理
+
+```typescript
+// 標準的內部 API 調用模式
+const callInternalApi = async (path: string, data: any) => {
+  try {
+    const response = await fetch(getApiUrl(path), {
+      method: 'POST',
+      headers: internalApiHeaders,
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(
+        errorData?.error || 
+        `API調用失敗 (${response.status}): ${response.statusText}`
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`調用 ${path} 失敗:`, error);
+    throw error;
+  }
+};
+```
+
+## URL 字段統一規範
+
+### 1. 字段命名標準
+
+**✅ 標準字段：**
+- `publicUrl` - 前端訪問的公開 URL（主要字段）
+- `fileId` - 文件唯一標識符
+- `markdownKey` - R2 存儲的內部 key（僅內部使用）
+
+**❌ 已棄用字段：**
+- `markdownUrl` - 改用 `publicUrl`
+- `r2Url` - 改用 `publicUrl`
+- `localPath` - 僅內部使用，不對外暴露
+
+### 2. URL 處理最佳實踐
+
+```typescript
+// 前端 URL 處理標準
+const handleApiResponse = (result: any) => {
+  // 優先使用 publicUrl
+  if (result.publicUrl) {
+    setViewUrl(`/viewer/${encodeURIComponent(result.publicUrl)}?view=markdown`);
+  } else if (result.markdownKey) {
+    // 後備方案：從 markdownKey 構建 URL
+    const key = result.markdownKey.split('/').pop() || '';
+    setViewUrl(`/viewer/processed/${key}?view=markdown`);
+  }
+};
 ```
 
 ## 錯誤處理最佳實踐
 
-### 1. 錯誤捕獲與日誌
+### 1. 統一錯誤處理函數
 
 ```typescript
-try {
-  // 操作代碼
-} catch (error) {
-  console.error('明確的錯誤前綴:', error);
+// src/utils/api-error-handler.ts
+export function handleApiError(error: unknown): NextResponse {
+  console.error('API錯誤:', error);
   
   const errorMessage = error instanceof Error ? error.message : '未知錯誤';
   
   return NextResponse.json(
-    { error: '用戶友好的錯誤信息', details: errorMessage },
+    { 
+      success: false,
+      error: '處理請求時發生錯誤', 
+      details: errorMessage 
+    },
     { 
       status: 500,
       headers: {
@@ -146,59 +322,123 @@ try {
     }
   );
 }
+
+// 使用示例
+export async function POST(request: Request) {
+  try {
+    // 處理邏輯...
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
 ```
 
-### 2. 錯誤日誌最佳實踐
-
-- 使用明確的前綴標識錯誤來源
-- 記錄詳細的錯誤對象或消息，不僅僅是錯誤文本
-- 在複雜處理流程中記錄中間狀態
-
-## Vercel部署注意事項
-
-### 1. 環境差異
-
-- Vercel環境比本地更嚴格遵循HTTP標準
-- Vercel自動對響應進行壓縮，必須正確設置`Content-Encoding`
-- 必須處理所有ESLint警告，否則會阻止生產部署
-
-### 2. ESLint問題處理
-
-對於功能正常但出現ESLint警告的代碼，可使用以下方式處理：
+### 2. 錯誤日誌標準
 
 ```typescript
-// 方法一：禁用特定行的檢查
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-catch (error) {
-  // 錯誤處理
-}
+// 使用明確的錯誤前綴
+console.error('[Extract Content] 文件處理失敗:', error);
+console.error('[API Auth] 認證檢查失敗:', error);
+console.error('[R2 Service] 文件上傳失敗:', error);
 
-// 方法二：重構代碼消除警告
-// 例如將未使用變量改為_前綴
-catch (_error) {
-  // 錯誤處理
-}
+// 記錄關鍵上下文信息
+console.error('處理文件失敗:', {
+  fileId,
+  fileType,
+  error: error instanceof Error ? error.message : error
+});
 ```
 
-### 3. 部署前檢查清單
+## 安全最佳實踐
 
-- ✅ 所有API響應設置了正確的Content-Type和Content-Encoding
-- ✅ URL字段使用統一的publicUrl
-- ✅ 處理所有ESLint警告
-- ✅ 本地模擬生產環境測試 (`next build && next start`)
+### 1. 輸入驗證
 
-## 本地與Vercel環境差異說明
+```typescript
+// 參數驗證示例
+const validateRequest = (data: any) => {
+  const requiredFields = ['fileUrl', 'fileType', 'fileId'];
+  
+  for (const field of requiredFields) {
+    if (!data[field]) {
+      throw new Error(`缺少必要參數: ${field}`);
+    }
+  }
+  
+  // URL 格式驗證
+  if (data.fileUrl && !isValidUrl(data.fileUrl)) {
+    throw new Error('無效的文件 URL 格式');
+  }
+};
 
-| 特性 | 本地開發環境 | Vercel生產環境 |
-|------|------------|--------------|
-| HTTP協議遵循 | 相對寬鬆 | 嚴格遵循標準 |
-| 響應壓縮 | 通常不啟用 | 自動啟用 |
-| ESLint檢查 | 警告不阻止運行 | 警告阻止構建 |
-| 錯誤顯示 | 詳細錯誤信息 | 有限的錯誤日誌 |
-| 緩存策略 | 開發模式無緩存 | 強緩存策略 |
+const isValidUrl = (string: string): boolean => {
+  try {
+    new URL(string);
+    return true;
+  } catch {
+    return false;
+  }
+};
+```
+
+### 2. 敏感信息處理
+
+```typescript
+// ✅ 正確：不暴露敏感信息
+console.log('API Key 檢查:', apiKey ? `${apiKey.substring(0, 8)}...` : 'null');
+
+// ❌ 錯誤：暴露完整 API Key
+console.log('API Key:', apiKey);
+```
+
+## 開發工具與檢查
+
+### 1. 部署前檢查清單
+
+- ✅ 使用正確的認證模式（用戶 API vs 內部 API）
+- ✅ 統一使用 `publicUrl` 字段
+- ✅ 設置正確的響應頭
+- ✅ 實現適當的錯誤處理
+- ✅ 處理所有 ESLint 警告
+- ✅ 本地生產模式測試 (`npm run build && npm start`)
+
+### 2. API 測試標準
+
+```typescript
+// 測試用戶 API（需要登錄）
+const testUserApi = async () => {
+  const response = await fetch('/api/extract-content', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(testData)
+  });
+  
+  console.log('狀態:', response.status);
+  console.log('響應:', await response.json());
+};
+
+// 測試內部 API（需要 API Key）
+const testInternalApi = async () => {
+  const response = await fetch('/api/processors/process-docx', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.API_SECRET_KEY
+    },
+    body: JSON.stringify(testData)
+  });
+  
+  console.log('狀態:', response.status);
+  console.log('響應:', await response.json());
+};
+```
 
 ## 總結
 
-遵循上述規範可以避免在Vercel部署時遇到的常見問題。特別要注意的是本地開發環境和Vercel生產環境之間的差異，以及HTTP協議標準的嚴格遵循。
+遵循這些標準可以確保：
 
-在任何API更改或添加後，應該確保進行完整的本地生產模式測試，以驗證在生產部署前的功能正常性。 
+- **🔒 安全性**：適當的認證保護
+- **🔄 一致性**：統一的 API 響應格式
+- **🛠️ 可維護性**：清晰的錯誤處理和日誌
+- **🚀 可擴展性**：標準化的開發模式
+
+在開發新 API 時，請參考相應的模板和檢查清單，確保符合項目標準。 
