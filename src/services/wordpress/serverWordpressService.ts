@@ -109,13 +109,19 @@ export async function uploadMediaFromUrl(
       console.warn(`URL不是明確的圖片格式，嘗試繼續: ${imageUrl}`);
     }
     
-    // 從URL獲取圖片內容
+    // 從URL獲取圖片內容（添加超時設定）
     let imageResponse;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超時
+      
       imageResponse = await fetch(imageUrl, { 
         headers: { 'Accept': 'image/*' },
-        redirect: 'follow'
+        redirect: 'follow',
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
     } catch (fetchError) {
       const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
       console.error(`獲取圖片失敗: ${errorMessage}`);
@@ -227,14 +233,20 @@ export async function uploadMediaFromUrl(
     headers.append('Content-Disposition', `attachment; filename="${safeFilename}"`);
     headers.append('Content-Type', contentType);
     
-    // 發送上傳請求
+    // 發送上傳請求（添加超時設定）
     let uploadResponse;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超時，因為上傳可能需要更長時間
+      
       uploadResponse = await fetch(apiUrl, {
         method: 'POST',
         headers: headers,
-        body: imageBlob
+        body: imageBlob,
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
     } catch (uploadError) {
       const errorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
       console.error(`上傳請求失敗: ${errorMessage}`);

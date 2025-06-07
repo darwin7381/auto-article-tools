@@ -7,6 +7,7 @@
 export * from './contentAgent';
 export * from './prWriterAgent';
 export * from './copyEditorAgent';
+export * from './imageGenerationAgent';
 
 // 共用工具
 export * from './common/agentUtils'; 

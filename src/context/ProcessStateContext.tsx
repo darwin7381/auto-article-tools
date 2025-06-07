@@ -27,6 +27,7 @@ export const defaultStages: ProcessStage[] = [
   { id: 'advanced-ai', name: 'PR writer處理', status: 'pending', progress: 0 },
   { id: 'format-conversion', name: '格式轉換', status: 'pending', progress: 0 },
   { id: 'copy-editing', name: 'AI上稿編修', status: 'pending', progress: 0 },
+  { id: 'cover-image', name: '封面圖處理', status: 'pending', progress: 0 },
   { id: 'article-formatting', name: '進階格式化', status: 'pending', progress: 0 },
   { id: 'prep-publish', name: '上稿準備', status: 'pending', progress: 0 },
   { id: 'publish-news', name: '上架新聞', status: 'pending', progress: 0 },
