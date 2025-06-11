@@ -250,10 +250,18 @@ export const defaultContentSettingsApi = {
   // 更新預設內容設定
   async update(data: Partial<DefaultContentSettings>) {
     try {
-      console.log('Updating default content settings with data:', data);
+      // 過濾掉 Strapi 系統字段，只保留業務數據
+      const filteredData = {
+        contextArticle: data.contextArticle,
+        backgroundArticle: data.backgroundArticle,
+        relatedReadingArticles: data.relatedReadingArticles,
+        isActive: data.isActive,
+      };
+      
+      console.log('Updating default content settings with filtered data:', filteredData);
       await strapiApi<DefaultContentSettings>('/default-content-setting', {
         method: 'PUT',
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({ data: filteredData }),
       });
       // 更新後重新取得完整資料
       const response = await strapiApi<DefaultContentSettings>('/default-content-setting?populate=*');
