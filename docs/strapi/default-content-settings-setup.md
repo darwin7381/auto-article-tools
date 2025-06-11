@@ -190,4 +190,19 @@ GET /api/default-content-setting?populate=*
 1. **Single Type** 只會有一條記錄，用於儲存全局預設設定
 2. **Component** 是可重複使用的結構，用於 title + url 組合
 3. **API ID** 必須使用 kebab-case (用 `-` 連接)
-4. 記得在查詢時使用 `?populate=*` 來載入所有關聯資料 
+4. 記得在查詢時使用 `?populate=*` 來載入所有關聯資料
+
+---
+
+## 🚨 **故障排除**
+
+如果在使用過程中遇到 `"invalid key id"` 錯誤，請參考詳細的故障排除指南：
+
+**📖 [Strapi 5 "Invalid Key ID" 錯誤故障排除指南](./troubleshooting-invalid-id-errors.md)**
+
+常見問題：
+- PUT/PATCH 請求包含系統字段（id, documentId 等）
+- 表單數據初始化時未過濾 ID 字段
+- 合併數據時保留了原始對象的完整結構
+
+**快速解決：** 確保所有更新請求只包含業務字段（title, url, isActive），不包含任何 Strapi 系統字段。 
