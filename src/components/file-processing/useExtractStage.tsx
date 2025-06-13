@@ -138,13 +138,15 @@ export default function useExtractStage(
       }, interval);
       
       // 調用內容提取API
+      // API 期望 urlInfoKey 格式：input/url-${urlId}.json
+      const urlInfoKey = `input/url-${urlId}.json`;
       const processResponse = await fetch('/api/process-url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          urlId: urlId 
+          urlInfoKey: urlInfoKey 
         }),
       });
       
