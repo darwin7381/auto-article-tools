@@ -385,7 +385,7 @@ const WordPressPublishComponent = ({
         completeStage('publish-news', '已成功發布到WordPress');
       }, 500);
     }
-  }, [processingParams?.mode, processingParams?.defaultPublishStatus, isSubmitting, publishResult, formData.title, processState?.currentStage, completeStage, handlePublish, sanitizedHtmlContent]);
+  }, [processingParams?.mode, processingParams?.defaultPublishStatus, isSubmitting, publishResult, formData.title, formData.author, formData.status, processState?.currentStage, completeStage, handlePublish, sanitizedHtmlContent]);
 
   return (
     <div className="mt-2 pl-8 pr-0">
@@ -419,7 +419,7 @@ const WordPressPublishComponent = ({
               isSubmitting ? (
                 <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 74 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -1295,11 +1295,15 @@ export default function IntegratedFileProcessor() {
                   isProcessing ? (
                     <svg className="animate-spin h-5 w-5 mr-1 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 74 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   ) : processSuccess ? (
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                  ) : uploadSuccess ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
@@ -1308,7 +1312,7 @@ export default function IntegratedFileProcessor() {
                   )
                 }
               >
-                {isProcessing ? '處理中...' : (processSuccess ? '重新處理' : (selectedInputType === 'file' ? '開始處理' : '處理連結'))}
+                {isProcessing ? '處理中...' : (processSuccess ? '重新處理' : uploadSuccess ? '繼續處理' : (selectedInputType === 'file' ? '開始處理' : '處理連結'))}
               </Button>
             </div>
           </div>
@@ -1365,6 +1369,16 @@ export default function IntegratedFileProcessor() {
                 >
                   前往後期處理
                 </Button>
+              )}
+              
+              {/* 顯示上傳成功狀態 */}
+              {uploadSuccess && !processState.stages.find(s => s.id === 'process')?.status && (
+                <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  上傳成功
+                </div>
               )}
             </div>
           </div>
