@@ -369,7 +369,9 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
         callbacksRef.current.onStageComplete('extract', result as Record<string, unknown>);
         
         // 直接開始AI處理階段
+        console.log('檢查 markdownKey:', result.markdownKey, '完整結果:', result);
         if (result.markdownKey) {
+          console.log('開始啟動AI處理階段，markdownKey:', result.markdownKey);
           try {
             await aiProcessingStage.startAiProcessing(result);
           } catch (error) {
@@ -377,6 +379,9 @@ export default function useProcessingFlow(props: UseProcessingFlowProps) {
             const errorMessage = error instanceof Error ? error.message : 'AI處理階段失敗';
             callbacksRef.current.onProcessError(errorMessage, 'process');
           }
+        } else {
+          console.error('缺少 markdownKey，無法繼續 AI 處理階段:', result);
+          callbacksRef.current.onProcessError('缺少處理結果中的 markdownKey，無法繼續處理', 'extract');
         }
       },
       onError: (error) => {

@@ -237,7 +237,7 @@ export async function uploadMediaFromUrl(
     let uploadResponse;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超時，因為上傳可能需要更長時間
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 增加到120秒超時，圖片上傳可能很慢
       
       uploadResponse = await fetch(apiUrl, {
         method: 'POST',

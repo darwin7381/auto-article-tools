@@ -137,9 +137,10 @@ export default function useExtractStage(
         updateStageProgress('extract', progress, '正在提取網頁內容...');
       }, interval);
       
-      // 調用內容提取API
-      // API 期望 urlInfoKey 格式：input/url-${urlId}.json
+      // 將 urlId 轉換為正確的 urlInfoKey 格式
       const urlInfoKey = `input/url-${urlId}.json`;
+      
+      // 調用內容提取API
       const processResponse = await fetch('/api/process-url', {
         method: 'POST',
         headers: {
@@ -161,8 +162,25 @@ export default function useExtractStage(
         throw new Error(errorData.error || '內容提取失敗');
       }
       
-      const extractResult = await processResponse.json();
-      console.log('URL內容提取結果:', extractResult);
+      const processUrlResult = await processResponse.json();
+      console.log('URL內容提取結果:', processUrlResult);
+      
+      // 從 process-url 的響應中提取實際的 ExtractResult
+      // process-url 的結果結構: { success: true, processResult: { extractResult: {...} } }
+      let actualExtractResult;
+      
+      if (processUrlResult.processResult && processUrlResult.processResult.extractResult) {
+        // 如果有嵌套的 extractResult，使用它
+        actualExtractResult = processUrlResult.processResult.extractResult;
+      } else if (processUrlResult.success && processUrlResult.markdownKey) {
+        // 如果沒有嵌套結構但有 markdownKey，直接使用
+        actualExtractResult = processUrlResult;
+      } else {
+        console.error('URL處理結果格式異常，缺少必要的 markdownKey:', processUrlResult);
+        throw new Error('URL處理結果格式異常，無法繼續後續處理');
+      }
+      
+      console.log('提取到的實際結果:', actualExtractResult);
       
       // 完成提取階段
       updateStageProgress('extract', 100, '網頁內容提取完成');
@@ -171,7 +189,7 @@ export default function useExtractStage(
       
       // 傳遞提取結果給後續階段
       if (onExtractComplete) {
-        onExtractComplete(extractResult);
+        onExtractComplete(actualExtractResult);
       }
     } catch (error) {
       // 清理可能存在的進度interval

@@ -112,6 +112,61 @@ export async function POST(request: Request) {
           status: 'content-extracted'
         });
         
+      } else if (fileType === 'gdocs') {
+        // 使用Google Docs處理器
+        console.log('使用Google Docs處理器...');
+        
+        // 從fileId中提取documentId (fileId格式通常是 gdocs-timestamp-random)
+        // 這裡需要從原始URL中提取documentId，由於fileUrl實際上是原始的Google Docs URL
+        let documentId = '';
+        try {
+          const urlObj = new URL(fileUrl);
+          if (fileUrl.includes('/document/d/')) {
+            const pathParts = urlObj.pathname.split('/');
+            for (let i = 0; i < pathParts.length; i++) {
+              if (pathParts[i] === 'd' && i + 1 < pathParts.length) {
+                documentId = pathParts[i + 1];
+                break;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('解析Google Docs URL錯誤:', error);
+        }
+        
+        if (!documentId) {
+          throw new Error('無法從Google Docs URL中提取文檔ID');
+        }
+        
+        const gdocsResponse = await fetch(getApiUrl('/api/processors/process-gdocs'), {
+          method: 'POST',
+          headers: internalApiHeaders,
+          body: JSON.stringify({ 
+            documentId,
+            urlId: fileId,
+            originalUrl: fileUrl
+          }),
+        });
+        
+        if (!gdocsResponse.ok) {
+          console.error('Google Docs處理器調用失敗:', gdocsResponse.status, gdocsResponse.statusText);
+          const errorText = await gdocsResponse.text();
+          console.error('Google Docs處理器錯誤響應:', errorText);
+          throw new Error(`Google Docs處理失敗: ${gdocsResponse.status} ${gdocsResponse.statusText}`);
+        }
+        
+        const gdocsResult = await gdocsResponse.json();
+        console.log('Google Docs處理器響應:', gdocsResult);
+        
+        return NextResponse.json({
+          success: true,
+          fileId,
+          markdownKey: gdocsResult.markdownKey,
+          publicUrl: gdocsResult.publicUrl,
+          fileType: 'gdocs-converted-to-docx',
+          status: 'content-extracted'
+        });
+        
       } else {
         throw new Error(`不支持的文件類型: ${fileType}`);
       }

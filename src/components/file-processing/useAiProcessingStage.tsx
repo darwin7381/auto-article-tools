@@ -78,7 +78,7 @@ export default function useAiProcessingStage(
     }, interval);
     
     try {
-      // 調用AI處理API
+      // 調用AI處理API (使用 Clerk 認證)
       const aiResponse = await fetch('/api/process-openai', {
         method: 'POST',
         headers: {
@@ -109,10 +109,7 @@ export default function useAiProcessingStage(
       completeStage('process', 'AI處理完成');
       moveToNextStage();
       
-      // 完成所有處理
-      completeStage('complete', '全部處理完成');
-      
-      // 返回處理結果
+      // 返回處理結果，觸發後續階段
       if (onProcessComplete) {
         onProcessComplete(processResult);
       }

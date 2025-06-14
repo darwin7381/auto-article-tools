@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import axios from 'axios';
 import { getApiUrl } from '@/services/utils/apiHelpers';
+import { apiAuth } from '@/middleware/api-auth';
 
 // Google Docs處理請求接口
 interface ProcessGDocsRequest {
@@ -63,6 +64,10 @@ async function saveDocxToR2(docxBuffer: Buffer, urlId: string): Promise<{ fileUr
 }
 
 export async function POST(request: Request) {
+  // API 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
+
   try {
     const { documentId, urlId, originalUrl } = await request.json() as ProcessGDocsRequest;
     
@@ -89,11 +94,19 @@ export async function POST(request: Request) {
     const { fileUrl, fileName } = await saveDocxToR2(docxBuffer, urlId);
     
     // 3. 調用現有的process-docx處理流程
+    // 準備內部 API 調用的認證頭部
+    const internalApiHeaders = {
+      'Content-Type': 'application/json',
+    } as Record<string, string>;
+    
+    // 如果有 API_SECRET_KEY，使用它進行內部認證
+    if (process.env.API_SECRET_KEY) {
+      internalApiHeaders['x-api-key'] = process.env.API_SECRET_KEY;
+    }
+    
     const processResponse = await fetch(getApiUrl('/api/processors/process-docx'), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: internalApiHeaders,
       body: JSON.stringify({
         fileUrl: fileUrl,
         fileName: fileName,
