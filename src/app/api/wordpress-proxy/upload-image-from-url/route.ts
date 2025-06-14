@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadMediaFromUrl } from '@/services/wordpress/serverWordpressService';
 
+// 增加執行時間限制，因為圖片上傳可能很慢
+export const maxDuration = 120; // 120秒
+
 /**
  * 從URL上傳圖片到WordPress媒體庫
  * POST /api/wordpress-proxy/upload-image-from-url

@@ -1035,6 +1035,7 @@ export default function IntegratedFileProcessor() {
 
   // 渲染狀態通知欄
   const renderStatusNotification = () => {
+    // 只顯示錯誤提示，因為上方的進度顯示已經足夠清楚
     if (uploadError) {
       return (
         <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800/30 mb-4">
@@ -1048,48 +1049,7 @@ export default function IntegratedFileProcessor() {
       );
     }
 
-    if (processSuccess) {
-      return (
-        <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800/30 mb-4">
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {selectedInputType === 'file' ? '文件' : '連結'}處理完成，已生成Markdown檔案
-            </p>
-            {markdownUrl && (
-              <a 
-                href={markdownUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-sm font-medium text-primary-600 dark:text-primary-400 flex items-center gap-1 hover:underline"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                查看
-              </a>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    if (uploadSuccess && !processSuccess) {
-      return (
-        <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-800/30 mb-4">
-          <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {selectedInputType === 'file' ? '文件上傳成功' : '連結處理中'}，正在處理中...
-          </p>
-        </div>
-      );
-    }
-
+    // 移除成功狀態的冗餘提示，因為上方的階段進度顯示已經提供足夠清楚的信息
     return null;
   };
 

@@ -3,10 +3,12 @@ import { processContent } from '@/agents/contentAgent';
 import { getFileFromR2 } from '@/services/storage/r2Service';
 import { saveMarkdown } from '@/services/document/markdownService';
 import { withRetry } from '@/agents/common/agentUtils';
+import { apiAuth } from '@/middleware/api-auth';
 
 export async function POST(request: Request) {
-  // 此 API 已被 Clerk middleware 保護，不需要額外的 API Key 檢查
-  // 前端調用會自動包含 Clerk session 信息
+  // API 認證檢查
+  const authResponse = await apiAuth(request);
+  if (authResponse) return authResponse; // 未授權，直接返回錯誤響應
   
   try {
     // 支持直接接收markdown內容或markdown URL
