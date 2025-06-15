@@ -3,6 +3,8 @@
  * 這個文件包含只能在服務器端運行的WordPress相關函數
  */
 
+import { compressBlobWithTinyPng, shouldCompressImage } from '@/services/compression/tinyPngService';
+
 // 重用現有的類型定義
 export interface WordPressCredentials {
   username: string;
@@ -172,6 +174,34 @@ export async function uploadMediaFromUrl(
       };
     }
     
+    console.log(`原始圖片大小: ${(imageBlob.size / 1024).toFixed(2)} KB`);
+    
+    // 檢查是否需要壓縮圖片
+    let finalImageBlob = imageBlob;
+    if (shouldCompressImage(imageBlob.size)) {
+      console.log('圖片大小超過 250KB，開始使用 TinyPNG 壓縮...');
+      
+      // 從環境變數獲取 TinyPNG API Key
+      const tinyPngApiKey = process.env.TINYPNG_API_KEY;
+      
+      if (tinyPngApiKey) {
+        try {
+          // 使用多次壓縮策略，目標大小200KB (留一些緩衝空間)
+          finalImageBlob = await compressBlobWithTinyPng(imageBlob, tinyPngApiKey, 200);
+          console.log(`圖片多次壓縮完成，最終大小: ${(finalImageBlob.size / 1024).toFixed(2)} KB`);
+        } catch (compressionError) {
+          console.warn('圖片壓縮失敗，使用原始圖片繼續上傳:', compressionError);
+          // 壓縮失敗時繼續使用原始圖片，不阻止上傳流程
+          finalImageBlob = imageBlob;
+        }
+      } else {
+        console.warn('未設置 TINYPNG_API_KEY 環境變數，跳過圖片壓縮');
+        finalImageBlob = imageBlob;
+      }
+    } else {
+      console.log('圖片大小未超過 250KB，無需壓縮');
+    }
+    
     const contentType = responseContentType || 'image/jpeg';
     
     // 從URL中提取文件名
@@ -242,7 +272,7 @@ export async function uploadMediaFromUrl(
       uploadResponse = await fetch(apiUrl, {
         method: 'POST',
         headers: headers,
-        body: imageBlob,
+        body: finalImageBlob,
         signal: controller.signal
       });
       
