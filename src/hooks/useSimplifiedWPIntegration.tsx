@@ -130,39 +130,53 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
       // 提取並處理特色圖片
       let featuredImageUrl = '';
       try {
+        // 🔧 修復Bug：始終先移除內容中的第一張圖片（避免重複顯示）
+        const firstImgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
+        let originalFirstImageUrl = '';
+        if (firstImgMatch && firstImgMatch[1]) {
+          originalFirstImageUrl = firstImgMatch[1];
+          console.log('檢測到內容中的第一張圖片:', originalFirstImageUrl);
+        }
+        
         // 如果表單中提供了featured_media且為URL，將其保存為特色圖片URL
         if (formData.featured_media && isURL(formData.featured_media.trim())) {
           featuredImageUrl = formData.featured_media.trim();
           console.log('從表單獲取到特色圖片URL:', featuredImageUrl);
           
-          // 如果特色圖片URL存在於內容中，則從內容中移除該圖片
-          if (featuredImageUrl && content.includes(featuredImageUrl)) {
-            // 找到包含該URL的img標籤，並移除整個figure或img標籤
-            const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+          // 🔧 關鍵修復：無論新的特色圖片URL是什麼，都要移除原本內容中的第一張圖片
+          if (originalFirstImageUrl) {
+            const originalImgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(originalFirstImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(originalFirstImageUrl)}["'][^>]*>`, 'i');
             const oldContent = content;
-            content = content.replace(imgRegex, '');
+            content = content.replace(originalImgRegex, '');
             
-            // 檢查是否成功移除
             if (oldContent !== content) {
-              console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
+              console.log('已從內容中移除原始首圖，避免與新特色圖片重複:', originalFirstImageUrl);
             }
           }
-        } else if (!formData.featured_media) {
-          // 如果沒有提供特色圖片，嘗試提取第一張圖片作為特色圖片
-          const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-          if (imgMatch && imgMatch[1]) {
-            featuredImageUrl = imgMatch[1];
-            console.log('從內容中提取特色圖片URL:', featuredImageUrl);
-            
-            // 從內容中移除該圖片
-            const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+          
+          // 如果新的特色圖片URL與原始首圖不同，且存在於內容中其他位置，也要移除
+          if (featuredImageUrl !== originalFirstImageUrl && content.includes(featuredImageUrl)) {
+            const newImgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
             const oldContent = content;
-            content = content.replace(imgRegex, '');
+            content = content.replace(newImgRegex, '');
             
-            // 檢查是否成功移除
             if (oldContent !== content) {
-              console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
+              console.log('已從內容中移除新設置的特色圖片，避免重複顯示:', featuredImageUrl);
             }
+          }
+        } else if (!formData.featured_media && originalFirstImageUrl) {
+          // 如果沒有提供特色圖片，使用內容中的第一張圖片作為特色圖片
+          featuredImageUrl = originalFirstImageUrl;
+          console.log('從內容中提取特色圖片URL:', featuredImageUrl);
+          
+          // 從內容中移除該圖片
+          const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+          const oldContent = content;
+          content = content.replace(imgRegex, '');
+          
+          // 檢查是否成功移除
+          if (oldContent !== content) {
+            console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
           }
         }
       } catch (error) {
