@@ -109,6 +109,9 @@ const WordPressPublishComponent = ({
     }
   }, [htmlContent, sanitizedHtmlContent]);
   
+  // 同步觸發標記（由外部觸發同步）
+  const [syncTrigger, setSyncTrigger] = useState(0);
+  
   // 提取HTML內容中的H1標題
   const extractH1Title = useCallback((html: string): string => {
     try {
@@ -142,9 +145,11 @@ const WordPressPublishComponent = ({
     return '';
   }, []);
 
-  // 當HTML內容加載時立即提取並使用標題與特色圖片
-  useEffect(() => {
+  // 從編輯器更新表單數據的函數
+  const updateFormFromEditor = useCallback(() => {
     if (sanitizedHtmlContent) {
+      console.log("從編輯器更新表單數據...");
+      
       // 提取並設置標題
       const extractedTitle = extractH1Title(sanitizedHtmlContent);
       if (extractedTitle) {
@@ -166,6 +171,39 @@ const WordPressPublishComponent = ({
       }
     }
   }, [sanitizedHtmlContent, extractH1Title, extractFeatureImage]);
+
+  // 組件首次載入時從編輯器更新表單數據
+  useEffect(() => {
+    if (sanitizedHtmlContent) {
+      console.log("WordPress組件載入，從編輯器更新表單數據");
+      updateFormFromEditor();
+    }
+  }, [sanitizedHtmlContent, updateFormFromEditor]);
+
+  // 當syncTrigger變化時重新同步（由onContinue觸發）
+  useEffect(() => {
+    if (syncTrigger > 0) {
+      console.log("收到同步觸發信號，重新從編輯器更新表單數據");
+      updateFormFromEditor();
+    }
+  }, [syncTrigger, updateFormFromEditor]);
+
+  // 暴露同步觸發函數到window（供外部調用）
+  useEffect(() => {
+    const triggerSync = () => {
+      setSyncTrigger(prev => prev + 1);
+    };
+    
+    // 設置全局觸發函數
+    (window as typeof window & { triggerWordPressSync?: () => void }).triggerWordPressSync = triggerSync;
+    
+    return () => {
+      // 清理全局函數
+      delete (window as typeof window & { triggerWordPressSync?: () => void }).triggerWordPressSync;
+    };
+  }, []);
+
+
 
   // 當WordPress參數變更時更新表單數據
   useEffect(() => {
@@ -195,22 +233,22 @@ const WordPressPublishComponent = ({
             .join(',');
         }
         
-        // 更新表單數據（標題已經由前面的useEffect從編輯器提取處理好了）
+        // 🔧 修復：只更新分類、標籤、slug，不覆蓋從編輯器提取的標題和圖片
         setFormData(prev => ({
           ...prev,
-          // 注意：不再設置title，因為它已經從編輯器內容中提取並設置了
+          // 保持標題和特色圖片不變（由updateFormFromEditor處理）
           categories: categoriesStr || prev.categories,
           tags: tagsStr || prev.tags,
           slug: wordpressParams.slug || prev.slug
         }));
         
-        console.log("表單數據已更新 (分類和標籤)");
+        console.log("表單數據已更新 (僅更新分類、標籤、slug)");
       } catch (error) {
         console.error("解析WordPress參數時出錯:", error);
       }
     }
-  }, [wordpressParams]);
-
+  }, [wordpressParams]); // 只依賴 wordpressParams
+  
   // 當處理參數中有預設作者ID時，自動設置到表單
   useEffect(() => {
     if (processingParams?.defaultAuthorId) {
@@ -390,6 +428,8 @@ const WordPressPublishComponent = ({
   return (
     <div className="mt-2 pl-8 pr-0">
       {renderPublishStatus()}
+      
+
       
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3 mb-2">
@@ -1458,6 +1498,13 @@ export default function IntegratedFileProcessor() {
                     }
                   }}
                   onContinue={() => {
+                    // 觸發WordPress表單同步
+                    const triggerSync = (window as typeof window & { triggerWordPressSync?: () => void }).triggerWordPressSync;
+                    if (triggerSync) {
+                      console.log("onContinue: 觸發WordPress表單同步");
+                      triggerSync();
+                    }
+                    
                     // 標記上稿準備階段為完成
                     if (processState) {
                       // 使用setTimeout避免渲染過程中的setState

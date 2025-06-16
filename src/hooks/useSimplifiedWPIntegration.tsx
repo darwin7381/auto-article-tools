@@ -167,16 +167,16 @@ export function useSimplifiedWPIntegration(options: WordPressIntegrationOptions)
         } else if (!formData.featured_media && originalFirstImageUrl) {
           // 如果沒有提供特色圖片，使用內容中的第一張圖片作為特色圖片
           featuredImageUrl = originalFirstImageUrl;
-          console.log('從內容中提取特色圖片URL:', featuredImageUrl);
-          
-          // 從內容中移除該圖片
-          const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
-          const oldContent = content;
-          content = content.replace(imgRegex, '');
-          
-          // 檢查是否成功移除
-          if (oldContent !== content) {
-            console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
+            console.log('從內容中提取特色圖片URL:', featuredImageUrl);
+            
+            // 從內容中移除該圖片
+            const imgRegex = new RegExp(`<figure[^>]*>\\s*<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>.*?<\\/figure>|<img[^>]*src=["']${escapeRegExp(featuredImageUrl)}["'][^>]*>`, 'i');
+            const oldContent = content;
+            content = content.replace(imgRegex, '');
+            
+            // 檢查是否成功移除
+            if (oldContent !== content) {
+              console.log('已從內容中移除特色圖片，避免WordPress顯示重複圖片');
           }
         }
       } catch (error) {
