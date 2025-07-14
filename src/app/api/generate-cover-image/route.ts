@@ -96,15 +96,21 @@ export async function POST(request: Request) {
     const prompt = generateImagePrompt(title, content, articleType);
     console.log('圖片生成提示詞:', prompt.substring(0, 200) + '...');
 
+    // 記錄 GPT Image 1 使用信息
+    console.log('🤖 [imageGeneration] 開始生成封面圖');
+    console.log('📡 提供商: openai');
+    console.log('🧠 模型: gpt-image-1');
+    console.log('📐 尺寸: 1536x1024');
+    console.log('🎨 品質: medium');
+
     // 使用重試機制調用最新的GPT Image API
     const imageResponse = await withRetry(
       async () => {
         const response = await openai.images.generate({
           model: "gpt-image-1",
           prompt: prompt,
-          n: 1,
           size: "1536x1024", // landscape format，適合文章封面
-          quality: "medium" // 使用medium品質平衡圖片質量和檔案大小
+          quality: "medium" // GPT Image 1 預設返回 b64_json 格式，不需要 response_format 參數
         });
 
         if (!response.data || response.data.length === 0) {

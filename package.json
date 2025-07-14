@@ -46,6 +46,7 @@
     "@tiptap/starter-kit": "^2.12.0",
     "@ungap/with-resolvers": "^0.1.0",
     "@upstash/redis": "^1.34.8",
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.9.0",
     "canvas": "^3.1.0",
     "convertapi": "^1.15.0",
