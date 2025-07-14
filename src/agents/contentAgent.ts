@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { getFileFromR2 } from '../services/storage/r2Service';
 import { saveMarkdown } from '../services/document/markdownService';
-import { createChatConfig, withRetry } from './common/agentUtils';
+import { createChatConfig, createModelAdaptedConfig, withRetry, getAgentConfig, logModelUsage, replacePromptVariables, getProviderType, callAIAPI, type AgentConfig } from './common/agentUtils';
 
 /**
  * 內容處理Agent - 專門處理文檔內容增強
@@ -34,49 +34,51 @@ export async function processContent(markdownContent: string): Promise<string> {
     return markdownContent;
   }
 
-  // 系統提示詞 - 專注於內容指導，不包含格式控制
-  const systemPrompt = `你是一個 30 年經驗的彭博社資深編輯，擅長任何形式的正規專業新聞稿處理。你的任務是：
-
-1. 將來源內容統一轉換為正規的台灣繁體為主的內容
-2. 若是內容處理涉及翻譯，請確實考量實際語意表達，以免有些詞或標題在翻譯後失去語境含義
-3. 進行內容初步處理、整理，使其成為專業的 PR 新聞稿
-4. 但需注意，要保留原始文章的所有重要信息和細節，包括連結、圖片、表格...格式和位置相符等
-5. 不要遺漏任何重要資訊，或過度簡化格式，仍須遵正客戶所給的原始內容格式和佈局，僅有大錯誤或大問題時，才進行修正
-6. 輸出必須保持正確的 Markdown 格式，維持標題層級、段落和列表的格式
-7. 不同段落之間不要自己亂加一大堆奇怪的分隔線，未來我們是會轉換成 html 的，所以不要自己亂加分隔線「---」以免未來造成格式隱患`;
-
-  // 用戶提示詞
-  const userPrompt = `請處理以下來源內容，你正在進行將客戶或合作公司給的稿件，統一處理為正規專業的新聞稿，但必須尊重原始內容，不要遺漏任何重要資訊或錯誤簡化格式或過度進行改寫：
-
-${markdownContent}`;
-
   try {
-    console.log('開始使用AI處理內容...');
+    // 獲取 Agent 配置
+    const agentConfig: AgentConfig = await getAgentConfig('contentAgent');
     
-    // 使用工具函數創建API配置
-    const config = createChatConfig("gpt-4o", {
-      temperature: 0.3,
-      max_tokens: 16000,
-      top_p: 0.95,
+    // 記錄模型使用信息
+    logModelUsage('contentAgent', agentConfig, '開始處理Markdown內容');
+
+    // 從配置中獲取系統提示詞
+    const systemPrompt = agentConfig.systemPrompt;
+
+    // 從配置中獲取用戶提示詞模板並替換變數
+    const userPrompt = replacePromptVariables(agentConfig.userPrompt, {
+      markdownContent: markdownContent
     });
+
+    // 根據提供商類型選擇 API 調用方式
+    const providerType = getProviderType(agentConfig.provider);
     
     // 使用重試機制調用API
     const content = await withRetry(
       async () => {
-        const completion = await openaiClient!.chat.completions.create({
-          ...config,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ]
-        });
+        if (providerType === 'google') {
+          // 使用 Gemini API
+          return await callAIAPI(agentConfig, systemPrompt, userPrompt);
+        } else {
+          // 使用 OpenAI API
+          if (!openaiClient) {
+            throw new Error('OpenAI 客戶端未初始化');
+          }
+          
+          const config = createModelAdaptedConfig(agentConfig);
+          const completion = await openaiClient.chat.completions.create({
+            ...config,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ]
+          });
 
-        // 獲取回應內容
-        const content = completion.choices[0].message.content;
-        if (!content) {
-          throw new Error('AI回應為空');
+          const content = completion.choices[0].message.content;
+          if (!content) {
+            throw new Error('AI回應為空');
+          }
+          return content;
         }
-        return content;
       },
       {
         maxRetries: 3,
@@ -105,12 +107,88 @@ ${markdownContent}`;
       }
     );
 
-    console.log('AI處理成功');
+    console.log('✅ Content Agent處理成功');
     return content;
-  } catch (error) {
-    console.error('AI處理失敗(已重試):', error);
-    // 所有重試都失敗，返回原始內容
-    return markdownContent;
+  } catch (configError) {
+    console.error('❌ Content Agent配置獲取失敗:', configError);
+    console.log('🔄 降級使用硬編碼配置');
+    
+    // 如果配置獲取失敗，使用硬編碼配置
+    const fallbackSystemPrompt = `你是一個 30 年經驗的彭博社資深編輯，擅長任何形式的正規專業新聞稿處理。你的任務是：
+
+1. 將來源內容統一轉換為正規的台灣繁體為主的內容
+2. 若是內容處理涉及翻譯，請確實考量實際語意表達，以免有些詞或標題在翻譯後失去語境含義
+3. 進行內容初步處理、整理，使其成為專業的 PR 新聞稿
+4. 但需注意，要保留原始文章的所有重要信息和細節，包括連結、圖片、表格...格式和位置相符等
+5. 不要遺漏任何重要資訊，或過度簡化格式，仍須遵正客戶所給的原始內容格式和佈局，僅有大錯誤或大問題時，才進行修正
+6. 輸出必須保持正確的 Markdown 格式，維持標題層級、段落和列表的格式
+7. 不同段落之間不要自己亂加一大堆奇怪的分隔線，未來我們是會轉換成 html 的，所以不要自己亂加分隔線「---」以免未來造成格式隱患`;
+
+    const fallbackUserPrompt = `請處理以下來源內容，你正在進行將客戶或合作公司給的稿件，統一處理為正規專業的新聞稿，但必須尊重原始內容，不要遺漏任何重要資訊或錯誤簡化格式或過度進行改寫：
+
+${markdownContent}`;
+
+    console.log('🤖 [contentAgent] 使用降級配置');
+    console.log('📡 提供商: openai');
+    console.log('🧠 模型: gpt-4o');
+    console.log('🌡️  溫度: 0.3');
+    console.log('📝 最大Token: 16000');
+
+    try {
+      const config = createChatConfig("gpt-4o", {
+        temperature: 0.3,
+        max_tokens: 16000,
+        top_p: 0.95,
+      });
+      
+      const content = await withRetry(
+        async () => {
+          const completion = await openaiClient!.chat.completions.create({
+            ...config,
+            messages: [
+              { role: "system", content: fallbackSystemPrompt },
+              { role: "user", content: fallbackUserPrompt }
+            ]
+          });
+
+          const content = completion.choices[0].message.content;
+          if (!content) {
+            throw new Error('AI回應為空');
+          }
+          return content;
+        },
+        {
+          maxRetries: 3,
+          retryDelay: 2000,
+          onRetry: (error, count) => {
+            console.warn(`內容處理重試 #${count}：`, error.message);
+          },
+          retryCondition: (error) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const retryableErrors = [
+              'timeout', 
+              'exceeded maximum time', 
+              'rate limit', 
+              'server error',
+              'network error',
+              'Gateway Timeout',
+              'timed out',
+              'not valid JSON'
+            ];
+            
+            return retryableErrors.some(errText => 
+              errorMessage.toLowerCase().includes(errText.toLowerCase())
+            );
+          }
+        }
+      );
+
+      console.log('✅ Content Agent處理成功(降級模式)');
+      return content;
+    } catch (fallbackError) {
+      console.error('❌ Content Agent處理失敗(已重試，降級模式):', fallbackError);
+      return markdownContent;
+    }
   }
 }
 

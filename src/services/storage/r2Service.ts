@@ -116,11 +116,16 @@ export async function uploadImageToR2(imageBuffer: Buffer, fileName: string, con
  * @returns 上傳後的文件鍵值
  */
 export async function uploadJsonToR2(data: object, key: string, metadata?: Record<string, string>): Promise<string> {
+  // 使用UTF-8編碼確保中文字符正確儲存
+  const jsonString = JSON.stringify(data, null, 2);
+  const buffer = Buffer.from(jsonString, 'utf-8');
+  
   const command = new PutObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
-    Body: JSON.stringify(data),
-    ContentType: 'application/json',
+    Body: buffer,
+    ContentType: 'application/json; charset=utf-8',
+    ContentEncoding: 'utf-8',
     Metadata: metadata,
   });
   
@@ -135,5 +140,6 @@ export async function uploadJsonToR2(data: object, key: string, metadata?: Recor
  */
 export async function getJsonFromR2<T = unknown>(key: string): Promise<T> {
   const buffer = await getFileFromR2(key);
-  return JSON.parse(buffer.toString()) as T;
+  const jsonString = buffer.toString('utf-8');
+  return JSON.parse(jsonString) as T;
 } 

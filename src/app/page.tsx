@@ -2,26 +2,14 @@
 
 import { ProcessingProvider } from '@/context/ProcessingContext';
 import IntegratedFileProcessor from '@/components/file-processing/IntegratedFileProcessor';
-import UserNav from '@/components/UserNav';
+import AppHeader from '@/components/AppHeader';
 
 export default function IntegratedProcessingDemo() {
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-primary-100 to-secondary-100 dark:from-primary-900 dark:to-secondary-900 p-4 shadow border-b border-divider backdrop-blur-sm">
-        <div className="container mx-auto max-w-5xl">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">文件處理與WordPress發布系統</h1>
-              <p className="text-sm text-foreground/70">
-                DOCX/PDF 自動處理並發布到 WordPress
-              </p>
-            </div>
-            <UserNav />
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
-      <div className="container mx-auto px-4 pt-28 pb-8 max-w-5xl">
+      <div className="container mx-auto px-4 pt-32 pb-8 max-w-5xl">
         <div className="space-y-8">
           <div className="bg-background shadow rounded-xl p-6 border border-divider">
             <ProcessingProvider>

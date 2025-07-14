@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { createChatConfig, withRetry } from './common/agentUtils';
+import { createChatConfig, createModelAdaptedConfig, withRetry, getAgentConfig, logModelUsage, replacePromptVariables, getProviderType, callAIAPI, type AgentConfig } from './common/agentUtils';
 
 /**
  * CopyEditorAgent - 專門處理文稿編輯與WordPress參數生成
@@ -70,72 +70,53 @@ export async function extractWordPressParams(
     };
   }
 
-  // 系統提示詞 - 專注於內容分析與參數提取
-  const systemPrompt = `你是一位專業的內容分析師和WordPress參數生成專家，負責分析網站文章並生成適合發布的參數和內容。
-
-你的任務是：
-1. 仔細分析提供的${contentType === 'html' ? 'HTML' : 'Markdown'}內容
-2. 提取核心信息，生成WordPress發布所需的參數
-3. 根據內容適配格式（避免標題和首圖重複出現等）
-4. 基於文章內容智能判斷適合的分類和標籤ID
-
-請根據內容分析，生成以下參數的完整JSON結構：
-1. title: 文章標題（核心必填）
-2. content: 完整的${contentType === 'html' ? 'HTML' : 'Markdown'}內容（經過適配後的）
-3. excerpt: 文章摘要（若無法提取則創建100-120字的摘要）
-4. slug: 網址後綴（基於標題生成的英文短語）
-5. categories: 分類ID列表，格式為[{id: 數字}]
-6. tags: 標籤ID列表，格式為[{id: 數字}]
-7. featured_image: 特色圖片信息（從內容中提取第一張圖片）
-
-🔍 圖片處理重要規則：
-- 請從內容中尋找第一張圖片（第一個<img>標籤），將其src屬性提取為featured_image的url
-- 在featured_image參數中，提供url和alt屬性
-- ⚠️ 關鍵：只移除被提取為特色圖片的那一張圖片，其他所有圖片必須保留在原位置
-- 如果文章只有一張圖片，提取後內容中將沒有圖片（這是正常的）
-- 如果文章有多張圖片，提取第一張後，其餘圖片必須保持不變
-- 如果無法提取圖片URL，請將featured_image設為null
-
-注意事項：
-- 必須根據你分析的內容生成適合的參數值
-- 分類ID和標籤ID應為數字，請依據內容估計合適的分類和標籤ID
-- 如果內容已有H1標題，請確保它不會在WordPress標題和內容中重複出現
-- 處理圖片時要格外小心，確保不會意外移除不該移除的圖片
-
-你的輸出格式必須為固定的JSON格式，包含wordpress_params和adaptedContent兩個字段：`;
-
-  // 用戶提示詞
-  const userPrompt = `請分析以下${contentType === 'html' ? 'HTML' : 'Markdown'}內容並生成WordPress發布參數。特別注意提取第一張圖片作為特色圖片，並記錄其URL。內容如下：
-
-${content}`;
-
   try {
-    console.log('開始使用CopyEditorAgent生成WordPress參數...');
+    // 獲取 Agent 配置
+    const agentConfig: AgentConfig = await getAgentConfig('copyEditorAgent');
     
-              // 使用工具函數創建API配置
-     const config = createChatConfig("gpt-4o", {
-       temperature: 0.3,
-       max_tokens: 16000,
-       top_p: 0.95
-     });
+    // 記錄模型使用信息
+    logModelUsage('copyEditorAgent', agentConfig, `開始分析${contentType === 'html' ? 'HTML' : 'Markdown'}內容並生成WordPress參數`);
+
+    // 從配置中獲取系統提示詞
+    const systemPrompt = agentConfig.systemPrompt;
+
+    // 從配置中獲取用戶提示詞模板並替換變數
+    const userPrompt = replacePromptVariables(agentConfig.userPrompt, {
+      content: content,
+      contentType: contentType
+    });
+
+    // 根據提供商類型選擇 API 調用方式
+    const providerType = getProviderType(agentConfig.provider);
      
      // 使用重試機制調用API
      const result = await withRetry(
        async () => {
-         const completion = await openaiClient!.chat.completions.create({
-           ...config,
-           messages: [
-             { role: "system", content: systemPrompt + '\n\n請以JSON格式響應，包含wordpress_params和adaptedContent字段。' },
-             { role: "user", content: userPrompt }
-           ]
-         });
+         if (providerType === 'google') {
+           // 使用 Gemini API
+           const enhancedSystemPrompt = systemPrompt + '\n\n請以JSON格式響應，包含wordpress_params和adaptedContent字段。';
+           return await callAIAPI(agentConfig, enhancedSystemPrompt, userPrompt);
+         } else {
+           // 使用 OpenAI API
+           if (!openaiClient) {
+             throw new Error('OpenAI 客戶端未初始化');
+           }
+           
+           const config = createModelAdaptedConfig(agentConfig);
+           const completion = await openaiClient.chat.completions.create({
+             ...config,
+             messages: [
+               { role: "system", content: systemPrompt + '\n\n請以JSON格式響應，包含wordpress_params和adaptedContent字段。' },
+               { role: "user", content: userPrompt }
+             ]
+           });
 
-        // 獲取回應內容
-        const content = completion.choices[0].message.content;
-        if (!content) {
-          throw new Error('AI回應為空');
-        }
-        return content;
+           const content = completion.choices[0].message.content;
+           if (!content) {
+             throw new Error('AI回應為空');
+           }
+           return content;
+         }
       },
       {
         maxRetries: 3,
@@ -146,7 +127,7 @@ ${content}`;
       }
     );
 
-    console.log('WordPress參數生成成功');
+    console.log('✅ CopyEditorAgent WordPress參數生成成功');
     
     // 解析JSON回應
     try {
@@ -217,7 +198,7 @@ ${content}`;
         adaptedContent: adaptedContent
       };
     } catch (parseError) {
-      console.error('解析AI回應JSON失敗:', parseError);
+      console.error('❌ 解析AI回應JSON失敗:', parseError);
       // 返回基本結果結構
       return {
         wordpressParams: {
@@ -228,16 +209,127 @@ ${content}`;
         adaptedContent: content
       };
     }
-  } catch (error) {
-    console.error('WordPress參數生成失敗:', error);
-    // 發生錯誤時返回原始內容
-    return {
-      wordpressParams: {
-        title: '參數生成失敗',
-        content: content,
-        excerpt: '生成WordPress參數時發生錯誤'
-      },
-      adaptedContent: content
-    };
+  } catch (configError) {
+    console.error('❌ CopyEditorAgent配置獲取失敗:', configError);
+    console.log('🔄 降級使用硬編碼配置');
+    
+    // 如果配置獲取失敗，使用硬編碼配置
+    const fallbackSystemPrompt = `你是一位專業的內容分析師和WordPress參數生成專家，負責分析網站文章並生成適合發布的參數和內容。
+
+你的任務是：
+1. 仔細分析提供的${contentType === 'html' ? 'HTML' : 'Markdown'}內容
+2. 提取核心信息，生成WordPress發布所需的參數
+3. 根據內容適配格式（避免標題和首圖重複出現等）
+4. 基於文章內容智能判斷適合的分類和標籤ID
+
+請根據內容分析，生成以下參數的完整JSON結構：
+1. title: 文章標題（核心必填）
+2. content: 完整的${contentType === 'html' ? 'HTML' : 'Markdown'}內容（經過適配後的）
+3. excerpt: 文章摘要（若無法提取則創建100-120字的摘要）
+4. slug: 網址後綴（基於標題生成的英文短語）
+5. categories: 分類ID列表，格式為[{id: 數字}]
+6. tags: 標籤ID列表，格式為[{id: 數字}]
+7. featured_image: 特色圖片信息（從內容中提取第一張圖片）
+
+你的輸出格式必須為固定的JSON格式，包含wordpress_params和adaptedContent兩個字段：`;
+
+    const fallbackUserPrompt = `請分析以下${contentType === 'html' ? 'HTML' : 'Markdown'}內容並生成WordPress發布參數。特別注意提取第一張圖片作為特色圖片，並記錄其URL。內容如下：
+
+${content}`;
+
+    console.log('🤖 [copyEditorAgent] 使用降級配置');
+    console.log('📡 提供商: openai');
+    console.log('🧠 模型: gpt-4o');
+    console.log('🌡️  溫度: 0.3');
+    console.log('📝 最大Token: 16000');
+
+    try {
+      const config = createChatConfig("gpt-4o", {
+        temperature: 0.3,
+        max_tokens: 16000,
+        top_p: 0.95
+      });
+      
+      const result = await withRetry(
+        async () => {
+          const completion = await openaiClient!.chat.completions.create({
+            ...config,
+            messages: [
+              { role: "system", content: fallbackSystemPrompt + '\n\n請以JSON格式響應，包含wordpress_params和adaptedContent字段。' },
+              { role: "user", content: fallbackUserPrompt }
+            ]
+          });
+
+          const content = completion.choices[0].message.content;
+          if (!content) {
+            throw new Error('AI回應為空');
+          }
+          return content;
+        },
+        {
+          maxRetries: 3,
+          retryDelay: 2000,
+          onRetry: (error, count) => {
+            console.warn(`CopyEditorAgent處理重試 #${count}：`, error.message);
+          }
+        }
+      );
+
+      console.log('✅ CopyEditorAgent WordPress參數生成成功(降級模式)');
+      
+      // 解析 JSON 回應
+      try {
+        let parsedResult;
+        try {
+          parsedResult = JSON.parse(result);
+        } catch {
+          const jsonMatch = result.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsedResult = JSON.parse(jsonMatch[0]);
+          } else {
+            throw new Error('回應不包含有效的JSON結構');
+          }
+        }
+        
+        if (!parsedResult.wordpress_params) {
+          parsedResult.wordpress_params = parsedResult.wordpressParams || {};
+        }
+        
+        if (!parsedResult.wordpress_params.content) {
+          parsedResult.wordpress_params.content = content;
+        }
+        
+        if (!parsedResult.wordpress_params.title) {
+          parsedResult.wordpress_params.title = '未能提取標題';
+        }
+        
+        const adaptedContent = parsedResult.adaptedContent || parsedResult.wordpress_params.content;
+        
+        return {
+          wordpressParams: parsedResult.wordpress_params,
+          adaptedContent: adaptedContent
+        };
+      } catch (parseError) {
+        console.error('❌ 解析降級模式AI回應JSON失敗:', parseError);
+        return {
+          wordpressParams: {
+            title: '參數解析失敗(降級模式)',
+            content: content,
+            excerpt: '無法解析WordPress參數JSON'
+          },
+          adaptedContent: content
+        };
+      }
+    } catch (fallbackError) {
+      console.error('❌ CopyEditorAgent處理失敗(已重試，降級模式):', fallbackError);
+      return {
+        wordpressParams: {
+          title: '參數生成失敗',
+          content: content,
+          excerpt: '生成WordPress參數時發生錯誤'
+        },
+        adaptedContent: content
+      };
+    }
   }
 } 
