@@ -84,13 +84,13 @@ export class OpenAIProvider extends AIProviderBase {
     }
     
     // 驗證圖像模型
-    if (!SUPPORTED_MODELS.openai.image.includes(request.model as 'gpt-image-1' | 'dall-e-3' | 'dall-e-2')) {
+    if (!SUPPORTED_MODELS.openai.image.includes(request.model as 'gpt-image-1' | 'custom')) {
       throw new Error(`不支援的圖像模型: ${request.model}`);
     }
     
     try {
       const response = await this.client.images.generate({
-        model: request.model as 'gpt-image-1' | 'dall-e-3' | 'dall-e-2',
+        model: request.model as 'gpt-image-1',
         prompt: request.prompt,
         size: request.size as '1024x1024' | '1536x1024' | '1024x1536',
         quality: request.quality as 'standard' | 'hd',
