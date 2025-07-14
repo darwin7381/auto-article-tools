@@ -39,3 +39,11 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# 敏感腳本文件 - 防止意外提交包含憑證的腳本
+upload-*.js
+*-config.js
+fix-*.js
+check-*.js
+migrate-*.js
+scripts/
