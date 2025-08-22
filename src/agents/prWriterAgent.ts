@@ -55,8 +55,9 @@ export async function processPRContent(markdownContent: string): Promise<string>
     // 使用重試機制調用API
     const content = await withRetry(
       async () => {
-        if (providerType === 'google') {
-          // 使用 Gemini API
+        if (providerType === 'google' || providerType === 'openrouter' || 
+            agentConfig.provider === 'grok' || agentConfig.provider === 'claude') {
+          // 使用統一 API 調用函數（支援 Gemini、OpenRouter、Grok、Claude）
           return await callAIAPI(agentConfig, systemPrompt, userPrompt);
         } else {
           // 使用 OpenAI API

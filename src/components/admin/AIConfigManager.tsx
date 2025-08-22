@@ -497,6 +497,7 @@ function TextAgentSection({
                   <option value="gemini">Gemini</option>
                   <option value="grok">Grok</option>
                   <option value="claude">Claude</option>
+                  <option value="openrouter">OpenRouter</option>
                 </select>
               </div>
 
@@ -751,6 +752,7 @@ function ImageAgentSection({
                   <option value="gemini">Gemini</option>
                   <option value="grok">Grok</option>
                   <option value="claude">Claude</option>
+                  <option value="openrouter">OpenRouter</option>
                 </select>
               </div>
 

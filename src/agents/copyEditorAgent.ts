@@ -92,11 +92,12 @@ export async function extractWordPressParams(
      // 使用重試機制調用API
      const result = await withRetry(
        async () => {
-         if (providerType === 'google') {
-           // 使用 Gemini API
-           const enhancedSystemPrompt = systemPrompt + '\n\n請以JSON格式響應，包含wordpress_params和adaptedContent字段。';
-           return await callAIAPI(agentConfig, enhancedSystemPrompt, userPrompt);
-         } else {
+        if (providerType === 'google' || providerType === 'openrouter' || 
+            agentConfig.provider === 'grok' || agentConfig.provider === 'claude') {
+          // 使用統一 API 調用函數（支援 Gemini、OpenRouter、Grok、Claude）
+          const enhancedSystemPrompt = systemPrompt + '\n\n請以JSON格式響應，包含wordpress_params和adaptedContent字段。';
+          return await callAIAPI(agentConfig, enhancedSystemPrompt, userPrompt);
+        } else {
            // 使用 OpenAI API
            if (!openaiClient) {
              throw new Error('OpenAI 客戶端未初始化');

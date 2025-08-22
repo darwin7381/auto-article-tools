@@ -1,0 +1,10 @@
+{
+  "success": true,
+  "data": {
+    "provider": "openai",
+    "model": "gpt-image-1",
+    "size": "1500 * 750",
+    "quality": "medium",
+    "promptTemplate": "Create a professional, modern cover image for an article with the following details:\n\nTitle: ${title}\nContent Summary: ${contentSummary}\nArticle Type: ${articleType}\n\nStyle Requirements:\n- Professional and modern design\n- Suitable for tech/business/news article\n- Clean, minimal composition\n- High contrast and readability\n- No text overlay (title will be added separately)\n- Color scheme should be professional (blues, grays, whites)\n- Abstract or conceptual representation of the topic\n- High quality, suitable for web publication\n\nThe image should be visually appealing and relevant to the article content while maintaining a professional appearance suitable for a technology/business news website."
+  }
+}

@@ -12,6 +12,8 @@ const isPublicRoute = createRouteMatcher([
   // 真正應該公開的 API 路由（只保留查詢類型的 API）
   '/api/parse-url(.*)',        // URL 解析 - 用於預覽，可以保持公開
   '/api/process-status(.*)',   // 狀態查詢 - 查詢處理狀態，可以保持公開
+  '/api/config/ai(.*)',        // AI 配置 - 用於配置管理，暫時公開以便備份
+  '/api/process-openai(.*)',   // AI 處理 - 用於測試，暫時公開
   
   // 移除以下路徑，這些 API 應該需要認證：
   // '/api/extract-content(.*)' - 內容提取，消耗資源，需要認證
