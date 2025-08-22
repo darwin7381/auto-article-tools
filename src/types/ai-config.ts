@@ -3,7 +3,7 @@
  */
 
 // 支援的 AI 提供商
-export type AIProvider = 'openai' | 'gemini' | 'grok' | 'claude';
+export type AIProvider = 'openai' | 'gemini' | 'grok' | 'claude' | 'openrouter';
 
 // 文本生成配置
 export interface TextAgentConfig {
@@ -187,6 +187,24 @@ export const SUPPORTED_MODELS = {
   claude: {
     text: ['claude-3.5-sonnet', 'claude-3.5-haiku', 'claude-3.7-sonnet', 'claude-3-sonnet', 'claude-3-haiku', 'custom'],
     image: ['custom']
+  },
+  openrouter: {
+    text: [
+      // OpenAI 模型
+      'openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/o1-preview', 'openai/o1-mini',
+      // Google 模型
+      'google/gemini-2.5-pro', 'google/gemini-2.5-flash', 'google/gemini-2.0-flash',
+      // Anthropic 模型
+      'anthropic/claude-3.5-sonnet', 'anthropic/claude-3.5-haiku', 'anthropic/claude-3-opus',
+      // X.AI 模型
+      'x-ai/grok-3', 'x-ai/grok-2', 'x-ai/grok-1',
+      // Meta 模型
+      'meta-llama/llama-3.3-70b', 'meta-llama/llama-3.2-90b',
+      // 其他熱門模型
+      'mistralai/mistral-large', 'cohere/command-r-plus',
+      'custom'
+    ],
+    image: ['openai/dall-e-3', 'openai/dall-e-2', 'custom']
   }
 } as const;
 

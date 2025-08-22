@@ -19,7 +19,7 @@ export interface AgentConfig {
 }
 
 // 定義支援的提供商
-export type AIProvider = 'openai' | 'google';
+export type AIProvider = 'openai' | 'gemini' | 'grok' | 'claude' | 'openrouter';
 
 // Gemini 專用配置介面
 export interface GeminiMessage {
@@ -106,12 +106,16 @@ export function createChatConfig(model: string = "gpt-4o", options?: {
  * @param provider 提供商名稱
  * @returns 提供商類型
  */
-export function getProviderType(provider: string): AIProvider {
+export function getProviderType(provider: string): 'openai' | 'google' | 'openrouter' {
   switch (provider.toLowerCase()) {
     case 'google':
     case 'gemini':
       return 'google';
+    case 'openrouter':
+      return 'openrouter';
     case 'openai':
+    case 'grok':    // Grok 使用 OpenAI 相容 API
+    case 'claude':  // Claude 使用 OpenAI 相容 API
     default:
       return 'openai';
   }
@@ -208,6 +212,70 @@ export async function callGeminiAPI(
   const content = data.candidates[0]?.content?.parts[0]?.text;
   if (!content) {
     throw new Error('Gemini API 回應內容為空');
+  }
+
+  return content;
+}
+
+/**
+ * 調用 OpenRouter API
+ * @param agentConfig Agent配置
+ * @param systemPrompt 系統提示詞
+ * @param userPrompt 用戶提示詞
+ * @returns AI回應內容
+ */
+export async function callOpenRouterAPI(
+  agentConfig: AgentConfig, 
+  systemPrompt: string, 
+  userPrompt: string
+): Promise<string> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY 環境變數未設置');
+  }
+
+  const url = 'https://openrouter.ai/api/v1/chat/completions';
+  
+  // OpenRouter 需要的特殊 Headers
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000',
+    'X-Title': 'Auto Article Tools'
+  };
+
+  // 使用 OpenAI 相容的請求格式
+  const requestBody = {
+    model: agentConfig.model, // 例如: 'google/gemini-2.5-pro'
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    temperature: agentConfig.temperature,
+    max_tokens: agentConfig.maxTokens,
+    top_p: agentConfig.topP || 0.95
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenRouter API 調用失敗: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  if (!data.choices || data.choices.length === 0) {
+    throw new Error('OpenRouter API 回應為空');
+  }
+
+  const content = data.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('OpenRouter API 回應內容為空');
   }
 
   return content;
@@ -412,6 +480,126 @@ export async function getAgentConfig(agentName: string): Promise<AgentConfig> {
 }
 
 /**
+ * 調用 Grok API (使用 OpenAI 相容格式)
+ * @param agentConfig Agent配置
+ * @param systemPrompt 系統提示詞
+ * @param userPrompt 用戶提示詞
+ * @returns AI回應內容
+ */
+export async function callGrokAPI(
+  agentConfig: AgentConfig, 
+  systemPrompt: string, 
+  userPrompt: string
+): Promise<string> {
+  const apiKey = process.env.GROK_API_KEY;
+  if (!apiKey) {
+    throw new Error('GROK_API_KEY 環境變數未設置');
+  }
+
+  const url = 'https://api.x.ai/v1/chat/completions';
+  
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  const requestBody = {
+    model: agentConfig.model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    temperature: agentConfig.temperature,
+    max_tokens: agentConfig.maxTokens,
+    top_p: agentConfig.topP || 0.95
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Grok API 調用失敗: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  if (!data.choices || data.choices.length === 0) {
+    throw new Error('Grok API 回應為空');
+  }
+
+  const content = data.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Grok API 回應內容為空');
+  }
+
+  return content;
+}
+
+/**
+ * 調用 Claude API (使用 OpenAI 相容格式)
+ * @param agentConfig Agent配置
+ * @param systemPrompt 系統提示詞
+ * @param userPrompt 用戶提示詞
+ * @returns AI回應內容
+ */
+export async function callClaudeAPI(
+  agentConfig: AgentConfig, 
+  systemPrompt: string, 
+  userPrompt: string
+): Promise<string> {
+  const apiKey = process.env.CLAUDE_API_KEY;
+  if (!apiKey) {
+    throw new Error('CLAUDE_API_KEY 環境變數未設置');
+  }
+
+  const url = 'https://api.anthropic.com/v1/messages';
+  
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'anthropic-version': '2023-06-01'
+  };
+
+  const requestBody = {
+    model: agentConfig.model,
+    max_tokens: agentConfig.maxTokens,
+    temperature: agentConfig.temperature,
+    system: systemPrompt,
+    messages: [
+      { role: 'user', content: userPrompt }
+    ]
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API 調用失敗: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  if (!data.content || data.content.length === 0) {
+    throw new Error('Claude API 回應為空');
+  }
+
+  const content = data.content[0]?.text;
+  if (!content) {
+    throw new Error('Claude API 回應內容為空');
+  }
+
+  return content;
+}
+
+/**
  * 通用 AI API 調用函數
  * @param agentConfig Agent配置
  * @param systemPrompt 系統提示詞
@@ -429,10 +617,19 @@ export async function callAIAPI(
     case 'google':
       return await callGeminiAPI(agentConfig, systemPrompt, userPrompt);
       
+    case 'openrouter':
+      return await callOpenRouterAPI(agentConfig, systemPrompt, userPrompt);
+      
     case 'openai':
     default:
-      // 這裡需要導入 OpenAI 客戶端，但為了避免循環依賴，
-      // 我們讓調用者處理 OpenAI 的情況
+      // 對於直接的 Grok 和 Claude，我們需要特殊處理
+      if (agentConfig.provider === 'grok') {
+        return await callGrokAPI(agentConfig, systemPrompt, userPrompt);
+      } else if (agentConfig.provider === 'claude') {
+        return await callClaudeAPI(agentConfig, systemPrompt, userPrompt);
+      }
+      
+      // 其他情況讓調用者處理 OpenAI
       throw new Error('OpenAI API 調用需要在 Agent 中處理');
   }
 }
