@@ -121,12 +121,24 @@ export async function POST(request: Request) {
     });
     
     if (!processResponse.ok) {
-      const errorData = await processResponse.json();
+      let errorData;
+      try {
+        errorData = await processResponse.json();
+      } catch {
+        const errorText = await processResponse.text();
+        throw new Error(`DOCX處理失敗 (${processResponse.status}): ${errorText.substring(0, 100)}`);
+      }
       throw new Error(errorData.error || 'DOCX處理失敗');
     }
     
     // 4. 返回處理結果
-    const processResult = await processResponse.json();
+    let processResult;
+    try {
+      processResult = await processResponse.json();
+    } catch {
+      const errorText = await processResponse.text();
+      throw new Error(`DOCX處理響應格式錯誤: ${errorText.substring(0, 100)}`);
+    }
     
     console.log('Google Docs處理完成，返回結果:', {
       ...processResult,

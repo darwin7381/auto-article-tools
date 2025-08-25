@@ -133,8 +133,15 @@ export async function POST(request: Request) {
           );
           
           if (extractResponse.ok) {
-            const extractResult = await extractResponse.json();
-            console.log('內容提取結果:', extractResult);
+            let extractResult;
+            try {
+              extractResult = await extractResponse.json();
+              console.log('內容提取結果:', extractResult);
+            } catch {
+              const errorText = await extractResponse.text();
+              console.error('內容提取返回非JSON響應:', errorText.substring(0, 500));
+              throw new Error(`內容提取響應格式錯誤: ${errorText.substring(0, 100)}`);
+            }
             
             // 更新響應數據
             responseData.extracted = true;

@@ -47,8 +47,15 @@ export async function POST(request: Request) {
           throw new Error(`PDF處理失敗: ${pdfResponse.status} ${pdfResponse.statusText}`);
         }
         
-        const pdfResult = await pdfResponse.json();
-        console.log('PDF處理器響應:', pdfResult);
+        let pdfResult;
+        try {
+          pdfResult = await pdfResponse.json();
+          console.log('PDF處理器響應:', pdfResult);
+        } catch {
+          const errorText = await pdfResponse.text();
+          console.error('PDF處理器返回非JSON響應:', errorText.substring(0, 500));
+          throw new Error(`PDF處理器響應格式錯誤: ${errorText.substring(0, 100)}`);
+        }
         
         if (!pdfResult.success) {
           throw new Error(pdfResult.error || 'PDF轉換失敗');
@@ -72,8 +79,15 @@ export async function POST(request: Request) {
           throw new Error(`DOCX處理失敗: ${docxResponse.status} ${docxResponse.statusText}`);
         }
         
-        const docxResult = await docxResponse.json();
-        console.log('DOCX處理器響應:', docxResult);
+        let docxResult;
+        try {
+          docxResult = await docxResponse.json();
+          console.log('DOCX處理器響應:', docxResult);
+        } catch {
+          const errorText = await docxResponse.text();
+          console.error('DOCX處理器返回非JSON響應:', errorText.substring(0, 500));
+          throw new Error(`DOCX處理器響應格式錯誤: ${errorText.substring(0, 100)}`);
+        }
         
         return NextResponse.json({
           success: true,
@@ -100,8 +114,15 @@ export async function POST(request: Request) {
           throw new Error(`DOCX處理失敗: ${docxResponse.status} ${docxResponse.statusText}`);
         }
         
-        const docxResult = await docxResponse.json();
-        console.log('DOCX處理器響應:', docxResult);
+        let docxResult;
+        try {
+          docxResult = await docxResponse.json();
+          console.log('DOCX處理器響應:', docxResult);
+        } catch {
+          const errorText = await docxResponse.text();
+          console.error('DOCX處理器返回非JSON響應:', errorText.substring(0, 500));
+          throw new Error(`DOCX處理器響應格式錯誤: ${errorText.substring(0, 100)}`);
+        }
         
         return NextResponse.json({
           success: true,
@@ -155,8 +176,15 @@ export async function POST(request: Request) {
           throw new Error(`Google Docs處理失敗: ${gdocsResponse.status} ${gdocsResponse.statusText}`);
         }
         
-        const gdocsResult = await gdocsResponse.json();
-        console.log('Google Docs處理器響應:', gdocsResult);
+        let gdocsResult;
+        try {
+          gdocsResult = await gdocsResponse.json();
+          console.log('Google Docs處理器響應:', gdocsResult);
+        } catch {
+          const errorText = await gdocsResponse.text();
+          console.error('Google Docs處理器返回非JSON響應:', errorText.substring(0, 500));
+          throw new Error(`Google Docs處理器響應格式錯誤: ${errorText.substring(0, 100)}`);
+        }
         
         return NextResponse.json({
           success: true,
