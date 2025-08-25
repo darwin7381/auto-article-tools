@@ -51,6 +51,12 @@ export async function processDOCX(buffer: Buffer, fileId: string): Promise<{
  */
 export async function convertDocxToHtml(buffer: Buffer, fileId: string): Promise<{value: string; messages: unknown[]}> {
   try {
+    console.log(`[DOCX Debug] 開始轉換文件 ${fileId}, Buffer 大小: ${buffer.length}`);
+    
+    // 檢查文件頭部
+    const header = buffer.slice(0, 10);
+    console.log(`[DOCX Debug] 文件頭部 (hex): ${header.toString('hex')}`);
+    
     // 使用mammoth將DOCX轉換為HTML
     const result = await mammoth.convertToHtml(
       { buffer },
@@ -74,13 +80,28 @@ export async function convertDocxToHtml(buffer: Buffer, fileId: string): Promise
       }
     );
     
+    console.log(`[DOCX Debug] 轉換成功, HTML 長度: ${result.value.length}, 消息數量: ${result.messages.length}`);
+    
+    // 檢查是否有可疑內容
+    if (result.value.includes('Request En') || result.value.includes('```json')) {
+      console.error(`[DOCX Debug] 發現可疑內容!`);
+      console.error(`[DOCX Debug] HTML 前 500 字符:`, result.value.substring(0, 500));
+    }
+    
     // 以安全的方式返回結果
     return {
       value: result.value,
       messages: result.messages as unknown[]
     };
   } catch (error) {
-    console.error('DOCX轉換失敗:', error);
+    console.error(`[DOCX Debug] DOCX轉換失敗 for ${fileId}:`, error);
+    
+    // 檢查錯誤信息是否包含 "Request En"
+    if (error instanceof Error && error.message.includes('Request En')) {
+      console.error(`[DOCX Debug] !!! 發現 "Request En" 錯誤 !!!`);
+      console.error(`[DOCX Debug] 完整錯誤:`, error.message);
+    }
+    
     throw error;
   }
 }
