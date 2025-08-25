@@ -56,6 +56,21 @@ export default function useUploadStage(
       return;
     }
 
+    // 檢查文件大小（Vercel 限制約 4.5MB）
+    const maxSizeInMB = 4;
+    const fileSizeInMB = file.size / (1024 * 1024);
+    
+    if (fileSizeInMB > maxSizeInMB) {
+      setUploadError(
+        `文件過大：${file.name} (${fileSizeInMB.toFixed(2)} MB) 超過 ${maxSizeInMB} MB 限制。` +
+        `\n\n建議解決方案：\n` +
+        `1. 使用較小的文件\n` +
+        `2. 將內容複製到 Google Docs 後使用連結上傳\n` +
+        `3. 壓縮文件或移除不必要的圖片`
+      );
+      return;
+    }
+
     setIsUploading(true);
     
     try {
