@@ -109,13 +109,6 @@ export async function processContent(markdownContent: string): Promise<string> {
     );
 
     console.log('✅ Content Agent處理成功');
-    
-    // 檢查 AI 回應是否包含可疑內容
-    if (content.includes('Request En') || content.includes('```json')) {
-      console.error(`[ContentAgent Debug] AI 回應包含可疑內容!`);
-      console.error(`[ContentAgent Debug] AI 回應前 500 字符:`, content.substring(0, 500));
-    }
-    
     return content;
   } catch (configError) {
     console.error('❌ Content Agent配置獲取失敗:', configError);
@@ -228,24 +221,8 @@ export async function enhanceMarkdown(fileId: string, markdownPath: string): Pro
     const markdownContent = markdownBuffer.toString('utf-8');
     
     try {
-      console.log(`[ContentAgent Debug] 開始處理內容, 長度: ${markdownContent.length}`);
-      
-      // 檢查輸入內容是否包含可疑字符
-      if (markdownContent.includes('Request En') || markdownContent.includes('```json')) {
-        console.error(`[ContentAgent Debug] 輸入內容包含可疑字符!`);
-        console.error(`[ContentAgent Debug] 內容前 500 字符:`, markdownContent.substring(0, 500));
-      }
-      
       // 使用Agent處理內容
       const enhancedContent = await processContent(markdownContent);
-      
-      console.log(`[ContentAgent Debug] 處理完成, 輸出長度: ${enhancedContent.length}`);
-      
-      // 檢查輸出內容是否包含可疑字符
-      if (enhancedContent.includes('Request En') || enhancedContent.includes('```json')) {
-        console.error(`[ContentAgent Debug] 輸出內容包含可疑字符!`);
-        console.error(`[ContentAgent Debug] 輸出前 500 字符:`, enhancedContent.substring(0, 500));
-      }
       
       // 直接使用處理後的內容，不添加frontmatter
       const finalMarkdown = enhancedContent;
