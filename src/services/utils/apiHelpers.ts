@@ -27,11 +27,43 @@ export function getBaseUrl() {
 }
 
 /**
+ * 检查环境变数是否包含异常字符
+ */
+function validateEnvironmentVariable(name: string, value?: string): boolean {
+  if (!value) return true; // 空值是可以的
+  
+  // 检查是否包含可能导致JSON解析错误的字符
+  const problematicPatterns = [
+    /```json/,
+    /Request\s+En/,
+    /<!DOCTYPE/i,
+    /<html/i,
+    /\{[\s\S]*"```json/
+  ];
+  
+  for (const pattern of problematicPatterns) {
+    if (pattern.test(value)) {
+      console.error(`环境变数 ${name} 包含异常内容:`, value.substring(0, 100));
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
  * 构建完整的API URL
  * @param path API路径，如 '/api/endpoint'
  * @returns 完整的API URL
  */
 export function getApiUrl(path: string): string {
+  // 在服务器端验证关键环境变数
+  if (typeof window === 'undefined') {
+    validateEnvironmentVariable('VERCEL_URL', process.env.VERCEL_URL);
+    validateEnvironmentVariable('API_SECRET_KEY', process.env.API_SECRET_KEY);
+    validateEnvironmentVariable('NEXT_PUBLIC_API_BASE_URL', process.env.NEXT_PUBLIC_API_BASE_URL);
+  }
+  
   const baseUrl = getBaseUrl();
   
   // 确保path以/开头
