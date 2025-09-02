@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button/Button';
 import { Card } from '@/components/ui/card/Card';
 import { TextAgentConfig, ImageAgentConfig, AIConfig, AIProvider } from '@/types/ai-config';
-import { SUPPORTED_MODELS } from '@/types/ai-config';
+import { SUPPORTED_MODELS, IMAGE_SIZES } from '@/types/ai-config';
 
 interface AIConfigManagerProps {
   className?: string;
@@ -642,6 +642,12 @@ function ImageAgentSection({
     config?.model === 'custom' || 
     !SUPPORTED_MODELS[config?.provider || 'openai']?.image.some((model: string) => model === config?.model)
   );
+  
+  const [customSize, setCustomSize] = useState(config?.size || '');
+  const [showCustomSize, setShowCustomSize] = useState(
+    config?.size === 'custom' || 
+    !IMAGE_SIZES[config?.provider || 'openai']?.some((size: string) => size === config?.size)
+  );
 
   // 如果config為undefined，顯示載入中狀態
   if (!config) {
@@ -668,6 +674,22 @@ function ImageAgentSection({
   const handleCustomModelChange = (value: string) => {
     setCustomModel(value);
     onUpdate({ model: value });
+  };
+
+  const handleSizeChange = (value: string) => {
+    if (value === 'custom') {
+      setShowCustomSize(true);
+      setCustomSize(config?.size === 'custom' ? '' : config?.size || '');
+    } else {
+      setShowCustomSize(false);
+      setCustomSize('');
+      onUpdate({ size: value });
+    }
+  };
+
+  const handleCustomSizeChange = (value: string) => {
+    setCustomSize(value);
+    onUpdate({ size: value });
   };
 
   return (
@@ -790,15 +812,31 @@ function ImageAgentSection({
                 <label className="block text-sm font-medium text-foreground/80 mb-2">
                   圖片尺寸
                 </label>
-                <input
-                  type="text"
-                  value={config.size}
-                  onChange={(e) => onUpdate({ size: e.target.value })}
-                  placeholder="如: 1536x1024"
-                  title="設定圖片尺寸"
-                  aria-label="圖片尺寸"
+                <select
+                  value={showCustomSize ? 'custom' : config.size}
+                  onChange={(e) => handleSizeChange(e.target.value)}
                   className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                  aria-label="選擇圖片尺寸"
+                  title="選擇圖片尺寸"
+                >
+                  {IMAGE_SIZES[config?.provider || 'openai']?.map((size: string) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                  <option value="custom">custom</option>
+                </select>
+                {showCustomSize && (
+                  <input
+                    type="text"
+                    value={customSize}
+                    onChange={(e) => handleCustomSizeChange(e.target.value)}
+                    placeholder="如: 1536x1024"
+                    title="自訂圖片尺寸"
+                    aria-label="自訂圖片尺寸"
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                  />
+                )}
               </div>
             </div>
 
@@ -808,14 +846,15 @@ function ImageAgentSection({
               </label>
               <select
                 value={config.quality}
-                onChange={(e) => onUpdate({ quality: e.target.value as 'standard' | 'medium' | 'hd' })}
+                onChange={(e) => onUpdate({ quality: e.target.value as 'low' | 'medium' | 'high' | 'auto' })}
                 className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
                 aria-label="選擇圖片品質"
                 title="選擇圖片品質"
               >
-                <option value="standard">標準</option>
-                <option value="medium">中等</option>
-                <option value="hd">高畫質</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="auto">auto</option>
               </select>
             </div>
 
@@ -825,7 +864,7 @@ function ImageAgentSection({
                 圖片生成提示詞模板
               </label>
               <p className="text-xs text-foreground/60 mb-2">
-                可用代數：• ${'${title}'} - 文章標題, ${'${contentSummary}'} - 內容摘要, ${'${articleType}'} - 文章類型
+                可用代數：• ${'{title}'} - 文章標題, ${'{contentSummary}'} - 內容摘要, ${'{articleType}'} - 文章類型
               </p>
               <textarea
                 value={config.promptTemplate}

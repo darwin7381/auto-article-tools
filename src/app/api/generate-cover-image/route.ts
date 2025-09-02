@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { uploadImageToR2 } from '@/services/storage/r2Service';
-import { withRetry } from '@/agents/common/agentUtils';
+import { withRetry, replacePromptVariables } from '@/agents/common/agentUtils';
 import { apiAuth } from '@/middleware/api-auth';
+import { getJsonFromR2 } from '@/services/storage/r2Service';
+import { DEFAULT_AI_CONFIG, type ImageAgentConfig } from '@/types/ai-config';
 
 // 初始化OpenAI客戶端
 const openai = new OpenAI({
@@ -30,35 +32,42 @@ interface GenerateCoverImageResponse {
 }
 
 /**
- * 根據文章內容生成封面圖描述提示詞
+ * 載入圖片生成配置
+ * @returns 圖片生成配置
+ */
+async function loadImageGenerationConfig(): Promise<ImageAgentConfig> {
+  try {
+    // 從 R2 獲取圖片生成配置
+    const config = await getJsonFromR2(`config/agents/imageGeneration.json`);
+    console.log('✅ 成功載入 imageGeneration 配置');
+    return config as ImageAgentConfig;
+  } catch (error) {
+    console.warn('⚠️  無法載入 imageGeneration 配置，使用預設值:', error);
+    // 如果無法獲取配置，返回預設配置
+    return DEFAULT_AI_CONFIG.imageGeneration;
+  }
+}
+
+/**
+ * 根據配置和文章內容生成封面圖描述提示詞
+ * @param config 圖片生成配置
  * @param title 文章標題
  * @param content 文章內容（前500字）
  * @param articleType 文章類型
  * @returns 圖片生成提示詞
  */
-function generateImagePrompt(title: string, content: string, articleType: string): string {
+function generateImagePrompt(config: ImageAgentConfig, title: string, content: string, articleType: string): string {
   // 擷取內容前500字，避免提示詞過長
   const contentSummary = content.replace(/<[^>]*>/g, '').substring(0, 500);
   
-  const basePrompt = `Create a professional, modern cover image for an article with the following details:
+  // 使用統一的模板變數替換函數
+  const prompt = replacePromptVariables(config.promptTemplate, {
+    title: title,
+    contentSummary: contentSummary,
+    articleType: articleType
+  });
 
-Title: ${title}
-Content Summary: ${contentSummary}
-Article Type: ${articleType}
-
-Style Requirements:
-- Professional and modern design
-- Suitable for tech/business/news article
-- Clean, minimal composition
-- High contrast and readability
-- No text overlay (title will be added separately)
-- Color scheme should be professional (blues, grays, whites)
-- Abstract or conceptual representation of the topic
-- High quality, suitable for web publication
-
-The image should be visually appealing and relevant to the article content while maintaining a professional appearance suitable for a technology/business news website.`;
-
-  return basePrompt;
+  return prompt;
 }
 
 export async function POST(request: Request) {
@@ -92,25 +101,28 @@ export async function POST(request: Request) {
     
     const startTime = Date.now();
 
+    // 載入圖片生成配置
+    const imageConfig = await loadImageGenerationConfig();
+    
     // 生成圖片描述提示詞
-    const prompt = generateImagePrompt(title, content, articleType);
+    const prompt = generateImagePrompt(imageConfig, title, content, articleType);
     console.log('圖片生成提示詞:', prompt.substring(0, 200) + '...');
 
-    // 記錄 GPT Image 1 使用信息
+    // 記錄圖片生成使用信息
     console.log('🤖 [imageGeneration] 開始生成封面圖');
-    console.log('📡 提供商: openai');
-    console.log('🧠 模型: gpt-image-1');
-    console.log('📐 尺寸: 1536x1024');
-    console.log('🎨 品質: medium');
+    console.log('📡 提供商:', imageConfig.provider);
+    console.log('🧠 模型:', imageConfig.model);
+    console.log('📐 尺寸:', imageConfig.size);
+    console.log('🎨 品質:', imageConfig.quality);
 
     // 使用重試機制調用最新的GPT Image API
     const imageResponse = await withRetry(
       async () => {
         const response = await openai.images.generate({
-          model: "gpt-image-1",
+          model: imageConfig.model,
           prompt: prompt,
-          size: "1536x1024", // landscape format，適合文章封面
-          quality: "medium" // GPT Image 1 預設返回 b64_json 格式，不需要 response_format 參數
+          size: imageConfig.size as "1024x1024" | "1536x1024" | "1024x1536", // GPT Image 1 支援的尺寸
+          quality: imageConfig.quality as "low" | "medium" | "high" | "auto" // GPT Image 1 支援的品質參數
         });
 
         if (!response.data || response.data.length === 0) {
@@ -180,8 +192,8 @@ export async function POST(request: Request) {
       imageUrl: r2ImageUrl,
       metadata: {
         prompt: prompt.substring(0, 200) + '...',
-        model: 'gpt-image-1',
-        size: '1536x1024',
+        model: imageConfig.model,
+        size: imageConfig.size,
         generationTime
       }
     };
