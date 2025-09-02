@@ -21,7 +21,7 @@ export interface ImageAgentConfig {
   provider: AIProvider;
   model: string;
   size: string;
-  quality: 'standard' | 'medium' | 'hd';
+  quality: 'low' | 'medium' | 'high' | 'auto';
   promptTemplate: string;
 }
 
@@ -131,15 +131,13 @@ Article Type: \${articleType}
 
 Style Requirements:
 - Professional and modern design
-- Suitable for tech/business/news article
 - Clean, minimal composition
 - High contrast and readability
 - No text overlay (title will be added separately)
-- Color scheme should be professional (blues, grays, whites)
 - Abstract or conceptual representation of the topic
 - High quality, suitable for web publication
 
-The image should be visually appealing and relevant to the article content while maintaining a professional appearance suitable for a technology/business news website.`
+The image should be visually appealing and relevant to the article content.`
   },
   lastUpdated: new Date().toISOString()
 };
@@ -211,13 +209,17 @@ export const SUPPORTED_MODELS = {
 // 圖片尺寸選項
 export const IMAGE_SIZES = {
   openai: ['1024x1024', '1536x1024', '1024x1536'],
+  gemini: ['1024x1024', '1536x1024', '1024x1536'], // 假設支援與 OpenAI 相同
+  grok: ['1024x1024', '1536x1024', '1024x1536'], // 假設支援與 OpenAI 相同
+  claude: ['1024x1024', '1536x1024', '1024x1536'], // 假設支援與 OpenAI 相同
+  openrouter: ['1024x1024', '1536x1024', '1024x1536'], // 假設支援與 OpenAI 相同
   midjourney: ['1:1', '4:3', '3:4', '16:9'],
   'stable-diffusion': ['512x512', '768x768', '1024x1024']
 } as const;
 
 // 圖片品質選項
 export const IMAGE_QUALITY = {
-  openai: ['standard', 'hd'],
+  openai: ['low', 'medium', 'high', 'auto'],
   midjourney: ['low', 'medium', 'high'],
   'stable-diffusion': ['draft', 'standard', 'high']
 } as const; 
