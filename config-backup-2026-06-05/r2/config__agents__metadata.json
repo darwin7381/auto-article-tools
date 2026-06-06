@@ -1,0 +1,17 @@
+{
+  "lastUpdated": "2025-07-12T13:08:25.499Z",
+  "version": "2.2.0",
+  "description": "乾淨的預設配置：修復undefined錯誤，添加安全檢查",
+  "agents": [
+    "contentAgent",
+    "prWriterAgent",
+    "copyEditorAgent",
+    "imageGeneration"
+  ],
+  "changes": [
+    "修復config為undefined的錯誤",
+    "添加全面的安全檢查",
+    "改進custom model支援",
+    "確保配置完整性"
+  ]
+}
