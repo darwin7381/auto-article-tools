@@ -1,29 +1,30 @@
-"""真實工作流：從 PDF/DOCX/MD 抽取文字。
+"""真實工作流：進稿抽取（檔案或網址 → markdown 文字）。
 
-輸入： {"file": "/絕對或相對路徑/檔案.pdf"}
+輸入： {"file": "/path/檔案.pdf"} 或 {"url": "https://..."}
+支援：PDF / DOCX / MD / Google Docs / Medium / WeChat / 一般網站
 """
 
 from __future__ import annotations
 
-import asyncio
-
 from app.core.registry import Workflow, register
 from app.core.stage import RunContext, Stage
-from app.services.extract import extract_document
+from app.services.ingest import ingest_markdown
 
 
 async def _extract(data: dict, ctx: RunContext) -> dict:
-    path = data["file"]
-    # CPU-bound 的解析丟到 thread，避免擋住 event loop（其他工作流可同時跑）
-    text = await asyncio.to_thread(extract_document, path)
-    preview = text[:300]
-    return {"file": path, "chars": len(text), "preview": preview, "text": text}
+    text = await ingest_markdown(data)
+    return {
+        "source": data.get("file") or data.get("url"),
+        "chars": len(text),
+        "preview": text[:300],
+        "text": text,
+    }
 
 
 register(
     Workflow(
         name="extract",
-        description="從 PDF/DOCX/MD 抽取純文字內容",
+        description="進稿抽取：PDF/DOCX/MD 或 URL（Google Docs/Medium/WeChat/網站）→ 純文字",
         stages=[Stage(id="extract", run=_extract)],
     )
 )

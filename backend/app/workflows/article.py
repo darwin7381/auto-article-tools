@@ -8,7 +8,6 @@ extract → content_ai → pr_writer → format_conversion → copy_editing → 
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from pathlib import Path
 
@@ -17,8 +16,8 @@ from pydantic import BaseModel, Field
 from app.core.registry import Workflow, register
 from app.core.stage import RunContext, Stage
 from app.services.agent_config import get_agent_config
-from app.services.extract import extract_document
 from app.services.image import generate_image
+from app.services.ingest import ingest_markdown
 from app.services.llm import chat, structured
 from app.services.markdown import md_to_html
 
@@ -47,7 +46,7 @@ class WordPressParams(BaseModel):
 
 # ---- 各階段 ----
 async def s_extract(data: dict, ctx: RunContext) -> dict:
-    text = await asyncio.to_thread(extract_document, data["file"])
+    text = await ingest_markdown(data)  # 支援 {"file": ...} 或 {"url": ...}
     return {**data, "markdown": text}
 
 
