@@ -147,18 +147,32 @@ Redis 只在「用 Celery（需 broker）」或「多 worker 跨 process 廣播�
 
 ---
 
-## 6. 待辦 / 下一步
+## 6. 復刻缺口 + 待辦（誠實對照）
 
-- [ ] **Strapi 設定備份**：啟動本機 Strapi 後跑 `config-backup-2026-06-05/backup-strapi.sh`（作者/範本/預設）
+> 「核心 7 階段 pipeline」已復刻並實測；但對照舊系統**全部功能**仍有以下缺口。
+
+### 6.1 復刻缺口（舊系統有、新平台還沒有）
+- [ ] **URL 進稿**：舊系統吃網址 / Google Docs（parse-url / process-url / process-gdocs）；新平台目前只吃本機檔案路徑
+- [ ] **檔案上傳端點**：瀏覽器上傳 → 儲存（舊 upload→R2）
+- [ ] **輸出持久化**：save-markdown 至 R2、圖片代理（/api/images）、viewer
+- [ ] **WordPress 發布**：publish + upload-image-from-url（外送動作，需明確授權才接）
+- [ ] **TinyPNG 圖片壓縮**
+- [ ] **article_formatting 完整版**：接 Strapi 頁首/頁尾免責範本（目前為輕量組稿；Strapi 未啟動）
+- [ ] **admin 編輯 agent 設定**：現只有 GET /agents，無 PUT（舊系統有完整後台），含「reset to default」防呆
+- [ ] **TipTap 人工審稿環節**：前端 console 仍是骨架
+
+### 6.2 測試缺口
+- [ ] `article` 完整流程僅測 1/4 份文件（WEEX 简中 docx）→ 其餘 2 PDF + 繁中 docx 待跑
+- [ ] `article` 經 **HTTP/SSE 路徑**未單獨跑過（與 CLI 同 runner，仍應補）
+- [ ] 前端僅驗 `pnpm build`，未實際開瀏覽器接後端
+
+### 6.3 平台本來就要做的（非復刻項）
+- [ ] **Strapi 設定備份**：啟動本機 Strapi 後跑 `config-backup-2026-06-05/backup-strapi.sh`
 - [ ] **job 持久化 + 並行**：jobs 寫進 DB、worker 拉取、asyncio semaphore 控併發上限
-- [ ] **admin API**：在 DB 上編輯 agent prompt（取代舊 R2 後台），含「reset to default」防呆
-- [ ] **article_formatting 完整版**：接 Strapi 的頁首/頁尾免責範本（目前是輕量組稿）
-- [ ] **WordPress publish 階段**：產出 payload → 發布到 wp.blocktempo.ai（外送動作，需明確授權）
-- [ ] **其餘 3 份文件實測**：2 PDF + 繁中 docx 跑完整 article
-- [ ] **OpenAPI codegen**：FastAPI schema → 前端型別安全 client（見 `shared/`）
+- [ ] **OpenAPI codegen**：FastAPI schema → 前端型別安全 client（見 `shared/`)
 - [ ] **觀測 + eval**：per-stage trace（input/output/cost/latency）+ prompt 回歸測試
 - [ ] **前端 console 真做**：config 驅動表單 + 進度 UI + 編輯器 + 發布
-- [ ] **commit 里程碑**（目前全在 branch `feat/python-platform-scaffold` 未 commit）
+- [x] ~~commit 里程碑~~（`c2e66e2`，2026-06-06，64 檔）
 
 ---
 
