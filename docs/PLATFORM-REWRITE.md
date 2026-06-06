@@ -139,6 +139,8 @@ Redis 只在「用 Celery（需 broker）」或「多 worker 跨 process 廣播�
 - **前端骨架**：`frontend/`（Vite+React），SSE 客戶端 + 最小 console，`pnpm build` 通過
 - **抓到並修掉一個真 bug**：思考型模型（gemini-2.5-pro）reasoning 吃光 output 預算 → `content=None` → 下游 `len(None)` 崩潰。修法：明確給足 `max_tokens`（未設預設 32k、過大收斂到 64k）+ 空內容防護擲明確錯誤。正是 instructor/pydantic 邊界驗證要解的那類問題的縮影。
 - **影像模型**：切換到 **gpt-image-2**（DB + seed + 程式碼 fallback 三處一致，實測通過）
+- **全 4 份文件完整 pipeline 通過**（含併發驗證 + HTTP/SSE 路徑，見 §6.2）
+- **URL 進稿復刻完成**（見 §6.1）：`ingest_markdown` 統一進稿（file 或 url），全 workflow 共用；實測 Google Docs（英文→繁中全鏈路）/ Medium / WeChat / Bybit / OKX
 
 ### 驗證證據
 - CLI：`uv run python cli.py article --input '{"file": "..."}'`
@@ -152,7 +154,7 @@ Redis 只在「用 Celery（需 broker）」或「多 worker 跨 process 廣播�
 > 「核心 7 階段 pipeline」已復刻並實測；但對照舊系統**全部功能**仍有以下缺口。
 
 ### 6.1 復刻缺口（舊系統有、新平台還沒有）
-- [ ] **URL 進稿**：舊系統吃網址 / Google Docs（parse-url / process-url / process-gdocs）；新平台目前只吃本機檔案路徑
+- [x] ~~**URL 進稿**~~（2026-06-06 完成）：所有 workflow 輸入支援 `{"url": ...}`。Google Docs（export?format=docx 技巧）/ WeChat / OKX 直抓；Medium（403 反爬）/ Bybit（JS 渲染）走 **Firecrawl fallback**（直抓→被擋或內容過短→firecrawl 渲染→trafilatura 抽主文）。實測 5/5 活連結通過（Cointelegraph 範例連結本身 404 死鏈）。⚠️ fallback 目前依賴本機已登入的 firecrawl CLI，部署時改 FIRECRAWL_API_KEY 直呼 API
 - [ ] **檔案上傳端點**：瀏覽器上傳 → 儲存（舊 upload→R2）
 - [ ] **輸出持久化**：save-markdown 至 R2、圖片代理（/api/images）、viewer
 - [ ] **WordPress 發布**：publish + upload-image-from-url（外送動作，需明確授權才接）
@@ -162,8 +164,8 @@ Redis 只在「用 Celery（需 broker）」或「多 worker 跨 process 廣播�
 - [ ] **TipTap 人工審稿環節**：前端 console 仍是骨架
 
 ### 6.2 測試缺口
-- [ ] `article` 完整流程僅測 1/4 份文件（WEEX 简中 docx）→ 其餘 2 PDF + 繁中 docx 待跑
-- [ ] `article` 經 **HTTP/SSE 路徑**未單獨跑過（與 CLI 同 runner，仍應補）
+- [x] ~~`article` 完整流程僅測 1/4 份文件~~（2026-06-06 補完）：**4/4 份全過**——WEEX 简中docx、HashKey 繁中docx、Bluefin 英文PDF（含英→繁翻譯）、數碼港 繁中PDF（最大篇 4083字）。其中 3 份**併發**跑（總耗時 214s ≈ 最慢單條，content_ai 在 38/59/61s 交錯完成，驗證 asyncio 並行主張）
+- [x] ~~`article` 經 HTTP/SSE 路徑未跑~~（同場補完）：HashKey 經 `POST /workflows/article/run` SSE 串流全 7 階段完成
 - [ ] 前端僅驗 `pnpm build`，未實際開瀏覽器接後端
 
 ### 6.3 平台本來就要做的（非復刻項）

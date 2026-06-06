@@ -7,19 +7,16 @@ extract（PDF/DOCX → 文字） → content_ai（contentAgent：標準化/翻�
 
 from __future__ import annotations
 
-import asyncio
-
 from app.core.registry import Workflow, register
 from app.core.stage import RunContext, Stage
 from app.services.agent_config import get_agent_config
-from app.services.extract import extract_document
+from app.services.ingest import ingest_markdown
 from app.services.llm import chat
 
 
 async def _extract(data: dict, ctx: RunContext) -> dict:
-    path = data["file"]
-    text = await asyncio.to_thread(extract_document, path)
-    return {"file": path, "text": text}
+    text = await ingest_markdown(data)  # 支援 {"file": ...} 或 {"url": ...}
+    return {"file": data.get("file") or data.get("url"), "text": text}
 
 
 async def _content_ai(data: dict, ctx: RunContext) -> dict:
