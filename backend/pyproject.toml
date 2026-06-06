@@ -1,0 +1,37 @@
+[project]
+name = "bd-content-platform-backend"
+version = "0.1.0"
+description = "BD 內容自動化平台 — Python (FastAPI) 後端"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "sqlmodel>=0.0.22",
+    "sse-starlette>=2.1",
+    "httpx>=0.28",
+    "python-multipart>=0.0.18",
+    "markdown>=3.7",
+]
+
+[project.optional-dependencies]
+# 之後接 LLM / 文件處理時再裝： uv sync --extra ai
+ai = [
+    "instructor>=1.7",
+    "openai>=1.59",
+    "boto3>=1.35",        # Cloudflare R2（S3 相容）
+    "pymupdf>=1.25",
+    "python-docx>=1.1",
+]
+dev = [
+    "ruff>=0.9",
+    "pytest>=8.3",
+]
+
+[tool.uv]
+# uv 會自動下載並使用相容的 Python（>=3.12），避開本機 3.14 尚無 wheel 的問題
+package = false
+
+[tool.ruff]
+line-length = 100

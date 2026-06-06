@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "lastUpdated": "2025-07-12T09:46:56.203Z",
+  "description": "修正後的AI配置 - 已更新變數代數、最新模型和實際提示詞",
+  "changes": [
+    "修正變數代數：{content} → ${markdownContent}",
+    "更新圖像模型：dall-e-3 → gpt-image-1",
+    "修正copyEditorAgent的變數為${htmlContent}",
+    "同步實際Agent提示詞",
+    "更新為最新模型列表"
+  ],
+  "agentCount": 4
+}
