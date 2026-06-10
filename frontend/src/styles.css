@@ -88,6 +88,29 @@ tr.click { cursor: pointer; }
 tr.click:hover td { background: var(--panel-2); }
 .banner { background: #2a2410; border: 1px solid #5a4a14; color: var(--warn); padding: 10px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; }
 
+.stage-list { display: flex; flex-direction: column; gap: 8px; }
+.stage-card { border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); overflow: hidden; }
+.stage-card.running { border-color: var(--accent); }
+.stage-card.done { border-color: #1f3a30; }
+.stage-card.error { border-color: var(--err); }
+.stage-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; }
+.stage-head .ic { width: 16px; text-align: center; color: var(--muted); }
+.stage-card.done .ic { color: var(--ok); }
+.stage-card.running .ic { color: var(--accent); animation: spin 1s linear infinite; display: inline-block; }
+.stage-card.error .ic { color: var(--err); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.stage-head .name { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+.spacer { margin-left: auto; }
+button.link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 2px 6px; }
+button.link:hover { text-decoration: underline; }
+.out { padding: 0 12px 12px; }
+.htmlframe { width: 100%; height: 320px; border: 1px solid var(--border); border-radius: 6px; background: #fff; margin-top: 8px; }
+.rerun { padding: 0 12px 12px; }
+.tag-diff { color: var(--warn); font-size: 11px; border: 1px solid #5a4a14; border-radius: 10px; padding: 1px 7px; margin-left: 6px; }
+tr.sel td { background: #1b2740; }
+.review { border-top: 1px solid var(--border); margin-top: 16px; }
+details summary { cursor: pointer; font-size: 12px; margin: 6px 0; }
+
 .editor { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .editor .toolbar { display: flex; gap: 2px; padding: 6px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
 .editor .toolbar button { background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 5px; padding: 4px 9px; cursor: pointer; font-size: 12px; }

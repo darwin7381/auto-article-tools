@@ -16,15 +16,18 @@ async function jpost<T>(path: string, body: unknown): Promise<T> {
 }
 
 export type Workflow = { name: string; description: string; stages: string[] }
+export type StageOutput = { id: string; output: Record<string, unknown> | null }
 export type Job = {
   id: number
   workflow: string
   status: string
   input: Record<string, unknown>
+  start_stage: string | null
   result: Record<string, unknown> | null
   error: string | null
   created_at: string
   updated_at: string
+  stages?: StageOutput[]
 }
 export type Agent = {
   name: string
@@ -39,10 +42,12 @@ export const getHealth = () => jget<{ status: string; workflows: string[] }>('/h
 export const listWorkflows = () => jget<Workflow[]>('/workflows')
 export const listJobs = () => jget<Job[]>('/jobs')
 export const getJob = (id: number) => jget<Job>(`/jobs/${id}`)
-export const createJob = (workflow: string, input: unknown) =>
-  jpost<{ id: number; status: string }>('/jobs', { workflow, input })
+export const createJob = (workflow: string, input: unknown, from_stage?: string) =>
+  jpost<{ id: number; status: string }>('/jobs', { workflow, input, from_stage })
 export const listAgents = () => jget<Agent[]>('/agents')
 export const getAgent = (name: string) => jget<Record<string, unknown>>(`/agents/${name}`)
+export const getAgentDefault = (name: string) =>
+  jget<Record<string, unknown>>(`/agents/${name}/default`)
 export const updateAgent = (name: string, patch: Record<string, unknown>) =>
   fetch(`${API_BASE}/agents/${name}`, {
     method: 'PUT',

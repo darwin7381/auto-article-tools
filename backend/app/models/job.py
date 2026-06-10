@@ -29,8 +29,9 @@ class Job(SQLModel, table=True):
     workflow: str
     status: JobStatus = Field(default=JobStatus.pending)
     input_json: str = "{}"
+    start_stage: Optional[str] = None  # 從這個階段重跑（None=從頭）
     result_json: Optional[str] = None
-    events_json: str = "[]"  # 逐階段進度事件（供 SSE 斷線重播 / 歷史檢視）
+    events_json: str = "[]"  # 逐階段進度事件（含每階段輸出，供檢視/重跑/斷線重播）
     error: Optional[str] = None
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
