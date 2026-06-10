@@ -87,3 +87,16 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 tr.click { cursor: pointer; }
 tr.click:hover td { background: var(--panel-2); }
 .banner { background: #2a2410; border: 1px solid #5a4a14; color: var(--warn); padding: 10px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; }
+
+.editor { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.editor .toolbar { display: flex; gap: 2px; padding: 6px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.editor .toolbar button { background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 5px; padding: 4px 9px; cursor: pointer; font-size: 12px; }
+.editor .toolbar button:hover { color: var(--text); }
+.editor .toolbar button.on { color: var(--text); background: #1b2740; border-color: var(--accent); }
+.tiptap { padding: 12px 14px; max-height: 360px; overflow: auto; background: #0c0e12; }
+.tiptap:focus { outline: none; }
+.tiptap .ProseMirror { outline: none; }
+.tiptap h1 { font-size: 20px; } .tiptap h2 { font-size: 17px; } .tiptap h3 { font-size: 15px; }
+.tiptap p { line-height: 1.7; margin: 8px 0; }
+.tiptap blockquote { border-left: 3px solid var(--border); margin: 8px 0; padding-left: 12px; color: var(--muted); }
+.tiptap img { max-width: 100%; }

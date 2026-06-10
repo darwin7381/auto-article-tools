@@ -964,7 +964,19 @@
           "status": {
             "type": "string",
             "title": "Status",
-            "default": "draft"
+            "default": "publish"
+          },
+          "overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overrides"
           }
         },
         "type": "object",

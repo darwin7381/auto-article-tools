@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { RichEditor } from './Editor'
 import {
   apiBase,
   createJob,
@@ -203,13 +204,14 @@ function ResultView({ job }: { job: Job }) {
   const coverUrl = (r.cover_image_url as string) || ''
   const outputUrl = (r.output_url as string) || ''
   const finalText = (r.final_html as string) || (r.markdown as string) || ''
+  const [edited, setEdited] = useState<string>(String(wp.content || ''))
 
   async function doPublish(status: string) {
-    if (status === 'publish' && !confirm('確定要『正式發布』到 WordPress？這是對外動作。')) return
     setPubMsg('發布中…')
     try {
-      const out = await publishJob(job.id, status)
-      setPubMsg(`✓ ${out.status} · ${out.link || 'post #' + out.id}`)
+      const out = await publishJob(job.id, status, edited ? { content: edited } : undefined)
+      setPubMsg(`✓ 已發布（${out.status}）`)
+      if (out.link) window.open(out.link, '_blank')
     } catch (err) {
       setPubMsg('✗ ' + String(err))
     }
@@ -238,22 +240,27 @@ function ResultView({ job }: { job: Job }) {
 
       {coverUrl && <img className="cover" src={coverUrl} alt="cover" />}
 
-      {outputUrl && (
-        <p style={{ marginTop: 10 }}>
-          <a href={outputUrl} target="_blank" rel="noreferrer">↗ 開啟組好的成稿（HTML）</a>
-        </p>
+      {Boolean(wp.content) && (
+        <>
+          <label>人工審稿（TipTap，可直接編輯內文）</label>
+          <RichEditor key={job.id} html={String(wp.content || '')} onChange={setEdited} />
+        </>
       )}
-      {!outputUrl && finalText && (
+      {!wp.content && finalText && (
         <>
           <label>結果預覽</label>
           <pre className="log" style={{ color: '#cdd3dc' }}>{finalText.slice(0, 4000)}</pre>
         </>
       )}
+      {outputUrl && (
+        <p style={{ marginTop: 10 }}>
+          <a href={outputUrl} target="_blank" rel="noreferrer">↗ 開啟組好的成稿（HTML）</a>
+        </p>
+      )}
 
       {Boolean(wp.title) && (
         <div className="row" style={{ marginTop: 12 }}>
-          <button className="ghost" onClick={() => doPublish('draft')}>存成 WordPress 草稿</button>
-          <button className="ghost" onClick={() => doPublish('publish')}>正式發布</button>
+          <button className="primary" style={{ width: 'auto', marginTop: 0 }} onClick={() => doPublish('publish')}>發布到 WordPress</button>
           {pubMsg && <span className="muted">{pubMsg}</span>}
         </div>
       )}
