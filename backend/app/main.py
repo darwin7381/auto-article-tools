@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 import app.workflows  # noqa: F401  匯入即註冊所有 workflow
 from app.api import agents, files, health, jobs, publish, site_config, uploads, workflows
 from app.models.job import init_db
 from app.settings import settings
 from app.worker.jobrunner import start_worker
+
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -23,7 +27,7 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server
+    allow_origins=["*"],  # 內部工具 + tunnel 隨機 origin；要鎖再改白名單
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -38,6 +42,11 @@ app.include_router(publish.router)
 app.include_router(site_config.router)
 
 
-@app.get("/")
-async def root() -> dict:
-    return {"service": settings.app_name, "docs": "/docs"}
+# 同源托管前端 SPA（build 後的 dist）：API 路由先註冊、優先；其餘交給靜態檔。
+# 這樣前端用相對路徑打 API，免 CORS、只需一條 tunnel。
+if _FRONTEND_DIST.exists():
+    app.mount("/", StaticFiles(directory=str(_FRONTEND_DIST), html=True), name="spa")
+else:
+    @app.get("/")
+    async def root() -> dict:
+        return {"service": settings.app_name, "docs": "/docs", "note": "frontend dist 未 build"}
