@@ -154,27 +154,27 @@ Redis 只在「用 Celery（需 broker）」或「多 worker 跨 process 廣播�
 > 「核心 7 階段 pipeline」已復刻並實測；但對照舊系統**全部功能**仍有以下缺口。
 
 ### 6.1 復刻缺口（舊系統有、新平台還沒有）
-- [x] ~~**URL 進稿**~~（2026-06-06 完成）：所有 workflow 輸入支援 `{"url": ...}`。Google Docs（export?format=docx 技巧）/ WeChat / OKX 直抓；Medium（403 反爬）/ Bybit（JS 渲染）走 **Firecrawl fallback**（直抓→被擋或內容過短→firecrawl 渲染→trafilatura 抽主文）。實測 5/5 活連結通過（Cointelegraph 範例連結本身 404 死鏈）。⚠️ fallback 目前依賴本機已登入的 firecrawl CLI，部署時改 FIRECRAWL_API_KEY 直呼 API
-- [ ] **檔案上傳端點**：瀏覽器上傳 → 儲存（舊 upload→R2）
-- [ ] **輸出持久化**：save-markdown 至 R2、圖片代理（/api/images）、viewer
-- [ ] **WordPress 發布**：publish + upload-image-from-url（外送動作，需明確授權才接）
-- [ ] **TinyPNG 圖片壓縮**
-- [ ] **article_formatting 完整版**：接 Strapi 頁首/頁尾免責範本（目前為輕量組稿；Strapi 未啟動）
-- [ ] **admin 編輯 agent 設定**：現只有 GET /agents，無 PUT（舊系統有完整後台），含「reset to default」防呆
-- [ ] **TipTap 人工審稿環節**：前端 console 仍是骨架
+- [x] ~~**URL 進稿**~~（2026-06-06）：所有 workflow 輸入支援 `{"url": ...}`。Google Docs / WeChat / OKX 直抓；Medium / Bybit 走 **Firecrawl fallback**。實測 5/5 活連結通過
+- [x] ~~**檔案上傳端點**~~（2026-06-10）：`POST /uploads`（PDF/DOCX/MD→`data/uploads/`，回路徑供 workflow）。實測上傳→extract job 通過
+- [x] ~~**輸出持久化 + viewer**~~（2026-06-10）：`storage.py`（本地 `data/` 為主、R2 選用），封面圖代理 `GET /files/images/{n}`、成稿 viewer `GET /files/output/{n}`；article 產 `output_url`
+- [x] ~~**WordPress 發布**~~（2026-06-10）：`POST /publish`（含封面圖上傳到媒體庫）。⚠️ 對外動作，**預設 status=draft、不自動發**，正式發布需明確帶 `status=publish`。憑證已遷入 `.env`，尚未實際對 prod 發過
+- [x] ~~**TinyPNG 圖片壓縮**~~（2026-06-10）：`compress.py`，封面圖生成後壓縮；無金鑰則原樣（金鑰已遷入）
+- [x] ~~**admin 編輯 agent 設定**~~（2026-06-10）：`PUT /agents/{name}` 編輯、`POST /agents/{name}/reset` 重置回 seed 真值。前端 Agent 分頁可線上編 prompt。實測通過
+- [~] **article_formatting 套範本**（2026-06-10 半成）：組稿已會讀 DB 的頁首/頁尾免責範本（`site_config.py`）；但範本要先從 Strapi 匯入才有料 → 見 6.3
+- [ ] **TipTap 人工審稿環節**：前端有結果預覽 + 可編 WordPress 參數，但尚無 TipTap 富文本審稿器
 
 ### 6.2 測試缺口
-- [x] ~~`article` 完整流程僅測 1/4 份文件~~（2026-06-06 補完）：**4/4 份全過**——WEEX 简中docx、HashKey 繁中docx、Bluefin 英文PDF（含英→繁翻譯）、數碼港 繁中PDF（最大篇 4083字）。其中 3 份**併發**跑（總耗時 214s ≈ 最慢單條，content_ai 在 38/59/61s 交錯完成，驗證 asyncio 並行主張）
-- [x] ~~`article` 經 HTTP/SSE 路徑未跑~~（同場補完）：HashKey 經 `POST /workflows/article/run` SSE 串流全 7 階段完成
-- [ ] 前端僅驗 `pnpm build`，未實際開瀏覽器接後端
+- [x] ~~`article` 4/4 文件 + HTTP/SSE~~（2026-06-06）
+- [x] ~~後端自動化測試~~（2026-06-10）：`tests/`，**pytest 9/9 過**（registry / echo runner / runner 不 raise / 文件抽取 / durable job 端到端 / SSE 重播 / 404）
+- [x] ~~前端實際接後端~~（2026-06-10）：`pnpm build` 過 + vite dev(5173) 服務 200 + CORS 200；durable job/upload/agents 全經真實 uvicorn smoke 通過。（未用瀏覽器截圖驗 UI——使用者禁令）
 
 ### 6.3 平台本來就要做的（非復刻項）
-- [ ] **Strapi 設定備份**：啟動本機 Strapi 後跑 `config-backup-2026-06-05/backup-strapi.sh`
-- [ ] **job 持久化 + 並行**：jobs 寫進 DB、worker 拉取、asyncio semaphore 控併發上限
-- [ ] **OpenAPI codegen**：FastAPI schema → 前端型別安全 client（見 `shared/`)
-- [ ] **觀測 + eval**：per-stage trace（input/output/cost/latency）+ prompt 回歸測試
-- [ ] **前端 console 真做**：config 驅動表單 + 進度 UI + 編輯器 + 發布
-- [x] ~~commit 里程碑~~（`c2e66e2`，2026-06-06，64 檔）
+- [~] **Strapi 設定遷移**（2026-06-10 半成）：importer 寫好 `app/services/strapi.py` + `POST /site-config/import-strapi`（抓 authors/頁首頁尾免責/預設→DB `SiteConfig`）。⚠️ **需本機 Strapi 開著**；目前 Strapi 沒開，import 優雅回 -1 不崩。開機後一鍵匯入即脫離 Strapi
+- [x] ~~**job 持久化 + 並行**~~（2026-06-10）：`Job` 寫 DB（pending→running→done/error）、in-process asyncio worker（queue + `Semaphore(max_concurrent_jobs)`）、崩潰復原、SSE 即時 + 斷線重播。實測通過
+- [x] ~~**OpenAPI codegen**~~（2026-06-10）：`shared/openapi.json`（16 endpoints）+ 重新產生指令；前端手寫型別 client 對齊
+- [ ] **觀測 + eval**：per-stage trace（input/output/cost/latency）+ prompt 回歸測試 ← 仍未做
+- [x] ~~**前端 console 真做**~~（2026-06-10）：Vite SPA 三分頁（處理稿件：選流程→上傳/URL/文字→SSE 進度→結果預覽+封面+WP 參數+發布；Jobs 歷史；Agent 設定線上編輯）。整頁重做樣式
+- [x] ~~commit 里程碑~~（`c2e66e2` 2026-06-06；本次一次性完成 2026-06-10）
 
 ---
 

@@ -17,10 +17,10 @@ async def run_workflow(
     這是「單一編排入口」—— API(SSE)、CLI、排程都共用這個，
     流程邏輯只有一份。
     """
-    wf = get_workflow(name)
     ctx = ctx or RunContext()
     data = input_data
     try:
+        wf = get_workflow(name)
         for stage in wf.stages:
             yield WorkflowEvent(event="stage", data={"id": stage.id, "status": "running"})
             data = await stage.run(data, ctx)
