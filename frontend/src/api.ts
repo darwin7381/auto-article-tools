@@ -50,8 +50,11 @@ export const updateAgent = (name: string, patch: Record<string, unknown>) =>
     body: JSON.stringify(patch),
   }).then((r) => r.json())
 export const resetAgent = (name: string) => jpost<Record<string, unknown>>(`/agents/${name}/reset`, {})
-export const publishJob = (job_id: number, status: string) =>
-  jpost<{ id: number; link: string; status: string }>('/publish', { job_id, status })
+export const publishJob = (
+  job_id: number,
+  status: string,
+  overrides?: Record<string, unknown>,
+) => jpost<{ id: number; link: string; status: string }>('/publish', { job_id, status, overrides })
 export const importStrapi = () => jpost<{ imported: Record<string, number> }>('/site-config/import-strapi', {})
 
 export async function uploadFile(file: File): Promise<{ file: string; original_name: string; size: number }> {
