@@ -1,59 +1,39 @@
 import { useEffect, useRef, useState } from 'react'
+import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
+import { StageList, type StageView } from './Stages'
 import {
-  apiBase,
-  createJob,
-  getAgent,
-  getHealth,
-  getJob,
-  importStrapi,
-  listAgents,
-  listJobs,
-  listWorkflows,
-  publishJob,
-  resetAgent,
-  streamJob,
-  updateAgent,
-  uploadFile,
-  type Agent,
-  type Job,
-  type Workflow,
+  createJob, getHealth, getJob, listJobs, listWorkflows, publishJob, streamJob,
+  uploadFile, type Job, type Workflow,
 } from './api'
 
-type Tab = 'run' | 'jobs' | 'agents'
-type StageState = { id: string; status: 'running' | 'done' }
+type Tab = 'run' | 'jobs' | 'config'
+type Mode = 'auto' | 'manual'
+type PubStatus = 'draft' | 'pending' | 'publish' | 'private' | 'future'
 
-function rec(o: unknown): Record<string, unknown> {
-  return (o ?? {}) as Record<string, unknown>
-}
+function rec(o: unknown): Record<string, unknown> { return (o ?? {}) as Record<string, unknown> }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('run')
   const [health, setHealth] = useState<{ status: string; workflows: string[] } | null>(null)
-  useEffect(() => {
-    getHealth().then(setHealth).catch(() => setHealth(null))
-  }, [])
-
+  useEffect(() => { getHealth().then(setHealth).catch(() => setHealth(null)) }, [])
   return (
     <div className="app">
       <div className="topbar">
         <h1>BD 內容自動化平台</h1>
-        <span className="sub">Console · {apiBase}</span>
         <span className="health">
           <span className={`dot ${health?.status === 'ok' ? 'ok' : ''}`} />
           {health ? `後端正常 · ${health.workflows.length} workflows` : '後端未連線'}
         </span>
       </div>
-
       <div className="tabs">
         <div className={`tab ${tab === 'run' ? 'active' : ''}`} onClick={() => setTab('run')}>處理稿件</div>
         <div className={`tab ${tab === 'jobs' ? 'active' : ''}`} onClick={() => setTab('jobs')}>Jobs 歷史</div>
-        <div className={`tab ${tab === 'agents' ? 'active' : ''}`} onClick={() => setTab('agents')}>Agent 設定</div>
+        <div className={`tab ${tab === 'config' ? 'active' : ''}`} onClick={() => setTab('config')}>設定 / Prompt</div>
       </div>
-
       {tab === 'run' && <RunPanel />}
       {tab === 'jobs' && <JobsPanel />}
-      {tab === 'agents' && <AgentsPanel />}
+      {tab === 'config' && <ConfigPanel />}
     </div>
   )
 }
@@ -61,209 +41,158 @@ export default function App() {
 function RunPanel() {
   const [workflows, setWorkflows] = useState<Workflow[]>([])
   const [wf, setWf] = useState('article')
-  const [mode, setMode] = useState<'file' | 'url' | 'text'>('file')
+  const [mode, setMode] = useState<Mode>('manual')
+  const [pubStatus, setPubStatus] = useState<PubStatus>('draft')
+  const [imode, setImode] = useState<'file' | 'url' | 'text'>('file')
   const [url, setUrl] = useState('')
   const [text, setText] = useState('hello world')
   const [uploaded, setUploaded] = useState<{ file: string; original_name: string } | null>(null)
   const [running, setRunning] = useState(false)
-  const [stages, setStages] = useState<StageState[]>([])
-  const [log, setLog] = useState<string[]>([])
+  const [views, setViews] = useState<StageView[]>([])
   const [job, setJob] = useState<Job | null>(null)
+  const [lastInput, setLastInput] = useState<Record<string, unknown>>({})
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    listWorkflows().then(setWorkflows).catch(() => {})
-  }, [])
-
+  useEffect(() => { listWorkflows().then(setWorkflows).catch(() => {}) }, [])
   const current = workflows.find((w) => w.name === wf)
-  useEffect(() => {
-    setMode(wf === 'echo' ? 'text' : 'file')
-  }, [wf])
+  useEffect(() => { setImode(wf === 'echo' ? 'text' : 'file'); setViews([]); setJob(null) }, [wf])
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    try {
-      const r = await uploadFile(f)
-      setUploaded(r)
-    } catch (err) {
-      alert('上傳失敗：' + String(err))
-    }
+    const f = e.target.files?.[0]; if (!f) return
+    try { setUploaded(await uploadFile(f)) } catch (err) { alert('上傳失敗：' + String(err)) }
   }
 
-  async function run() {
-    let input: Record<string, unknown> = {}
-    if (mode === 'text') input = { text }
-    else if (mode === 'url') input = { url }
-    else if (mode === 'file') {
-      if (!uploaded) return alert('請先上傳檔案')
-      input = { file: uploaded.file }
-    }
+  function gatherInput(): Record<string, unknown> | null {
+    if (imode === 'text') return { text }
+    if (imode === 'url') return url ? { url } : null
+    if (!uploaded) { alert('請先上傳檔案'); return null }
+    return { file: uploaded.file }
+  }
+
+  async function execute(inputObj: Record<string, unknown>, fromStage?: string) {
+    const ids = current?.stages ?? []
+    const startIdx = fromStage ? ids.indexOf(fromStage) : 0
     setRunning(true)
-    setStages([])
-    setLog([])
-    setJob(null)
+    setLastInput(inputObj)
+    setViews((prev) => {
+      const byId = new Map(prev.map((v) => [v.id, v]))
+      return ids.map((id, i) =>
+        i < startIdx ? byId.get(id) ?? { id, status: 'pending' as const } : { id, status: 'pending' as const },
+      )
+    })
     try {
-      const { id } = await createJob(wf, input)
+      const { id } = await createJob(wf, inputObj, fromStage)
       await streamJob(id, (ev, data) => {
         const d = rec(data)
-        setLog((l) => [...l, `[${ev}] ${JSON.stringify(data)}`])
         if (ev === 'stage') {
-          const sid = String(d.id)
-          const status = d.status as 'running' | 'done'
-          setStages((prev) => {
-            const others = prev.filter((s) => s.id !== sid)
-            return [...others, { id: sid, status }]
-          })
+          setViews((prev) => prev.map((v) =>
+            v.id === d.id ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output } : v))
         }
       })
       const finished = await getJob(id)
       setJob(finished)
-    } catch (err) {
-      setLog((l) => [...l, 'ERROR ' + String(err)])
-    } finally {
-      setRunning(false)
-    }
+      setViews((prev) => prev.map((v) => {
+        const so = finished.stages?.find((s) => s.id === v.id)
+        return so ? { ...v, status: 'done' as const, output: so.output } : v
+      }))
+      if (mode === 'auto' && rec(finished.result).wordpress) {
+        await doPublish(finished, pubStatus, setJob)
+      }
+    } finally { setRunning(false) }
   }
+
+  function run() { const i = gatherInput(); if (i) execute(i) }
 
   return (
     <div className="grid">
       <div className="panel">
         <h2>輸入</h2>
+        <label>處理模式</label>
+        <div className="seg">
+          <button className={mode === 'manual' ? 'on' : ''} onClick={() => setMode('manual')}>手動（逐步審稿）</button>
+          <button className={mode === 'auto' ? 'on' : ''} onClick={() => setMode('auto')}>自動（跑完直接發）</button>
+        </div>
+        <label>發布狀態</label>
+        <select value={pubStatus} onChange={(e) => setPubStatus(e.target.value as PubStatus)}>
+          <option value="draft">草稿 draft</option>
+          <option value="pending">待審 pending</option>
+          <option value="publish">公開 publish</option>
+          <option value="private">私密 private</option>
+          <option value="future">排程 future</option>
+        </select>
+
         <label>Workflow</label>
         <select value={wf} onChange={(e) => setWf(e.target.value)}>
-          {workflows.map((w) => (
-            <option key={w.name} value={w.name}>{w.name} — {w.description}</option>
-          ))}
+          {workflows.map((w) => <option key={w.name} value={w.name}>{w.name} — {w.description}</option>)}
         </select>
 
         {wf !== 'echo' && (
           <>
             <label>進稿方式</label>
             <div className="seg">
-              <button className={mode === 'file' ? 'on' : ''} onClick={() => setMode('file')}>檔案上傳</button>
-              <button className={mode === 'url' ? 'on' : ''} onClick={() => setMode('url')}>網址</button>
+              <button className={imode === 'file' ? 'on' : ''} onClick={() => setImode('file')}>檔案</button>
+              <button className={imode === 'url' ? 'on' : ''} onClick={() => setImode('url')}>網址</button>
             </div>
           </>
         )}
-
-        {mode === 'text' && (
-          <>
-            <label>文字</label>
-            <input type="text" value={text} onChange={(e) => setText(e.target.value)} />
-          </>
-        )}
-        {mode === 'url' && (
-          <>
-            <label>網址（Google Docs / Medium / WeChat / 一般網站）</label>
-            <input type="text" value={url} placeholder="https://…" onChange={(e) => setUrl(e.target.value)} />
-          </>
-        )}
-        {mode === 'file' && (
-          <>
-            <label>檔案（PDF / DOCX / MD）</label>
+        {imode === 'text' && <><label>文字</label><input type="text" value={text} onChange={(e) => setText(e.target.value)} /></>}
+        {imode === 'url' && <><label>網址（Google Docs / Medium / WeChat / 網站）</label><input type="text" value={url} placeholder="https://…" onChange={(e) => setUrl(e.target.value)} /></>}
+        {imode === 'file' && (
+          <><label>檔案（PDF / DOCX / MD）</label>
             <input ref={fileRef} type="file" accept=".pdf,.docx,.md,.txt" onChange={onPickFile} />
-            {uploaded && <p className="muted">已上傳：{uploaded.original_name}</p>}
-          </>
+            {uploaded && <p className="muted">已上傳：{uploaded.original_name}</p>}</>
         )}
-
-        <button className="primary" disabled={running} onClick={run}>
-          {running ? '處理中…' : '開始處理'}
-        </button>
+        <button className="primary" disabled={running} onClick={run}>{running ? '處理中…' : '開始處理'}</button>
         {current && <p className="muted" style={{ marginTop: 10 }}>{current.stages.length} 階段：{current.stages.join(' → ')}</p>}
       </div>
 
       <div className="panel">
-        <h2>進度與結果</h2>
-        {stages.length === 0 && !job && <p className="muted">選好輸入後按「開始處理」。</p>}
-        <div className="stages">
-          {stages.map((s) => (
-            <div key={s.id} className={`stage-row ${s.status}`}>
-              <span className="ic">{s.status === 'done' ? '✓' : '◐'}</span>
-              <span className="name">{s.id}</span>
-              <span className="t">{s.status}</span>
-            </div>
-          ))}
-        </div>
-        {job && <ResultView job={job} />}
-        {log.length > 0 && (
-          <>
-            <label>事件 log</label>
-            <pre className="log">{log.join('\n')}</pre>
-          </>
-        )}
+        <h2>逐階段進度與結果</h2>
+        {views.length === 0 ? <p className="muted">選好輸入後按「開始處理」。每一步即時更新，完成後可展開檢視、也可從任一步重跑。</p>
+          : <StageList stages={views} originalInput={lastInput} onRerun={(sid, input) => execute(input, sid)} />}
+        {job && <ReviewPublish job={job} pubStatus={pubStatus} onJob={setJob} />}
       </div>
     </div>
   )
 }
 
-function ResultView({ job }: { job: Job }) {
-  const [pubMsg, setPubMsg] = useState('')
+async function doPublish(job: Job, status: string, onJob: (j: Job) => void, content?: string) {
+  const overrides = content ? { content } : undefined
+  const out = await publishJob(job.id, status, overrides)
+  onJob({ ...job, result: { ...rec(job.result), _published: out } })
+  return out
+}
+
+function ReviewPublish({ job, pubStatus, onJob }: { job: Job; pubStatus: string; onJob: (j: Job) => void }) {
   const r = rec(job.result)
   const wp = rec(r.wordpress)
-  const coverUrl = (r.cover_image_url as string) || ''
-  const outputUrl = (r.output_url as string) || ''
-  const finalText = (r.final_html as string) || (r.markdown as string) || ''
-  const [edited, setEdited] = useState<string>(String(wp.content || ''))
-
-  async function doPublish(status: string) {
-    setPubMsg('發布中…')
-    try {
-      const out = await publishJob(job.id, status, edited ? { content: edited } : undefined)
-      setPubMsg(`✓ 已發布（${out.status}）`)
-      if (out.link) window.open(out.link, '_blank')
-    } catch (err) {
-      setPubMsg('✗ ' + String(err))
-    }
+  const [edited, setEdited] = useState(String(wp.content || ''))
+  const [msg, setMsg] = useState('')
+  const published = rec(r._published)
+  if (!wp.title) {
+    return job.status === 'error' ? <p className="err" style={{ marginTop: 12 }}>錯誤：{job.error}</p> : null
   }
-
+  async function publish(status: string) {
+    setMsg('發布中…')
+    try {
+      const out = await doPublish(job, status, onJob, edited || undefined)
+      setMsg(`✓ 已發布（${out.status}）`); if (out.link) window.open(out.link, '_blank')
+    } catch (e) { setMsg('✗ ' + String(e)) }
+  }
   return (
-    <div style={{ marginTop: 14 }}>
-      <div className="row">
-        <span className={`status ${job.status}`}>{job.status}</span>
-        <span className="muted">job #{job.id} · {job.workflow}</span>
+    <div className="review">
+      <h2 style={{ marginTop: 18 }}>人工審稿 → 發布</h2>
+      <div className="kv">
+        <span className="k">標題</span><span>{String(wp.title)}</span>
+        <span className="k">slug</span><span className="muted">{String(wp.slug || '')}</span>
       </div>
-      {job.error && <p className="err">錯誤：{job.error}</p>}
-
-      {Boolean(wp.title) && (
-        <div className="kv" style={{ marginTop: 12 }}>
-          <span className="k">標題</span><span>{String(wp.title)}</span>
-          <span className="k">slug</span><span className="muted">{String(wp.slug || '')}</span>
-          <span className="k">摘要</span><span>{String(wp.excerpt || '')}</span>
-          <span className="k">分類/標籤</span>
-          <span>
-            {(wp.categories as unknown[] | undefined)?.map((c, i) => <span key={'c' + i} className="chip">cat {rec(c).id as number}</span>)}
-            {(wp.tags as unknown[] | undefined)?.map((t, i) => <span key={'t' + i} className="chip">tag {rec(t).id as number}</span>)}
-          </span>
-        </div>
-      )}
-
-      {coverUrl && <img className="cover" src={coverUrl} alt="cover" />}
-
-      {Boolean(wp.content) && (
-        <>
-          <label>人工審稿（TipTap，可直接編輯內文）</label>
-          <RichEditor key={job.id} html={String(wp.content || '')} onChange={setEdited} />
-        </>
-      )}
-      {!wp.content && finalText && (
-        <>
-          <label>結果預覽</label>
-          <pre className="log" style={{ color: '#cdd3dc' }}>{finalText.slice(0, 4000)}</pre>
-        </>
-      )}
-      {outputUrl && (
-        <p style={{ marginTop: 10 }}>
-          <a href={outputUrl} target="_blank" rel="noreferrer">↗ 開啟組好的成稿（HTML）</a>
-        </p>
-      )}
-
-      {Boolean(wp.title) && (
-        <div className="row" style={{ marginTop: 12 }}>
-          <button className="primary" style={{ width: 'auto', marginTop: 0 }} onClick={() => doPublish('publish')}>發布到 WordPress</button>
-          {pubMsg && <span className="muted">{pubMsg}</span>}
-        </div>
-      )}
+      <label>內文（TipTap，可直接編輯後再發布）</label>
+      <RichEditor key={job.id} html={String(wp.content || '')} onChange={setEdited} />
+      <div className="row" style={{ marginTop: 12 }}>
+        <button className="primary" style={{ width: 'auto', marginTop: 0 }} onClick={() => publish(pubStatus)}>發布到 WordPress（{pubStatus}）</button>
+        {msg && <span className="muted">{msg}</span>}
+        {Boolean(published.link) && <a href={String(published.link)} target="_blank" rel="noreferrer">↗ 開啟文章</a>}
+      </div>
     </div>
   )
 }
@@ -272,9 +201,7 @@ function JobsPanel() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [sel, setSel] = useState<Job | null>(null)
   const load = () => listJobs().then(setJobs).catch(() => {})
-  useEffect(() => {
-    load()
-  }, [])
+  useEffect(() => { load() }, [])
   return (
     <div className="grid">
       <div className="panel">
@@ -284,7 +211,8 @@ function JobsPanel() {
           <tbody>
             {jobs.map((j) => (
               <tr key={j.id} className="click" onClick={() => getJob(j.id).then(setSel)}>
-                <td>{j.id}</td><td>{j.workflow}</td><td><span className={`status ${j.status}`}>{j.status}</span></td>
+                <td>{j.id}</td><td>{j.workflow}{j.start_stage ? ` ↻${j.start_stage}` : ''}</td>
+                <td><span className={`status ${j.status}`}>{j.status}</span></td>
               </tr>
             ))}
             {jobs.length === 0 && <tr><td colSpan={3} className="muted">還沒有 job</td></tr>}
@@ -293,101 +221,14 @@ function JobsPanel() {
       </div>
       <div className="panel">
         <h2>詳情</h2>
-        {sel ? <ResultView job={sel} /> : <p className="muted">點左邊一筆 job 看結果。</p>}
-      </div>
-    </div>
-  )
-}
-
-function AgentsPanel() {
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [name, setName] = useState('')
-  const [cfg, setCfg] = useState<Record<string, unknown> | null>(null)
-  const [msg, setMsg] = useState('')
-  const [strapiMsg, setStrapiMsg] = useState('')
-
-  const load = () => listAgents().then(setAgents).catch(() => {})
-  useEffect(() => {
-    load()
-  }, [])
-
-  async function open(n: string) {
-    setName(n)
-    setMsg('')
-    setCfg(await getAgent(n))
-  }
-  function set(field: string, v: unknown) {
-    setCfg((c) => ({ ...(c ?? {}), [field]: v }))
-  }
-  async function save() {
-    if (!cfg) return
-    setMsg('儲存中…')
-    await updateAgent(name, {
-      provider: cfg.provider,
-      model: cfg.model,
-      system_prompt: cfg.system_prompt,
-      user_prompt: cfg.user_prompt,
-    })
-    setMsg('✓ 已儲存到 DB')
-    load()
-  }
-  async function reset() {
-    if (!confirm('重置回 seed 預設（從 R2 匯出的真值）？會覆蓋目前 DB 內容。')) return
-    setCfg(await resetAgent(name))
-    setMsg('✓ 已重置')
-    load()
-  }
-  async function runStrapi() {
-    setStrapiMsg('匯入中…（需本機 Strapi 開著）')
-    try {
-      const out = await importStrapi()
-      setStrapiMsg('✓ ' + JSON.stringify(out.imported))
-    } catch (err) {
-      setStrapiMsg('✗ ' + String(err))
-    }
-  }
-
-  const c = rec(cfg)
-  return (
-    <div className="grid">
-      <div className="panel">
-        <h2>Agents（設定存 DB）</h2>
-        <table>
-          <thead><tr><th>名稱</th><th>model</th></tr></thead>
-          <tbody>
-            {agents.map((a) => (
-              <tr key={a.name} className="click" onClick={() => open(a.name)}>
-                <td>{a.name}</td><td className="muted">{a.model}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="banner" style={{ marginTop: 16 }}>
-          Strapi 設定遷移（作者 / 頁首頁尾免責範本 / 預設）
-          <div className="row" style={{ marginTop: 8 }}>
-            <button className="ghost" onClick={runStrapi}>從 Strapi 匯入 DB</button>
-            <span className="muted">{strapiMsg}</span>
-          </div>
-        </div>
-      </div>
-      <div className="panel">
-        <h2>編輯 {name || '—'}</h2>
-        {!cfg ? <p className="muted">點左邊一個 agent 編輯。</p> : (
+        {!sel ? <p className="muted">點左邊一筆 job。</p> : (
           <>
-            <label>provider / model</label>
-            <div className="row">
-              <input type="text" value={String(c.provider || '')} onChange={(e) => set('provider', e.target.value)} style={{ flex: 1 }} />
-              <input type="text" value={String(c.model || '')} onChange={(e) => set('model', e.target.value)} style={{ flex: 2 }} />
-            </div>
-            <label>system prompt</label>
-            <textarea value={String(c.system_prompt || '')} onChange={(e) => set('system_prompt', e.target.value)} style={{ minHeight: 120 }} />
-            <label>user prompt</label>
-            <textarea value={String(c.user_prompt || '')} onChange={(e) => set('user_prompt', e.target.value)} style={{ minHeight: 80 }} />
-            <div className="row" style={{ marginTop: 12 }}>
-              <button className="ghost" onClick={save}>儲存</button>
-              <button className="ghost" onClick={reset}>重置到預設</button>
-              <span className="muted">{msg}</span>
-            </div>
+            <StageList
+              stages={(sel.stages ?? []).map((s) => ({ id: s.id, status: 'done' as const, output: s.output }))}
+              originalInput={sel.input}
+              onRerun={() => alert('在「處理稿件」分頁可重跑；歷史頁為唯讀檢視')}
+            />
+            {sel.error && <p className="err">錯誤：{sel.error}</p>}
           </>
         )}
       </div>

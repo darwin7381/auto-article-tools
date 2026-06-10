@@ -37,10 +37,14 @@ def _submit(job_id: int) -> None:
         _loop.call_soon_threadsafe(_queue.put_nowait, job_id)
 
 
-def enqueue_job(workflow: str, input_data: dict) -> int:
-    """建立一筆 pending job 並排入佇列，回傳 job_id。"""
+def enqueue_job(workflow: str, input_data: dict, start_stage: str | None = None) -> int:
+    """建立一筆 pending job 並排入佇列，回傳 job_id。start_stage：從某階段重跑。"""
     with get_session() as s:
-        job = Job(workflow=workflow, input_json=json.dumps(input_data, ensure_ascii=False))
+        job = Job(
+            workflow=workflow,
+            input_json=json.dumps(input_data, ensure_ascii=False),
+            start_stage=start_stage,
+        )
         s.add(job)
         s.commit()
         s.refresh(job)
@@ -58,6 +62,7 @@ async def _run_job(job_id: int) -> None:
                 return
             workflow = job.workflow
             input_data = json.loads(job.input_json)
+            start_stage = job.start_stage
             job.status = JobStatus.running
             job.updated_at = _now()
             s.add(job)
@@ -68,7 +73,7 @@ async def _run_job(job_id: int) -> None:
         result = None
         error = None
         try:
-            async for ev in run_workflow(workflow, input_data):
+            async for ev in run_workflow(workflow, input_data, start_stage=start_stage):
                 item = {"event": ev.event, "data": ev.data}
                 events.append(item)
                 bus.publish(job_id, item)

@@ -97,6 +97,15 @@ def _seed_fields(name: str) -> dict[str, Any] | None:
     return {col: raw[k] for k, col in _FIELD_MAP.items() if k in raw and raw[k] is not None}
 
 
+@router.get("/{name}/default")
+async def get_agent_default(name: str) -> dict:
+    """回傳 seed 預設值（從 R2 匯出的真值，不套用）——讓前端對照 default vs 現用。"""
+    fields = _seed_fields(name)
+    if fields is None:
+        raise HTTPException(404, f"找不到 {name} 的 seed 預設")
+    return {"name": name, **fields}
+
+
 @router.post("/{name}/reset")
 async def reset_agent(name: str) -> AgentConfig:
     """重置回 seed/agents/{name}.json 的真實 production 預設。

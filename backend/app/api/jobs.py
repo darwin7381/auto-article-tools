@@ -26,26 +26,41 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 class CreateJobRequest(BaseModel):
     workflow: str
     input: dict[str, Any] = {}
+    from_stage: str | None = None  # 從某階段重跑；input 即該階段輸入態（可被使用者編輯過）
 
 
-def _job_dict(job: Job) -> dict:
-    return {
+def _stage_outputs(job: Job) -> list[dict]:
+    """從 events 萃取每階段的輸出，給前端逐階段展開檢視。"""
+    out = []
+    for ev in json.loads(job.events_json or "[]"):
+        d = ev.get("data", {})
+        if ev.get("event") == "stage" and d.get("status") == "done":
+            out.append({"id": d.get("id"), "output": d.get("output")})
+    return out
+
+
+def _job_dict(job: Job, with_stages: bool = False) -> dict:
+    d = {
         "id": job.id,
         "workflow": job.workflow,
         "status": job.status.value if isinstance(job.status, JobStatus) else job.status,
         "input": json.loads(job.input_json),
+        "start_stage": job.start_stage,
         "result": json.loads(job.result_json) if job.result_json else None,
         "error": job.error,
         "created_at": job.created_at,
         "updated_at": job.updated_at,
     }
+    if with_stages:
+        d["stages"] = _stage_outputs(job)
+    return d
 
 
 @router.post("")
 async def create_job(body: CreateJobRequest) -> dict:
     if body.workflow not in WORKFLOWS:
         raise HTTPException(404, f"找不到 workflow: {body.workflow}")
-    job_id = enqueue_job(body.workflow, body.input)
+    job_id = enqueue_job(body.workflow, body.input, start_stage=body.from_stage)
     return {"id": job_id, "status": "pending"}
 
 
@@ -62,7 +77,7 @@ async def get_job(job_id: int) -> dict:
         job = s.get(Job, job_id)
         if job is None:
             raise HTTPException(404, f"找不到 job: {job_id}")
-        return _job_dict(job)
+        return _job_dict(job, with_stages=True)
 
 
 @router.get("/{job_id}/stream")
