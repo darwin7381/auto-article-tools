@@ -59,6 +59,9 @@ backend/data/*.db
 backend/data/*.db-wal
 backend/data/*.db-shm
 backend/data/images/
+backend/data/uploads/
+backend/data/output/
+backend/.pytest_timeout
 backend/.env
 
 # Vite frontend

@@ -3,23 +3,24 @@
 extract → content_ai → pr_writer → format_conversion → copy_editing → cover_image → article_formatting
 
 所有 agent 設定讀自 DB；copy_editing 用 instructor+pydantic 做結構化輸出。
-輸入： {"file": "/path/檔案.pdf"}
+封面圖壓縮(TinyPNG 選用)後落地存儲、回傳可公開 URL；組稿套 DB 的頁首/頁尾免責範本並持久化輸出。
+輸入： {"file": "/path/檔案.pdf"} 或 {"url": "https://..."}
 """
 
 from __future__ import annotations
-
-import uuid
-from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 from app.core.registry import Workflow, register
 from app.core.stage import RunContext, Stage
+from app.services import site_config
 from app.services.agent_config import get_agent_config
+from app.services.compress import compress_png
 from app.services.image import generate_image
 from app.services.ingest import ingest_markdown
 from app.services.llm import chat, structured
 from app.services.markdown import md_to_html
+from app.services.storage import save_image, save_text
 
 
 def _fill(template: str, content: str, key: str) -> str:
@@ -47,7 +48,7 @@ class WordPressParams(BaseModel):
 # ---- 各階段 ----
 async def s_extract(data: dict, ctx: RunContext) -> dict:
     text = await ingest_markdown(data)  # 支援 {"file": ...} 或 {"url": ...}
-    return {**data, "markdown": text}
+    return {**data, "source": data.get("file") or data.get("url"), "markdown": text}
 
 
 async def s_content_ai(data: dict, ctx: RunContext) -> dict:
@@ -88,11 +89,11 @@ async def s_cover_image(data: dict, ctx: RunContext) -> dict:
     try:
         img = await generate_image(prompt, cfg.model or "gpt-image-2",
                                    cfg.size or "1536x1024", cfg.quality or "medium")
-        out_dir = Path("data/images")
-        out_dir.mkdir(parents=True, exist_ok=True)
-        path = out_dir / f"{uuid.uuid4().hex}.png"
-        path.write_bytes(img)
-        return {**data, "cover_image": str(path), "cover_image_bytes": len(img)}
+        img = await compress_png(img)  # TinyPNG 壓縮（沒金鑰則原樣回傳）
+        path, url = save_image(img, "png")  # 落地 + 可公開 URL（本地代理或 R2）
+        wp = {**wp, "featured_image": {"url": url, "alt": wp.get("title", "")}}
+        return {**data, "wordpress": wp, "cover_image": path, "cover_image_url": url,
+                "cover_image_bytes": len(img)}
     except Exception as exc:  # noqa: BLE001  封面圖失敗不擋整條流程
         return {**data, "cover_image": None, "cover_image_error": str(exc)}
 
@@ -100,13 +101,21 @@ async def s_cover_image(data: dict, ctx: RunContext) -> dict:
 async def s_article_formatting(data: dict, ctx: RunContext) -> dict:
     wp = data.get("wordpress", {})
     title = wp.get("title", "")
-    cover = data.get("cover_image")
+    cover = data.get("cover_image_url") or data.get("cover_image")
     body = wp.get("content") or data.get("html", "")
+    header = site_config.header_disclaimer()
+    footer = site_config.footer_disclaimer()
     parts = [f"<h1>{title}</h1>"]
+    if header:
+        parts.append(f'<section class="header-disclaimer">{header}</section>')
     if cover:
         parts.append(f'<figure class="featured-image"><img src="{cover}" alt="{title}"/></figure>')
     parts.append(body)
-    return {**data, "final_html": "\n".join(parts)}
+    if footer:
+        parts.append(f'<section class="footer-disclaimer">{footer}</section>')
+    final_html = "\n".join(parts)
+    _, output_url = save_text(final_html, "html")  # 輸出持久化 + viewer URL
+    return {**data, "final_html": final_html, "output_url": output_url}
 
 
 register(

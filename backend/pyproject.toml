@@ -28,11 +28,18 @@ ai = [
 dev = [
     "ruff>=0.9",
     "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.28",
 ]
 
 [tool.uv]
 # uv 會自動下載並使用相容的 Python（>=3.12），避開本機 3.14 尚無 wheel 的問題
 package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
