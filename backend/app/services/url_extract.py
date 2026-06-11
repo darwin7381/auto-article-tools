@@ -139,8 +139,17 @@ async def _extract_webpage(url: str) -> str:
     return md
 
 
+_DEAD_MIN = 150  # 連 fallback 都抽不到這個字數 → 連結失效/被刪，明確報錯而非帶殼頁面跑完整條 AI 流程
+
+
 async def extract_url(url: str) -> str:
     m = _GDOC_RE.search(url)
     if m:
-        return await _extract_gdoc(m.group(1))
-    return await _extract_webpage(url)
+        text = await _extract_gdoc(m.group(1))
+    else:
+        text = await _extract_webpage(url)
+    if len((text or "").strip()) < _DEAD_MIN:
+        raise RuntimeError(
+            f"抽取內容過短（{len((text or '').strip())} 字）——連結可能已失效、被刪除或非文章頁：{url}"
+        )
+    return text
