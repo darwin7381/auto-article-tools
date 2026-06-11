@@ -64,15 +64,37 @@ function RunPanel() {
 
   function gatherInput(): Record<string, unknown> | null {
     if (imode === 'text') return { text }
-    if (imode === 'url') return url ? { url } : null
+    if (imode === 'url') {
+      if (!url.trim()) { alert('請先貼上網址'); return null }
+      return { url: url.trim() }
+    }
     if (!uploaded) { alert('請先上傳檔案'); return null }
     return { file: uploaded.file }
+  }
+
+  /** 用 job 快照更新逐階段視圖（事件已即時入庫，輪詢也拿得到中途進度）。 */
+  function applyJobToViews(j: Job) {
+    const done = new Map((j.stages ?? []).map((s) => [s.id, s.output]))
+    setViews((prev) => {
+      let marked = false
+      return prev.map((v) => {
+        if (done.has(v.id)) return { id: v.id, status: 'done' as const, output: done.get(v.id) ?? v.output }
+        if (v.status === 'done') return v // 重跑時保留之前已完成的上游階段
+        if (!marked) {
+          marked = true
+          if (j.status === 'running' || j.status === 'pending') return { ...v, status: 'running' as const }
+          if (j.status === 'error') return { ...v, status: 'error' as const }
+        }
+        return v
+      })
+    })
   }
 
   async function execute(inputObj: Record<string, unknown>, fromStage?: string) {
     const ids = current?.stages ?? []
     const startIdx = fromStage ? ids.indexOf(fromStage) : 0
     setRunning(true)
+    setJob(null)
     setLastInput(inputObj)
     setViews((prev) => {
       const byId = new Map(prev.map((v) => [v.id, v]))
@@ -82,22 +104,33 @@ function RunPanel() {
     })
     try {
       const { id } = await createJob(wf, inputObj, fromStage)
-      await streamJob(id, (ev, data) => {
+      // SSE 求即時（解析已修 \r\n）；輪詢保底（任何 proxy/串流壞掉 UI 都不會卡死）
+      const ac = new AbortController()
+      streamJob(id, (ev, data) => {
         const d = rec(data)
         if (ev === 'stage') {
           setViews((prev) => prev.map((v) =>
             v.id === d.id ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output } : v))
         }
-      })
-      const finished = await getJob(id)
+      }, ac.signal).catch(() => { /* SSE 斷線無妨，輪詢接手 */ })
+
+      let finished: Job | null = null
+      for (let i = 0; i < 400; i++) { // 上限 ~10 分鐘
+        await new Promise((r) => setTimeout(r, 1500))
+        const j = await getJob(id).catch(() => null)
+        if (j) {
+          applyJobToViews(j)
+          if (j.status === 'done' || j.status === 'error') { finished = j; break }
+        }
+      }
+      ac.abort()
+      if (!finished) { alert('處理逾時（10 分鐘），請到 Jobs 歷史查看狀態'); return }
       setJob(finished)
-      setViews((prev) => prev.map((v) => {
-        const so = finished.stages?.find((s) => s.id === v.id)
-        return so ? { ...v, status: 'done' as const, output: so.output } : v
-      }))
-      if (mode === 'auto' && rec(finished.result).wordpress) {
+      if (mode === 'auto' && finished.status === 'done' && rec(finished.result).wordpress) {
         await doPublish(finished, pubStatus, setJob)
       }
+    } catch (err) {
+      alert('啟動失敗：' + String(err))
     } finally { setRunning(false) }
   }
 

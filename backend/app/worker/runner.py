@@ -44,4 +44,5 @@ async def run_workflow(
             )
         yield WorkflowEvent(event="done", data={"result": json_safe(data)})
     except Exception as exc:  # noqa: BLE001  骨架階段先全捕捉；之後分階段重試
-        yield WorkflowEvent(event="error", data={"message": str(exc)})
+        # 帶上例外類型：KeyError('file') 之類的裸值對使用者毫無意義
+        yield WorkflowEvent(event="error", data={"message": f"{type(exc).__name__}: {exc}"})

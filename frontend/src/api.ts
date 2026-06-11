@@ -72,9 +72,14 @@ export async function uploadFile(file: File): Promise<{ file: string; original_n
 
 export type StreamHandler = (event: string, data: unknown) => void
 
-/** 訂閱某 job 的 SSE 進度（先重播歷史事件，再接 live）。 */
-export async function streamJob(jobId: number, onEvent: StreamHandler): Promise<void> {
-  const resp = await fetch(`${API_BASE}/jobs/${jobId}/stream`)
+/** 訂閱某 job 的 SSE 進度（先重播歷史事件，再接 live）。
+ *  注意：SSE 規範行尾可為 \r\n（sse-starlette 預設就是）——必須用 \r?\n 解析。 */
+export async function streamJob(
+  jobId: number,
+  onEvent: StreamHandler,
+  signal?: AbortSignal,
+): Promise<void> {
+  const resp = await fetch(`${API_BASE}/jobs/${jobId}/stream`, { signal })
   if (!resp.body) return
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
@@ -83,10 +88,10 @@ export async function streamJob(jobId: number, onEvent: StreamHandler): Promise<
     const { done, value } = await reader.read()
     if (done) break
     buffer += decoder.decode(value, { stream: true })
-    const chunks = buffer.split('\n\n')
+    const chunks = buffer.split(/\r?\n\r?\n/)
     buffer = chunks.pop() ?? ''
     for (const chunk of chunks) {
-      const lines = chunk.split('\n')
+      const lines = chunk.split(/\r?\n/)
       const evLine = lines.find((l) => l.startsWith('event:'))
       const dataLine = lines.find((l) => l.startsWith('data:'))
       if (dataLine) {

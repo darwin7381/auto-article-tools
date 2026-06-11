@@ -16,7 +16,7 @@ from app.services.llm import chat
 
 async def _extract(data: dict, ctx: RunContext) -> dict:
     text = await ingest_markdown(data)  # 支援 {"file": ...} 或 {"url": ...}
-    return {"file": data.get("file") or data.get("url"), "text": text}
+    return {**data, "source": data.get("file") or data.get("url"), "text": text}
 
 
 async def _content_ai(data: dict, ctx: RunContext) -> dict:
@@ -30,8 +30,9 @@ async def _content_ai(data: dict, ctx: RunContext) -> dict:
         temperature=cfg.temperature if cfg.temperature is not None else 0.3,
         max_tokens=cfg.max_tokens,
     )
+    # pass-through 用 {**data}：欄位缺漏（如使用者編輯重跑輸入）不會 KeyError
     return {
-        "file": data["file"],
+        **data,
         "model": f"{cfg.provider}/{cfg.model}",
         "source_chars": len(data["text"]),
         "result_chars": len(output),

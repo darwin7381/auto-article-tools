@@ -67,24 +67,41 @@ async def _run_job(job_id: int) -> None:
             job.updated_at = _now()
             s.add(job)
             s.commit()
-        bus.publish(job_id, {"event": "status", "data": {"status": "running"}})
-
         events: list[dict] = []
+        seq = 0
         result = None
         error = None
+
+        def _persist_events() -> None:
+            """事件逐筆即時入庫 → 中途加入/刷新/輪詢都看得到進度（不是跑完才有）。"""
+            with get_session() as s2:
+                j2 = s2.get(Job, job_id)
+                if j2 is not None:
+                    j2.events_json = json.dumps(events, ensure_ascii=False)
+                    j2.updated_at = _now()
+                    s2.add(j2)
+                    s2.commit()
+
+        def _emit(event: str, data: dict, persist: bool = True) -> None:
+            nonlocal seq
+            item = {"seq": seq, "event": event, "data": data}
+            seq += 1
+            if persist:
+                events.append(item)
+                _persist_events()
+            bus.publish(job_id, item)
+
+        _emit("status", {"status": "running"}, persist=False)
         try:
             async for ev in run_workflow(workflow, input_data, start_stage=start_stage):
-                item = {"event": ev.event, "data": ev.data}
-                events.append(item)
-                bus.publish(job_id, item)
+                _emit(ev.event, ev.data)
                 if ev.event == "done":
                     result = ev.data.get("result")
                 elif ev.event == "error":
                     error = ev.data.get("message")
         except Exception as exc:  # noqa: BLE001
             error = str(exc)
-            events.append({"event": "error", "data": {"message": error}})
-            bus.publish(job_id, {"event": "error", "data": {"message": error}})
+            _emit("error", {"message": error})
 
         with get_session() as s:
             job = s.get(Job, job_id)
@@ -98,10 +115,7 @@ async def _run_job(job_id: int) -> None:
                 job.updated_at = _now()
                 s.add(job)
                 s.commit()
-        bus.publish(
-            job_id,
-            {"event": "end", "data": {"status": "error" if error else "done"}},
-        )
+        _emit("end", {"status": "error" if error else "done"}, persist=False)
 
 
 async def _dispatcher() -> None:

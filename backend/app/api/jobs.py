@@ -82,25 +82,28 @@ async def get_job(job_id: int) -> dict:
 
 @router.get("/{job_id}/stream")
 async def stream_job(job_id: int):
-    """SSE 即時進度。先重播 DB 已存事件，再接 live 推送；job 已結束則只重播。"""
+    """SSE 即時進度。先訂閱再重播已存事件（seq 去重堵訂閱競態）；job 已結束則只重播。"""
+    q = bus.subscribe(job_id)  # 先訂閱：重播與 live 之間不漏事件
     with get_session() as s:
         job = s.get(Job, job_id)
         if job is None:
+            bus.unsubscribe(job_id, q)
             raise HTTPException(404, f"找不到 job: {job_id}")
         past = json.loads(job.events_json or "[]")
         finished = job.status in (JobStatus.done, JobStatus.error)
-
-    q = bus.subscribe(job_id) if not finished else None
+    last_seq = max((e.get("seq", -1) for e in past), default=-1)
 
     async def gen():
-        for ev in past:
-            yield {"event": ev["event"], "data": json.dumps(ev["data"], ensure_ascii=False)}
-        if finished:
-            yield {"event": "end", "data": json.dumps({"status": "replayed"})}
-            return
         try:
+            for ev in past:
+                yield {"event": ev["event"], "data": json.dumps(ev["data"], ensure_ascii=False)}
+            if finished:
+                yield {"event": "end", "data": json.dumps({"status": "replayed"})}
+                return
             while True:
                 ev = await asyncio.wait_for(q.get(), timeout=300)
+                if ev.get("seq", -1) <= last_seq:
+                    continue  # 重播已涵蓋，去重
                 yield {"event": ev["event"], "data": json.dumps(ev["data"], ensure_ascii=False)}
                 if ev["event"] == "end":
                     break
