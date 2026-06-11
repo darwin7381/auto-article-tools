@@ -39,25 +39,29 @@ def _r2_put(key: str, data: bytes, content_type: str) -> str:
 
 
 def save_image(data: bytes, ext: str = "png") -> tuple[str, str]:
-    """存圖片，回傳 (本地路徑或 r2 key, 公開 URL)。"""
+    """存圖片，回傳 (本地路徑或 r2 key, 公開 URL)。
+
+    本地模式回**相對 URL**（/files/...）：同源/手機/tunnel 任何入口都載得到，
+    不能寫死 localhost。
+    """
     name = f"{uuid.uuid4().hex}.{ext}"
     if _r2_enabled():
         key = f"platform/images/{name}"
         return key, _r2_put(key, data, f"image/{ext}")
     path = _data_path(_IMAGES, name)
     path.write_bytes(data)
-    return str(path), f"{settings.public_base_url.rstrip('/')}/files/images/{name}"
+    return str(path), f"/files/images/{name}"
 
 
 def save_text(text: str, ext: str = "html") -> tuple[str, str]:
-    """存文字輸出（如 final_html），回傳 (路徑/key, 公開 URL)。"""
+    """存文字輸出（如 final_html），回傳 (路徑/key, 公開 URL)。本地模式回相對 URL。"""
     name = f"{uuid.uuid4().hex}.{ext}"
     if _r2_enabled():
         key = f"platform/output/{name}"
         return key, _r2_put(key, text.encode("utf-8"), "text/html; charset=utf-8")
     path = _data_path(_OUTPUT, name)
     path.write_text(text, encoding="utf-8")
-    return str(path), f"{settings.public_base_url.rstrip('/')}/files/output/{name}"
+    return str(path), f"/files/output/{name}"
 
 
 def local_image_path(name: str) -> Path:
