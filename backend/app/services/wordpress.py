@@ -24,6 +24,9 @@ def _base() -> str:
     return settings.wordpress_api_url.rstrip("/") + "/wp-json/wp/v2"
 
 
+_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+
+
 async def _upload_media_from_path(client: httpx.AsyncClient, path: str, title: str) -> int:
     data = Path(path).read_bytes()
     filename = Path(path).name
@@ -33,7 +36,7 @@ async def _upload_media_from_path(client: httpx.AsyncClient, path: str, title: s
         content=data,
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
-            "Content-Type": "image/png",
+            "Content-Type": _MIME.get(Path(path).suffix.lower(), "image/png"),
         },
     )
     resp.raise_for_status()

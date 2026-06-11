@@ -18,13 +18,16 @@ def _safe(name: str) -> None:
         raise HTTPException(400, "非法檔名")
 
 
+_IMG_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+
+
 @router.get("/images/{name}")
 async def get_image(name: str):
     _safe(name)
     p = local_image_path(name)
     if not p.exists():
         raise HTTPException(404, "圖片不存在")
-    return FileResponse(p, media_type="image/png")
+    return FileResponse(p, media_type=_IMG_TYPES.get(p.suffix.lower(), "application/octet-stream"))
 
 
 @router.get("/output/{name}")
