@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from app.core.registry import Workflow, register
 from app.core.stage import RunContext, Stage
 from app.services.agent_config import get_agent_config
-from app.services.compress import compress_png
+from app.services.compress import compress_cover
 from app.services.image import generate_image
 from app.services.ingest import ingest_markdown
 from app.services.llm import chat, structured
@@ -91,8 +91,8 @@ async def s_cover_image(data: dict, ctx: RunContext) -> dict:
     try:
         img = await generate_image(prompt, cfg.model or "gpt-image-2",
                                    cfg.size or "1536x1024", cfg.quality or "medium")
-        img = await compress_png(img)  # TinyPNG 壓縮（沒金鑰則原樣回傳）
-        path, url = save_image(img, "png")  # 落地 + 可公開 URL（本地代理或 R2）
+        img, ext = await compress_cover(img)  # 本地 Pillow 壓縮（PNG→JPEG，小 ~80%）
+        path, url = save_image(img, ext)  # 落地 + 可公開 URL（本地代理或 R2）
         wp = {**wp, "featured_image": {"url": url, "alt": wp.get("title", "")}}
         return {**data, "wordpress": wp, "cover_image": path, "cover_image_url": url,
                 "cover_image_bytes": len(img)}
@@ -123,7 +123,21 @@ async def s_article_formatting(data: dict, ctx: RunContext) -> dict:
     if footer:
         parts.append(f'<section class="footer-disclaimer">{footer}</section>')
     final_html = "\n".join(parts)
-    _, output_url = save_text(final_html, "html")  # 輸出持久化 + viewer URL
+    # viewer 檔包成完整 HTML 文件：沒有 <meta charset> 的裸 fragment 在拿不到
+    # response header 的情境（手機 app 內建預覽/下載後本地開啟）會變亂碼
+    doc = (
+        '<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{title}</title>"
+        "<style>body{max-width:760px;margin:32px auto;padding:0 20px;"
+        "font-family:-apple-system,'PingFang TC','Microsoft JhengHei',sans-serif;"
+        "line-height:1.85;color:#222}img{max-width:100%;height:auto}"
+        "h1{line-height:1.4}.header-disclaimer,.footer-disclaimer{font-size:14px}"
+        ".alert{background:#fff7e6;border:1px solid #e8c97a;border-radius:8px;"
+        "padding:12px 16px;color:#7a5b00}</style></head><body>"
+        f"{final_html}</body></html>"
+    )
+    _, output_url = save_text(doc, "html")  # 輸出持久化 + viewer URL
     return {**data, "final_html": final_html, "output_url": output_url}
 
 

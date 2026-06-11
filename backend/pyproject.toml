@@ -24,11 +24,13 @@ ai = [
     "pymupdf>=1.25",
     "python-docx>=1.1",
     "trafilatura>=2.0",   # URL 進稿：網頁主文抽取 → markdown
+    "pillow>=11.0",       # 封面壓縮（本地，取代 TinyPNG API）
 ]
 dev = [
     "ruff>=0.9",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
+    "pytest-timeout>=2.3",
     "httpx>=0.28",
 ]
 

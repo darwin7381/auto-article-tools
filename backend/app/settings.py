@@ -35,9 +35,6 @@ class Settings(BaseSettings):
     strapi_url: str = "http://localhost:1337"
     strapi_api_token: str = ""
 
-    # 圖片壓縮（TinyPNG，選用；沒設就略過壓縮）
-    tinypng_api_key: str = ""
-
     # URL 進稿 fallback（Firecrawl，選用）
     firecrawl_api_key: str = ""
 
