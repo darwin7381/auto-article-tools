@@ -21,13 +21,13 @@ router = APIRouter(prefix="/publish", tags=["publish"])
 class PublishRequest(BaseModel):
     job_id: int
     status: str = "publish"  # 測試站，預設直接發布
-    overrides: dict[str, Any] | None = None  # 人工審稿後的 title/content/excerpt… 覆蓋
+    overrides: dict[str, Any] | None = None  # 人工審稿後的 title/content/excerpt/author/date… 覆蓋
 
 
 @router.post("")
 async def publish(body: PublishRequest) -> dict:
-    if body.status not in ("draft", "pending", "publish"):
-        raise HTTPException(400, "status 需為 draft / pending / publish")
+    if body.status not in ("draft", "pending", "publish", "private", "future"):
+        raise HTTPException(400, "status 需為 draft / pending / publish / private / future")
     with get_session() as s:
         job = s.get(Job, body.job_id)
         if job is None:

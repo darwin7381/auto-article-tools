@@ -448,7 +448,7 @@
           "jobs"
         ],
         "summary": "Stream Job",
-        "description": "SSE 即時進度。先重播 DB 已存事件，再接 live 推送；job 已結束則只重播。",
+        "description": "SSE 即時進度。先訂閱再重播已存事件（seq 去重堵訂閱競態）；job 已結束則只重播。",
         "operationId": "stream_job_jobs__job_id__stream_get",
         "parameters": [
           {

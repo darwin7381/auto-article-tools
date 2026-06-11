@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field
 
 from app.core.registry import Workflow, register
 from app.core.stage import RunContext, Stage
-from app.services import site_config
 from app.services.agent_config import get_agent_config
 from app.services.compress import compress_png
 from app.services.image import generate_image
@@ -82,10 +81,13 @@ async def s_copy_editing(data: dict, ctx: RunContext) -> dict:
 async def s_cover_image(data: dict, ctx: RunContext) -> dict:
     cfg = get_agent_config("imageGeneration")
     wp = data.get("wordpress", {})
+    from app.services.templates import TYPE_DEFAULTS
+
+    type_name = TYPE_DEFAULTS.get(data.get("article_type", ""), {}).get("name", "新聞稿")
     prompt = (cfg.prompt_template or "Cover image for: ${title}")
     prompt = (prompt.replace("${title}", wp.get("title", ""))
                     .replace("${contentSummary}", wp.get("excerpt", ""))
-                    .replace("${articleType}", "新聞稿"))
+                    .replace("${articleType}", type_name))
     try:
         img = await generate_image(prompt, cfg.model or "gpt-image-2",
                                    cfg.size or "1536x1024", cfg.quality or "medium")
@@ -99,12 +101,19 @@ async def s_cover_image(data: dict, ctx: RunContext) -> dict:
 
 
 async def s_article_formatting(data: dict, ctx: RunContext) -> dict:
+    from app.services.templates import resolve_disclaimers
+
     wp = data.get("wordpress", {})
     title = wp.get("title", "")
     cover = data.get("cover_image_url") or data.get("cover_image")
     body = wp.get("content") or data.get("html", "")
-    header = site_config.header_disclaimer()
-    footer = site_config.footer_disclaimer()
+    # 文稿類型/押註/供稿方（輸入帶入；未帶用 regular 預設=無押註）
+    header, footer, _ = resolve_disclaimers(
+        data.get("article_type", "regular"),
+        supplier=data.get("supplier", ""),
+        header_kind=data.get("header_disclaimer"),
+        footer_kind=data.get("footer_disclaimer"),
+    )
     parts = [f"<h1>{title}</h1>"]
     if header:
         parts.append(f'<section class="header-disclaimer">{header}</section>')
