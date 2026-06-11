@@ -30,12 +30,13 @@ class CreateJobRequest(BaseModel):
 
 
 def _stage_outputs(job: Job) -> list[dict]:
-    """從 events 萃取每階段的輸出，給前端逐階段展開檢視。"""
+    """從 events 萃取每階段的輸出與耗時，給前端逐階段展開檢視。"""
     out = []
     for ev in json.loads(job.events_json or "[]"):
         d = ev.get("data", {})
         if ev.get("event") == "stage" and d.get("status") == "done":
-            out.append({"id": d.get("id"), "output": d.get("output")})
+            out.append({"id": d.get("id"), "output": d.get("output"),
+                        "elapsed_ms": d.get("elapsed_ms")})
     return out
 
 

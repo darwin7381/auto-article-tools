@@ -16,7 +16,7 @@ async function jpost<T>(path: string, body: unknown): Promise<T> {
 }
 
 export type Workflow = { name: string; description: string; stages: string[] }
-export type StageOutput = { id: string; output: Record<string, unknown> | null }
+export type StageOutput = { id: string; output: Record<string, unknown> | null; elapsed_ms?: number | null }
 export type Job = {
   id: number
   workflow: string
