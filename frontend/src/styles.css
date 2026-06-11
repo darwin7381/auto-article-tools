@@ -52,7 +52,30 @@ a { color: var(--accent); }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
 .grid { display: grid; grid-template-columns: 380px 1fr; gap: 18px; align-items: start; }
-@media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+/* grid blowout 防線：子項 min-width:auto 會讓長內容(pre/diff/長字串)把欄位撐爆 */
+.grid > .panel, .panel, .stage-card, .out, .stage-list { min-width: 0; }
+.out pre, .out .diff { max-width: 100%; }
+.kv span { overflow-wrap: anywhere; }
+.fname, .run-chip, .hero-title { overflow-wrap: anywhere; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; gap: 14px; } }
+@media (max-width: 700px) {
+  .app { padding: 14px 12px 60px; }
+  .panel { padding: 13px; }
+  .topbar h1 { font-size: 17px; }
+  .tabs { overflow-x: auto; }
+  .tab { padding: 9px 12px; white-space: nowrap; }
+}
+
+/* 全頁拖放 overlay */
+.drop-overlay {
+  position: fixed; inset: 0; z-index: 900; display: flex; align-items: center; justify-content: center;
+  background: rgba(12, 17, 28, .82); backdrop-filter: blur(2px);
+  border: 3px dashed var(--accent); border-radius: 14px; margin: 10px;
+  font-size: 20px; color: var(--text); pointer-events: none;
+}
+:root.light .drop-overlay { background: rgba(245,246,248,.88); }
+.dropzone.busy { opacity: .7; cursor: default; }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
 .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 12px; }
@@ -85,6 +108,10 @@ button.ghost:hover { border-color: var(--accent); }
 .stage-row .t { margin-left: auto; color: var(--muted); font-size: 11px; }
 
 .kv { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 13px; margin: 8px 0; }
+@media (max-width: 700px) { .kv { grid-template-columns: 72px 1fr; } }
+.htmlframe { max-height: 50vh; }
+.runs-strip { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+@media (min-width: 701px) { .runs-strip { flex-wrap: wrap; overflow: visible; } }
 .kv .k { color: var(--muted); }
 .chip { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; background: var(--panel-2); border: 1px solid var(--border); margin: 2px 4px 2px 0; }
 .status { font-size: 11px; padding: 2px 8px; border-radius: 20px; }
@@ -98,6 +125,7 @@ pre.log { background: #0a0c10; color: #8be9a0; padding: 12px; border-radius: 8px
 .muted { color: var(--muted); }
 .err { color: var(--err); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 500; font-size: 12px; }
@@ -208,7 +236,12 @@ pre.log.content { color: #cdd3dc; }
 .stage-card.running { border-color: var(--accent); }
 .stage-card.done { border-color: #1f3a30; }
 .stage-card.error { border-color: var(--err); }
-.stage-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; }
+.stage-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; flex-wrap: wrap; row-gap: 4px; }
+@media (max-width: 700px) {
+  .stage-head { gap: 6px; padding: 8px 10px; }
+  .stage-head .name { font-size: 12px; }
+  .meta-badge { font-size: 10px; padding: 1px 5px; }
+}
 .stage-head .ic { width: 16px; text-align: center; color: var(--muted); }
 .stage-card.done .ic { color: var(--ok); }
 .stage-card.running .ic { color: var(--accent); animation: spin 1s linear infinite; display: inline-block; }
@@ -227,7 +260,7 @@ tr.sel td { background: #1b2740; }
 details summary { cursor: pointer; font-size: 12px; margin: 6px 0; }
 
 .editor { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.editor .toolbar { display: flex; gap: 2px; padding: 6px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.editor .toolbar { display: flex; gap: 2px; padding: 6px; background: var(--panel-2); border-bottom: 1px solid var(--border); flex-wrap: wrap; row-gap: 3px; }
 .editor .toolbar button { background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 5px; padding: 4px 9px; cursor: pointer; font-size: 12px; }
 .editor .toolbar button:hover { color: var(--text); }
 .editor .toolbar button.on { color: var(--text); background: #1b2740; border-color: var(--accent); }

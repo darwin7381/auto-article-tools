@@ -23,11 +23,12 @@ export type Job = {
   status: string
   input: Record<string, unknown>
   start_stage: string | null
-  result: Record<string, unknown> | null
+  result?: Record<string, unknown> | null
   error: string | null
   created_at: string
   updated_at: string
   stages?: StageOutput[]
+  done_stages?: string[] // slim 輪詢回傳的已完成階段摘要
 }
 export type Agent = {
   name: string
@@ -41,7 +42,7 @@ export type Agent = {
 export const getHealth = () => jget<{ status: string; workflows: string[] }>('/health')
 export const listWorkflows = () => jget<Workflow[]>('/workflows')
 export const listJobs = () => jget<Job[]>('/jobs')
-export const getJob = (id: number) => jget<Job>(`/jobs/${id}`)
+export const getJob = (id: number, full = true) => jget<Job>(`/jobs/${id}?full=${full}`)
 export const createJob = (workflow: string, input: unknown, from_stage?: string) =>
   jpost<{ id: number; status: string }>('/jobs', { workflow, input, from_stage })
 export const listAgents = () => jget<Agent[]>('/agents')

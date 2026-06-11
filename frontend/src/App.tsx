@@ -3,10 +3,10 @@ import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
 import { PublishForm } from './PublishForm'
 import { StageList, type StageView } from './Stages'
-import { FileDrop, UrlInput, type Uploaded } from './Upload'
+import { FileDrop, UrlInput, acceptOk, useGlobalDrop, type Uploaded } from './Upload'
 import { Toasts, toast } from './toast'
 import {
-  createJob, getHealth, getJob, listJobs, listWorkflows, publishJob, streamJob,
+  createJob, getHealth, getJob, listJobs, listWorkflows, publishJob, streamJob, uploadFile,
   type Job, type Workflow,
 } from './api'
 
@@ -103,6 +103,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const [imode, setImode] = useState<'file' | 'url'>('file')
   const [url, setUrl] = useState('')
   const [uploaded, setUploaded] = useState<Uploaded | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [atype, setAtype] = pref<ArticleType>('article-type', 'press-release')
   const [headerD, setHeaderD] = useState(() => TYPE_OPTS.find((o) => o.key === 'press-release')!.header)
   const [footerD, setFooterD] = useState('none')
@@ -115,6 +116,23 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const [lastInput, setLastInput] = useState<Record<string, unknown>>({})
   const attachToken = useRef(0)
   const stageIdsRef = useRef<string[]>([]) // attach 在 mount 早期就會用到，避免 state race
+  const submitLock = useRef(false) // 防連點重複建 job
+  const progressRef = useRef<HTMLDivElement>(null)
+
+  /** 上傳（點選/區內拖放/全頁拖放 共用同一條路）。 */
+  async function handleFile(f: File) {
+    if (!acceptOk(f.name)) { toast.err(`不支援的格式（支持 PDF、DOCX、MD）：${f.name}`); return }
+    setImode('file')
+    setUploading(true)
+    try {
+      const u = await uploadFile(f)
+      setUploaded(u)
+      toast.ok(`已上傳：${u.original_name}`)
+    } catch (e) {
+      toast.err('上傳失敗：' + String(e))
+    } finally { setUploading(false) }
+  }
+  const dragOver = useGlobalDrop(handleFile)
 
   // 初始：先載 pipeline 定義（attach 依賴它），再接回進行中（B1）
   useEffect(() => {
@@ -182,47 +200,78 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
     })
   }
 
-  /** 統一的「掛上一個 job」：建立後 / 重新整理接回 / 歷史點開，全走這條（B1/B2/B3 共用）。 */
-  async function attach(id: number, keepPrefix: StageView[] = []) {
+  /** slim 輪詢結果套用到視圖（done_stages 摘要；輸出靠 SSE 帶，完成時再抓一次 full）。 */
+  function applySlim(j: Job, keepPrefix: StageView[]) {
+    const doneIds = new Set(j.done_stages ?? [])
+    const keep = new Map(keepPrefix.map((v) => [v.id, v]))
+    setViews((prev) => {
+      let marked = false
+      return prev.map((v) => {
+        if (doneIds.has(v.id)) return v.status === 'done' ? v : { ...v, status: 'done' as const }
+        if (keep.get(v.id)?.status === 'done' || v.status === 'done') return v
+        if (!marked) {
+          marked = true
+          if (j.status === 'running' || j.status === 'pending') return v.status === 'running' ? v : { ...v, status: 'running' as const }
+          if (j.status === 'error') return { ...v, status: 'error' as const }
+        }
+        return v
+      })
+    })
+  }
+
+  /** 統一的「掛上一個 job」：建立後 / 重新整理接回 / 歷史點開，全走這條（B1/B2/B3 共用）。
+   *  輪詢一律 slim（避免大 payload 在手機/tunnel 上塞死互動），輸出靠 SSE + 完成時一次 full。 */
+  async function attach(id: number, keepPrefix: StageView[] = [], placeholderSet = false) {
     const token = ++attachToken.current
     setWatchingId(id)
     setJob(null)
-    const first = await getJob(id).catch(() => null)
-    if (!first) { toast.err(`載入 job #${id} 失敗`); return }
-    setLastInput(first.input)
-    setViews(viewsFromJob(first, keepPrefix))
-    if (first.status === 'done' || first.status === 'error') { setJob(first); return }
-
     setRunning(true)
     const ac = new AbortController()
-    streamJob(id, (ev, data) => {
-      if (attachToken.current !== token) return
-      const d = rec(data)
-      if (ev === 'stage') {
-        setViews((prev) => prev.map((v) => v.id === d.id
-          ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output, elapsedMs: (d.elapsed_ms as number) ?? v.elapsedMs }
-          : v))
-      }
-    }, ac.signal).catch(() => {})
     try {
+      const first = await getJob(id, false).catch(() => null) // slim：快
+      if (!first) { toast.err(`載入 job #${id} 失敗`); return }
+      if (attachToken.current !== token) return
+      setLastInput(first.input)
+      if (first.status === 'done' || first.status === 'error') {
+        const full = await getJob(id, true).catch(() => null)
+        if (full && attachToken.current === token) { setViews(viewsFromJob(full, keepPrefix)); setJob(full) }
+        return
+      }
+      if (!placeholderSet) setViews(viewsFromJob({ ...first, stages: [] }, keepPrefix))
+      applySlim(first, keepPrefix)
+
+      // SSE：即時逐階段（含輸出）
+      streamJob(id, (ev, data) => {
+        if (attachToken.current !== token) return
+        const d = rec(data)
+        if (ev === 'stage') {
+          setViews((prev) => prev.map((v) => v.id === d.id
+            ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output, elapsedMs: (d.elapsed_ms as number) ?? v.elapsedMs }
+            : v))
+        }
+      }, ac.signal).catch(() => {})
+
+      // slim 輪詢保底
       for (let i = 0; i < 400; i++) {
-        await new Promise((r) => setTimeout(r, 1500))
-        if (attachToken.current !== token) return // 使用者切去看別的 job
-        const j = await getJob(id).catch(() => null)
-        if (j) {
-          setViews(viewsFromJob(j, keepPrefix))
-          if (j.status === 'done' || j.status === 'error') {
-            setJob(j)
-            if (j.status === 'done') toast.ok(`任務 #${id} 完成`)
-            else toast.err(`任務 #${id} 失敗：${j.error ?? ''}`)
-            if (mode === 'auto' && j.status === 'done' && rec(j.result).wordpress) {
-              try {
-                const out = await publishJob(j.id, pubStatus)
-                toast.ok(`自動發布成功（${out.status}）`)
-              } catch (e) { toast.err('自動發布失敗：' + String(e)) }
-            }
-            return
+        await new Promise((r) => setTimeout(r, 2000))
+        if (attachToken.current !== token) return
+        const j = await getJob(id, false).catch(() => null)
+        if (!j) continue
+        applySlim(j, keepPrefix)
+        if (j.status === 'done' || j.status === 'error') {
+          const full = await getJob(id, true).catch(() => null)
+          if (!full || attachToken.current !== token) return
+          setViews(viewsFromJob(full, keepPrefix))
+          setJob(full)
+          if (full.status === 'done') toast.ok(`任務 #${id} 完成`)
+          else toast.err(`任務 #${id} 失敗：${full.error ?? ''}`)
+          if (mode === 'auto' && full.status === 'done' && rec(full.result).wordpress) {
+            try {
+              const out = await publishJob(full.id, pubStatus)
+              toast.ok(`自動發布成功（${out.status}）`)
+            } catch (e) { toast.err('自動發布失敗：' + String(e)) }
           }
+          return
         }
       }
       toast.err('處理逾時（10 分鐘），稍後可從執行列接回')
@@ -234,15 +283,32 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   }
 
   async function execute(inputObj: Record<string, unknown>, fromStage?: string) {
+    if (submitLock.current) return // 防連點：建立期間再點直接忽略
+    submitLock.current = true
     const startIdx = fromStage ? stageIds.indexOf(fromStage) : 0
     const keepPrefix = fromStage ? views.slice(0, startIdx) : []
+    // ⚡ 點下去「立刻」有反應：鎖按鈕 + 渲染骨架，不等任何網路往返
+    setRunning(true)
+    setJob(null)
     setLastInput(inputObj)
+    setViews(() => {
+      const byId = new Map(keepPrefix.map((v) => [v.id, v]))
+      return stageIdsRef.current.map((sid, i) =>
+        i < startIdx ? byId.get(sid) ?? { id: sid, status: 'pending' as const }
+          : i === startIdx ? { id: sid, status: 'running' as const }
+            : { id: sid, status: 'pending' as const })
+    })
+    if (window.innerWidth < 900) progressRef.current?.scrollIntoView({ behavior: 'smooth' })
     try {
       const { id } = await createJob(PIPELINE, inputObj, fromStage)
       toast.info(fromStage ? `從「${fromStage}」重跑（#${id}）` : `開始處理（#${id}）`)
       refreshRecent()
-      await attach(id, keepPrefix)
-    } catch (e) { toast.err('啟動失敗：' + String(e)) }
+      await attach(id, keepPrefix, true)
+    } catch (e) {
+      toast.err('啟動失敗：' + String(e))
+      setRunning(false)
+      setViews([])
+    } finally { submitLock.current = false }
   }
 
   const meta = (() => {
@@ -255,6 +321,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
 
   return (
     <div className="grid">
+      {dragOver && <div className="drop-overlay"><div>📄 放開以上傳檔案</div></div>}
       <div className="panel">
         <h2>1. 進稿</h2>
         <div className="seg">
@@ -263,7 +330,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
         </div>
         <div style={{ marginTop: 12 }}>
           {imode === 'file'
-            ? <FileDrop uploaded={uploaded} onUploaded={setUploaded} />
+            ? <FileDrop uploaded={uploaded} uploading={uploading} onFile={handleFile} onReset={() => setUploaded(null)} />
             : <UrlInput url={url} onUrl={setUrl} />}
         </div>
 
@@ -312,15 +379,15 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
           </div>
         </div>
 
-        <button className="primary" disabled={running} onClick={() => { const i = gatherInput(); if (i) execute(i) }}>
-          {running ? '處理中...' : '開始處理'}
+        <button className="primary" disabled={running || uploading} onClick={() => { const i = gatherInput(); if (i) execute(i) }}>
+          {uploading ? '檔案上傳中...' : running ? '處理中...' : '開始處理'}
         </button>
         <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
           {running ? '可以放心離開或重新整理——回來會自動接上進度。' : `完整流程 ${stageIds.length || 7} 階段，每一步即時更新、可展開查看、可從任一步重跑。`}
         </p>
       </div>
 
-      <div className="panel">
+      <div className="panel" ref={progressRef}>
         <div className="row">
           <h2 style={{ margin: 0 }}>處理進度與結果</h2>
           <span className="spacer" />
@@ -404,7 +471,7 @@ function JobsPanel({ onOpen }: { onOpen: (id: number) => void }) {
         <span className="spacer" />
         <button className="ghost" onClick={load}>重新整理</button>
       </div>
-      <table>
+      <div className="table-wrap"><table>
         <thead><tr><th>#</th><th>來源</th><th>流程</th><th>狀態</th><th>耗時</th><th>時間</th></tr></thead>
         <tbody>
           {shown.map((j) => {
@@ -422,7 +489,7 @@ function JobsPanel({ onOpen }: { onOpen: (id: number) => void }) {
           })}
           {shown.length === 0 && <tr><td colSpan={6} className="muted">沒有符合的 job</td></tr>}
         </tbody>
-      </table>
+      </table></div>
       <p className="hint" style={{ marginTop: 8 }}>點任一筆回到「處理稿件」載入完整視圖（可查看每階段、重跑、發布）。</p>
     </div>
   )

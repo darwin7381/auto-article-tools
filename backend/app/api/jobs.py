@@ -40,20 +40,29 @@ def _stage_outputs(job: Job) -> list[dict]:
     return out
 
 
-def _job_dict(job: Job, with_stages: bool = False) -> dict:
+def _job_dict(job: Job, with_stages: bool = False, slim: bool = False) -> dict:
+    """slim=True：不含 result/stages 的輕量摘要。
+
+    列表/輪詢 payload 控制是手機+tunnel 體感的關鍵——完整 result（整篇稿+HTML）
+    一筆可達數百 KB，每 1.5s 輪詢或一次列 50 筆會把行動網路塞死。
+    """
     d = {
         "id": job.id,
         "workflow": job.workflow,
         "status": job.status.value if isinstance(job.status, JobStatus) else job.status,
         "input": json.loads(job.input_json),
         "start_stage": job.start_stage,
-        "result": json.loads(job.result_json) if job.result_json else None,
         "error": job.error,
         "created_at": job.created_at,
         "updated_at": job.updated_at,
     }
+    if not slim:
+        d["result"] = json.loads(job.result_json) if job.result_json else None
     if with_stages:
         d["stages"] = _stage_outputs(job)
+    # 輪詢用的階段進度摘要（極小）：已完成階段 id 列表
+    if slim:
+        d["done_stages"] = [s["id"] for s in _stage_outputs(job)]
     return d
 
 
@@ -67,18 +76,20 @@ async def create_job(body: CreateJobRequest) -> dict:
 
 @router.get("")
 async def list_jobs(limit: int = 50) -> list[dict]:
+    """列表一律輕量（不含 result）。"""
     with get_session() as s:
         rows = s.exec(select(Job).order_by(Job.id.desc()).limit(limit)).all()  # type: ignore[attr-defined]
-        return [_job_dict(j) for j in rows]
+        return [_job_dict(j, slim=True) for j in rows]
 
 
 @router.get("/{job_id}")
-async def get_job(job_id: int) -> dict:
+async def get_job(job_id: int, full: bool = True) -> dict:
+    """full=false：輕量狀態（輪詢用，含 done_stages 摘要）；full=true：完整含逐階段輸出。"""
     with get_session() as s:
         job = s.get(Job, job_id)
         if job is None:
             raise HTTPException(404, f"找不到 job: {job_id}")
-        return _job_dict(job, with_stages=True)
+        return _job_dict(job, with_stages=full, slim=not full)
 
 
 @router.get("/{job_id}/stream")
