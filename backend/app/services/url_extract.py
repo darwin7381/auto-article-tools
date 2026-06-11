@@ -54,6 +54,41 @@ def _trafilatura_md(html: str, url: str) -> str | None:
     )
 
 
+_firecrawl_bin: str | None = None
+
+
+def _find_firecrawl() -> str:
+    """找 firecrawl CLI 的絕對路徑。
+
+    launchd 啟動的 process PATH 很窄（沒有 nvm/.local），不能用裸名 'firecrawl'
+    ——實測在 launchd 下會 FileNotFoundError。
+    """
+    global _firecrawl_bin
+    if _firecrawl_bin:
+        return _firecrawl_bin
+    import glob
+    import shutil
+
+    cand = shutil.which("firecrawl")
+    if not cand:
+        home = str(Path.home())
+        for pat in (
+            f"{home}/.nvm/versions/node/*/bin/firecrawl",
+            f"{home}/.local/bin/firecrawl",
+            "/opt/homebrew/bin/firecrawl",
+            "/usr/local/bin/firecrawl",
+            f"{home}/Library/pnpm/firecrawl",
+        ):
+            hits = sorted(glob.glob(pat), reverse=True)  # nvm 取最新版
+            if hits:
+                cand = hits[0]
+                break
+    if not cand:
+        raise RuntimeError("找不到 firecrawl CLI（裝在 PATH 外？）；或改設 FIRECRAWL_API_KEY 走 API")
+    _firecrawl_bin = cand
+    return cand
+
+
 async def _firecrawl_html(url: str) -> str:
     """Firecrawl fallback：過反爬牆 + 渲染 JS，回傳完整 HTML。
 
@@ -63,7 +98,7 @@ async def _firecrawl_html(url: str) -> str:
         tmp = f.name
     try:
         proc = await asyncio.create_subprocess_exec(
-            "firecrawl", "scrape", url, "--format", "html", "-o", tmp,
+            _find_firecrawl(), "scrape", url, "--format", "html", "-o", tmp,
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
         )
         _, err = await asyncio.wait_for(proc.communicate(), timeout=90)
