@@ -63,7 +63,7 @@ export function ConfigPanel() {
     <div className="grid">
       <div className="panel">
         <h2>Agents（設定存 DB）</h2>
-        <table>
+        <div className="table-wrap"><table>
           <thead><tr><th>名稱</th><th>model</th></tr></thead>
           <tbody>
             {agents.map((a) => (
@@ -72,7 +72,7 @@ export function ConfigPanel() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         <div className="banner" style={{ marginTop: 16 }}>
           Strapi 設定遷移（作者 / 頁首頁尾免責 / 預設）
           <div className="row" style={{ marginTop: 8 }}>

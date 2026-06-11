@@ -44,8 +44,21 @@ app.include_router(site_config.router)
 
 # 同源托管前端 SPA（build 後的 dist）：API 路由先註冊、優先；其餘交給靜態檔。
 # 這樣前端用相對路徑打 API，免 CORS、只需一條 tunnel。
+class _SpaStatic(StaticFiles):
+    """index.html 一律 no-cache（否則瀏覽器啟發式快取 → 使用者卡在舊 bundle）；
+    hashed assets 永久快取。"""
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        resp = await super().get_response(path, scope)
+        if path.startswith("assets/"):
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
 if _FRONTEND_DIST.exists():
-    app.mount("/", StaticFiles(directory=str(_FRONTEND_DIST), html=True), name="spa")
+    app.mount("/", _SpaStatic(directory=str(_FRONTEND_DIST), html=True), name="spa")
 else:
     @app.get("/")
     async def root() -> dict:
