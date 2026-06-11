@@ -1,15 +1,18 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
 
-async function jget<T>(path: string): Promise<T> {
-  const r = await fetch(`${API_BASE}${path}`)
+// 所有請求都帶 timeout：tunnel/行動網路壅塞時，沒 timeout 的 fetch 會永遠懸住
+// → UI 卡死且不自癒
+async function jget<T>(path: string, timeoutMs = 20_000): Promise<T> {
+  const r = await fetch(`${API_BASE}${path}`, { signal: AbortSignal.timeout(timeoutMs) })
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
   return r.json()
 }
-async function jpost<T>(path: string, body: unknown): Promise<T> {
+async function jpost<T>(path: string, body: unknown, timeoutMs = 30_000): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
   })
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
   return r.json()

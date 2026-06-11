@@ -118,6 +118,8 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const stageIdsRef = useRef<string[]>([]) // attach 在 mount 早期就會用到，避免 state race
   const submitLock = useRef(false) // 防連點重複建 job
   const progressRef = useRef<HTMLDivElement>(null)
+  const jobCache = useRef(new Map<number, Job>()) // 已完成 job 不可變 → 快取，切換秒開
+  const [loadingJob, setLoadingJob] = useState<number | null>(null)
 
   /** 上傳（點選/區內拖放/全頁拖放 共用同一條路）。 */
   async function handleFile(f: File) {
@@ -134,19 +136,33 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   }
   const dragOver = useGlobalDrop(handleFile)
 
-  // 初始：先載 pipeline 定義（attach 依賴它），再接回進行中（B1）
+  // 初始：先載 pipeline 定義（attach 依賴它），再接回進行中（B1）。
+  // 任務列定時自刷新：初始請求若逾時（tunnel 壅塞）也能自癒；自動接回在「首次成功刷新」時檢查。
+  const didAutoAttach = useRef(false)
   useEffect(() => {
-    ;(async () => {
+    let stop = false
+    async function ensureStageIds() {
+      if (stageIdsRef.current.length) return
       try {
         const ws: Workflow[] = await listWorkflows()
         const ids = ws.find((w) => w.name === PIPELINE)?.stages ?? []
         stageIdsRef.current = ids
         setStageIds(ids)
-      } catch { /* health 會顯示未連線 */ }
+      } catch { /* 下一輪再試 */ }
+    }
+    async function tick() {
+      if (stop || document.hidden) return
+      await ensureStageIds()
       const js = await refreshRecent()
-      const live = js.find((j) => j.workflow === PIPELINE && (j.status === 'running' || j.status === 'pending'))
-      if (live) { toast.info(`接回進行中的任務 #${live.id}`); attach(live.id) }
-    })()
+      if (!didAutoAttach.current && js.length) {
+        didAutoAttach.current = true
+        const live = js.find((j) => j.status === 'running' || j.status === 'pending')
+        if (live) { toast.info(`接回進行中的任務 #${live.id}`); attach(live.id) }
+      }
+    }
+    tick()
+    const t = setInterval(tick, 12_000)
+    return () => { stop = true; clearInterval(t) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Jobs 頁點開某筆 → 載入完整視圖（B3）
@@ -226,6 +242,16 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
     setWatchingId(id)
     setJob(null)
     setRunning(true)
+    // ⚡ 快取命中（已完成 job 不可變）→ 零網路、秒開
+    const cached = jobCache.current.get(id)
+    if (cached) {
+      setLastInput(cached.input)
+      setViews(viewsFromJob(cached, keepPrefix))
+      setJob(cached)
+      setRunning(false)
+      return
+    }
+    if (!placeholderSet) { setViews([]); setLoadingJob(id) } // 骨架屏：載入有感
     const ac = new AbortController()
     try {
       const first = await getJob(id, false).catch(() => null) // slim：快
@@ -234,7 +260,10 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
       setLastInput(first.input)
       if (first.status === 'done' || first.status === 'error') {
         const full = await getJob(id, true).catch(() => null)
-        if (full && attachToken.current === token) { setViews(viewsFromJob(full, keepPrefix)); setJob(full) }
+        if (full && attachToken.current === token) {
+          jobCache.current.set(id, full)
+          setViews(viewsFromJob(full, keepPrefix)); setJob(full)
+        }
         return
       }
       if (!placeholderSet) setViews(viewsFromJob({ ...first, stages: [] }, keepPrefix))
@@ -261,6 +290,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
         if (j.status === 'done' || j.status === 'error') {
           const full = await getJob(id, true).catch(() => null)
           if (!full || attachToken.current !== token) return
+          jobCache.current.set(id, full)
           setViews(viewsFromJob(full, keepPrefix))
           setJob(full)
           if (full.status === 'done') toast.ok(`任務 #${id} 完成`)
@@ -276,7 +306,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
       }
       toast.err('處理逾時（10 分鐘），稍後可從執行列接回')
     } finally {
-      if (attachToken.current === token) setRunning(false)
+      if (attachToken.current === token) { setRunning(false); setLoadingJob(null) }
       ac.abort()
       refreshRecent()
     }
@@ -394,17 +424,29 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
         </div>
         {recent.length > 0 && (
           <div className="runs-strip">
-            {recent.map((j) => (
-              <button key={j.id} className={`run-chip ${j.id === watchingId ? 'cur' : ''}`} onClick={() => attach(j.id)}
-                title={`${jobSource(j)} · ${relTime(j.created_at)}`}>
-                <span className={`dot2 ${j.status}`} />#{j.id}{j.start_stage ? '↻' : ''}
-              </button>
-            ))}
+            {recent.map((j) => {
+              const st = j.status === 'running' || j.status === 'pending' ? '處理中' : j.status === 'done' ? '完成' : '失敗'
+              return (
+                <button key={j.id} className={`run-item ${j.id === watchingId ? 'cur' : ''}`} onClick={() => attach(j.id)}>
+                  <span className={`dot2 ${j.status}`} />
+                  <span className="ri-main">
+                    <span className="ri-title">#{j.id}{j.start_stage ? ' ↻' : ''} {jobSource(j).slice(0, 18)}</span>
+                    <span className="ri-sub">{st} · {relTime(j.created_at)}</span>
+                  </span>
+                </button>
+              )
+            })}
           </div>
         )}
-        {views.length === 0
-          ? <p className="muted" style={{ marginTop: 10 }}>選好進稿後按「開始處理」。進行中或歷史任務可從上方執行列點開。</p>
-          : <StageList stages={views} originalInput={lastInput} meta={meta} totalMs={totalMs}
+        {loadingJob != null && views.length === 0 && (
+          <div className="skeleton-list">
+            <div className="muted" style={{ marginBottom: 8 }}>載入任務 #{loadingJob} …</div>
+            {[0, 1, 2, 3, 4].map((i) => <div key={i} className="skel" style={{ animationDelay: `${i * 0.08}s` }} />)}
+          </div>
+        )}
+        {views.length === 0 && loadingJob == null
+          ? <p className="muted" style={{ marginTop: 10 }}>選好進稿後按「開始處理」。進行中或歷史任務可從上方任務列點開。</p>
+          : views.length > 0 && <StageList stages={views} originalInput={lastInput} meta={meta} totalMs={totalMs}
               onRerun={(sid, input) => execute(input, sid)} />}
         {job && job.status === 'done' && <ResultHero job={job} />}
         {job && mode === 'manual' && <ReviewPublish job={job} defaultStatus={pubStatus} />}
