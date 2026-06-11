@@ -184,4 +184,5 @@ Redis 只在「用 Celery（需 broker）」或「多 worker 跨 process 廣播�
 - **repo 結構說明**：`MONOREPO.md`
 - **後端**：`backend/README.md` · **前端**：`frontend/README.md` · **型別合約**：`shared/README.md`
 - **舊計劃（已過時，僅存參考）**：HedgeDoc <https://md.blocktempo.ai/5m1xSHAuSRe3K9LTLsSWNA>
+- **Console 設計文件**：`docs/CONSOLE-DESIGN.md`（為什麼舊版 40 分、80 分的定義與驗收清單）
 - **本文件**：`docs/PLATFORM-REWRITE.md`（唯一真相，後續更新這份）

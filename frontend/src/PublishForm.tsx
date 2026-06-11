@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { publishJob, type Job } from './api'
+import { toast } from './toast'
 
 function rec(o: unknown): Record<string, unknown> {
   return (o ?? {}) as Record<string, unknown>
@@ -28,11 +29,24 @@ export function PublishForm({ job, editedHtml, defaultStatus }: {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<{ link?: string; status?: string } | null>(null)
   const [err, setErr] = useState('')
+  const [confirming, setConfirming] = useState(false)
   const coverUrl = (r.cover_image_url as string) || ''
 
+  function precheck(): boolean {
+    if (!title.trim()) { setErr('文章標題為必填'); toast.err('文章標題為必填'); return false }
+    if (status === 'future' && !date) { setErr('選擇「定時發布」時必須設定發布日期時間'); return false }
+    return true
+  }
+
+  /** 對外動作防呆：直接發布/定時/私密需內嵌確認；草稿/待審不擋。 */
+  function onPublishClick() {
+    if (!precheck()) return
+    if (status === 'publish' || status === 'future') { setConfirming(true); return }
+    publish()
+  }
+
   async function publish() {
-    if (!title.trim()) { setErr('文章標題為必填'); return }
-    if (status === 'future' && !date) { setErr('選擇「定時發布」時必須設定發布日期時間'); return }
+    setConfirming(false)
     setBusy(true); setErr(''); setDone(null)
     try {
       const toIds = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean).map((id) => ({ id: Number(id) }))
@@ -48,8 +62,10 @@ export function PublishForm({ job, editedHtml, defaultStatus }: {
       }
       const out = await publishJob(job.id, status, overrides)
       setDone(out)
+      toast.ok(`發布成功（${out.status}）`)
     } catch (e) {
       setErr(String(e))
+      toast.err('發布失敗')
     } finally { setBusy(false) }
   }
 
@@ -111,7 +127,7 @@ export function PublishForm({ job, editedHtml, defaultStatus }: {
       )}
 
       <div className="row" style={{ marginTop: 14 }}>
-        <button className="primary" style={{ width: 'auto', marginTop: 0 }} disabled={busy} onClick={publish}>
+        <button className="primary" style={{ width: 'auto', marginTop: 0 }} disabled={busy || confirming} onClick={onPublishClick}>
           {busy ? '發布中...' : '發布到WordPress'}
         </button>
         {done && (
@@ -120,6 +136,15 @@ export function PublishForm({ job, editedHtml, defaultStatus }: {
           </span>
         )}
       </div>
+      {confirming && (
+        <div className="confirm-box">
+          即將以「{status === 'publish' ? '直接發布' : '定時發布'}」發到 <b>wp.blocktempo.ai</b>，文章會公開可見。確定？
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="primary" style={{ width: 'auto', marginTop: 0 }} onClick={publish}>確認發布</button>
+            <button className="ghost" onClick={() => setConfirming(false)}>取消</button>
+          </div>
+        </div>
+      )}
       {err && <div className="err-box">發布失敗：{err}</div>}
     </div>
   )

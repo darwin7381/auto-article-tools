@@ -16,7 +16,8 @@ async def generate_image(
 
     from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, InternalServerError
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    # timeout 收緊：SDK 預設 600s，API 不通時 3 次重試會把階段拖到近 10 分鐘
+    client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=120)
     last_err: Exception | None = None
     for attempt in range(3):
         try:

@@ -105,6 +105,49 @@ tr.click { cursor: pointer; }
 tr.click:hover td { background: var(--panel-2); }
 .banner { background: #2a2410; border: 1px solid #5a4a14; color: var(--warn); padding: 10px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; }
 
+/* Toast 通知 */
+.toasts { position: fixed; top: 14px; right: 14px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; max-width: min(380px, 86vw); }
+.toast { padding: 10px 14px; border-radius: 9px; font-size: 13px; cursor: pointer; box-shadow: 0 6px 22px rgba(0,0,0,.35); animation: slidein .18s ease; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+.toast.ok { border-color: #1f5c49; }
+.toast.err { border-color: #5c1f1f; }
+@keyframes slidein { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* 行級 diff */
+.diff { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #0a0c10; border-radius: 8px; padding: 10px 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+:root.light .diff { background: #f6f8fa; }
+.d-add { color: #4ade80; background: rgba(34,197,94,.08); }
+.d-del { color: #f08c8c; background: rgba(239,68,68,.08); text-decoration: line-through; text-decoration-color: rgba(240,140,140,.4); }
+.d-same { color: var(--muted); }
+.d-skip { color: var(--muted); text-align: center; padding: 2px 0; font-style: italic; }
+
+/* 成品區 hero */
+.hero { display: flex; gap: 14px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 12px; padding: 14px; margin-top: 14px; align-items: flex-start; }
+.hero-cover { width: 190px; border-radius: 8px; border: 1px solid var(--border); }
+.hero-title { font-size: 16px; font-weight: 700; line-height: 1.45; }
+.hero-excerpt { color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.6; }
+@media (max-width: 700px) { .hero { flex-direction: column; } .hero-cover { width: 100%; } }
+
+/* 執行列（最近 jobs chips） */
+.runs-strip { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 12px; }
+.run-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 16px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); cursor: pointer; font-size: 12px; }
+.run-chip.cur { border-color: var(--accent); color: var(--text); }
+.dot2 { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.dot2.done { background: var(--ok); }
+.dot2.running, .dot2.pending { background: var(--accent); animation: pulse 1.2s ease infinite; }
+.dot2.error { background: var(--err); }
+@keyframes pulse { 50% { opacity: .35; } }
+
+/* 階段 meta 徽章 */
+.meta-badge { font-size: 10.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
+.meta-badge.model { color: var(--accent-2); }
+button.link.cur { text-decoration: underline; color: var(--text); }
+pre.log.content { color: #cdd3dc; }
+:root.light pre.log.content { color: #2a2f3a; }
+
+/* 發布確認框 */
+.confirm-box { margin-top: 10px; border: 1px solid #5a4a14; background: #2a2410; color: var(--warn); border-radius: 9px; padding: 12px 14px; font-size: 13px; }
+:root.light .confirm-box { background: #fff7e6; }
+
 /* 拖放上傳 */
 .dropzone { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
 .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(79,140,255,.06); }

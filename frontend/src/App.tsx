@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
 import { PublishForm } from './PublishForm'
 import { StageList, type StageView } from './Stages'
 import { FileDrop, UrlInput, type Uploaded } from './Upload'
+import { Toasts, toast } from './toast'
 import {
   createJob, getHealth, getJob, listJobs, listWorkflows, publishJob, streamJob,
   type Job, type Workflow,
@@ -15,7 +16,7 @@ type ArticleType = 'regular' | 'sponsored' | 'press-release'
 
 function rec(o: unknown): Record<string, unknown> { return (o ?? {}) as Record<string, unknown> }
 
-const PIPELINE = 'article' // 主流程固定完整 pipeline；extract/standardize 留給 CLI/API 與重跑
+const PIPELINE = 'article'
 
 const TYPE_OPTS: { key: ArticleType; label: string; header: string; footer: string }[] = [
   { key: 'regular', label: '一般文章', header: 'none', footer: 'none' },
@@ -28,29 +29,56 @@ const DISCLAIMER_OPTS = [
   { key: 'press-release', label: '新聞稿押註' },
 ]
 
+/** 偏好記憶（E1）。 */
+function pref<T>(key: string, init: T): [T, (v: T) => void] {
+  const [v, setV] = useState<T>(() => {
+    try { const s = localStorage.getItem('pref:' + key); return s != null ? JSON.parse(s) : init }
+    catch { return init }
+  })
+  return [v, (nv: T) => { setV(nv); localStorage.setItem('pref:' + key, JSON.stringify(nv)) }]
+}
+
+function relTime(iso: string): string {
+  const s = Math.max(0, (Date.now() - new Date(iso + (iso.endsWith('Z') ? '' : 'Z')).getTime()) / 1000)
+  if (s < 60) return `${Math.floor(s)} 秒前`
+  if (s < 3600) return `${Math.floor(s / 60)} 分鐘前`
+  if (s < 86400) return `${Math.floor(s / 3600)} 小時前`
+  return `${Math.floor(s / 86400)} 天前`
+}
+function jobDurMs(j: Job): number | null {
+  const a = new Date(j.created_at + (j.created_at.endsWith('Z') ? '' : 'Z')).getTime()
+  const b = new Date(j.updated_at + (j.updated_at.endsWith('Z') ? '' : 'Z')).getTime()
+  return b > a ? b - a : null
+}
+function jobSource(j: Job): string {
+  const i = rec(j.input)
+  if (i.url) return String(i.url).replace(/^https?:\/\//, '').slice(0, 42)
+  if (i.file) return String(i.file).split('/').pop()?.slice(0, 42) ?? '檔案'
+  return '—'
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('run')
-  const [health, setHealth] = useState<{ status: string; workflows: string[] } | null>(null)
-  const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
+  const [health, setHealth] = useState<{ status: string } | null>(null)
+  const [light, setLight] = pref('theme-light', false)
+  const [openJobId, setOpenJobId] = useState<number | null>(null) // Jobs 頁點開 → 跳回 run 視圖
   useEffect(() => {
     const check = () => getHealth().then(setHealth).catch(() => setHealth(null))
     check()
-    const t = setInterval(check, 30_000) // 定時輪詢，後端重啟後自動恢復顯示
+    const t = setInterval(check, 30_000)
     return () => clearInterval(t)
   }, [])
-  useEffect(() => {
-    document.documentElement.classList.toggle('light', light)
-    localStorage.setItem('theme', light ? 'light' : 'dark')
-  }, [light])
+  useEffect(() => { document.documentElement.classList.toggle('light', light) }, [light])
   return (
     <div className="app">
+      <Toasts />
       <div className="topbar">
         <h1>BD 內容自動化平台</h1>
         <span className="health">
-          <span className={`dot ${health?.status === 'ok' ? 'ok' : ''}`} />
+          <span className={`dot ${health ? 'ok' : ''}`} />
           {health ? '後端正常' : '後端未連線'}
         </span>
-        <button className="ghost theme-btn" onClick={() => setLight((v) => !v)} title={light ? '切換到暗色模式' : '切換到亮色模式'}>
+        <button className="ghost theme-btn" onClick={() => setLight(!light)} title={light ? '切換到暗色模式' : '切換到亮色模式'}>
           {light ? '🌙' : '☀️'}
         </button>
       </div>
@@ -59,35 +87,62 @@ export default function App() {
         <div className={`tab ${tab === 'jobs' ? 'active' : ''}`} onClick={() => setTab('jobs')}>Jobs 歷史</div>
         <div className={`tab ${tab === 'config' ? 'active' : ''}`} onClick={() => setTab('config')}>設定 / Prompt</div>
       </div>
-      {tab === 'run' && <RunPanel />}
-      {tab === 'jobs' && <JobsPanel />}
+      <div style={{ display: tab === 'run' ? 'block' : 'none' }}>
+        <RunPanel openJobId={openJobId} onOpened={() => setOpenJobId(null)} />
+      </div>
+      {tab === 'jobs' && <JobsPanel onOpen={(id) => { setOpenJobId(id); setTab('run') }} />}
       {tab === 'config' && <ConfigPanel />}
     </div>
   )
 }
 
-function RunPanel() {
+function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened: () => void }) {
   const [stageIds, setStageIds] = useState<string[]>([])
-  const [mode, setMode] = useState<Mode>('manual')
-  const [pubStatus, setPubStatus] = useState('draft')
+  const [mode, setMode] = pref<Mode>('mode', 'manual')
+  const [pubStatus, setPubStatus] = pref('pub-status', 'draft')
   const [imode, setImode] = useState<'file' | 'url'>('file')
   const [url, setUrl] = useState('')
   const [uploaded, setUploaded] = useState<Uploaded | null>(null)
-  const [atype, setAtype] = useState<ArticleType>('press-release')
-  const [headerD, setHeaderD] = useState('press-release')
+  const [atype, setAtype] = pref<ArticleType>('article-type', 'press-release')
+  const [headerD, setHeaderD] = useState(() => TYPE_OPTS.find((o) => o.key === 'press-release')!.header)
   const [footerD, setFooterD] = useState('none')
   const [supplier, setSupplier] = useState('')
   const [running, setRunning] = useState(false)
   const [views, setViews] = useState<StageView[]>([])
   const [job, setJob] = useState<Job | null>(null)
-  const [autoMsg, setAutoMsg] = useState('')
+  const [recent, setRecent] = useState<Job[]>([])
+  const [watchingId, setWatchingId] = useState<number | null>(null)
   const [lastInput, setLastInput] = useState<Record<string, unknown>>({})
+  const attachToken = useRef(0)
+  const stageIdsRef = useRef<string[]>([]) // attach 在 mount 早期就會用到，避免 state race
 
+  // 初始：先載 pipeline 定義（attach 依賴它），再接回進行中（B1）
   useEffect(() => {
-    listWorkflows().then((ws: Workflow[]) => {
-      setStageIds(ws.find((w) => w.name === PIPELINE)?.stages ?? [])
-    }).catch(() => {})
-  }, [])
+    ;(async () => {
+      try {
+        const ws: Workflow[] = await listWorkflows()
+        const ids = ws.find((w) => w.name === PIPELINE)?.stages ?? []
+        stageIdsRef.current = ids
+        setStageIds(ids)
+      } catch { /* health 會顯示未連線 */ }
+      const js = await refreshRecent()
+      const live = js.find((j) => j.workflow === PIPELINE && (j.status === 'running' || j.status === 'pending'))
+      if (live) { toast.info(`接回進行中的任務 #${live.id}`); attach(live.id) }
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Jobs 頁點開某筆 → 載入完整視圖（B3）
+  useEffect(() => {
+    if (openJobId != null) { attach(openJobId); onOpened() }
+  }, [openJobId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function refreshRecent(): Promise<Job[]> {
+    try {
+      const js = (await listJobs()).filter((j) => j.workflow === PIPELINE).slice(0, 6)
+      setRecent(js)
+      return js
+    } catch { return [] }
+  }
 
   function pickType(t: ArticleType) {
     setAtype(t)
@@ -96,80 +151,107 @@ function RunPanel() {
   }
 
   function gatherInput(): Record<string, unknown> | null {
-    const base = {
-      article_type: atype,
-      header_disclaimer: headerD,
-      footer_disclaimer: footerD,
-      supplier: supplier.trim(),
-    }
+    const base = { article_type: atype, header_disclaimer: headerD, footer_disclaimer: footerD, supplier: supplier.trim() }
     if (imode === 'url') {
-      if (!url.trim() || !/^https?:\/\/.+\..+/.test(url.trim())) { alert('請輸入有效的URL'); return null }
+      if (!url.trim() || !/^https?:\/\/.+\..+/.test(url.trim())) { toast.err('請輸入有效的URL'); return null }
       return { ...base, url: url.trim() }
     }
-    if (!uploaded) { alert('請先上傳文件'); return null }
+    if (!uploaded) { toast.err('請先上傳文件'); return null }
     return { ...base, file: uploaded.file }
   }
 
-  function applyJobToViews(j: Job) {
-    const done = new Map((j.stages ?? []).map((s) => [s.id, s.output]))
-    setViews((prev) => {
-      let marked = false
-      return prev.map((v) => {
-        if (done.has(v.id)) return { id: v.id, status: 'done' as const, output: done.get(v.id) ?? v.output }
-        if (v.status === 'done') return v
-        if (!marked) {
-          marked = true
-          if (j.status === 'running' || j.status === 'pending') return { ...v, status: 'running' as const }
-          if (j.status === 'error') return { ...v, status: 'error' as const }
-        }
-        return v
-      })
+  function viewsFromJob(j: Job, keepPrefix: StageView[] = []): StageView[] {
+    let ids = stageIdsRef.current.length ? stageIdsRef.current : (j.stages ?? []).map((s) => s.id)
+    // 重跑型 job 從歷史載入（無上游 keepPrefix）：只顯示它實際跑的階段，
+    // 否則被跳過的上游會永遠掛在 pending、整體進度卡在「處理中」
+    if (j.start_stage && keepPrefix.length === 0) {
+      const si = ids.indexOf(j.start_stage)
+      if (si > 0) ids = ids.slice(si)
+    }
+    const done = new Map((j.stages ?? []).map((s) => [s.id, s]))
+    const keep = new Map(keepPrefix.map((v) => [v.id, v]))
+    let marked = false
+    return ids.map((id) => {
+      const so = done.get(id)
+      if (so) return { id, status: 'done' as const, output: so.output, elapsedMs: so.elapsed_ms ?? undefined }
+      const kept = keep.get(id)
+      if (kept?.status === 'done') return kept
+      if (!marked && (j.status === 'running' || j.status === 'pending')) { marked = true; return { id, status: 'running' as const } }
+      if (!marked && j.status === 'error') { marked = true; return { id, status: 'error' as const } }
+      return { id, status: 'pending' as const }
     })
+  }
+
+  /** 統一的「掛上一個 job」：建立後 / 重新整理接回 / 歷史點開，全走這條（B1/B2/B3 共用）。 */
+  async function attach(id: number, keepPrefix: StageView[] = []) {
+    const token = ++attachToken.current
+    setWatchingId(id)
+    setJob(null)
+    const first = await getJob(id).catch(() => null)
+    if (!first) { toast.err(`載入 job #${id} 失敗`); return }
+    setLastInput(first.input)
+    setViews(viewsFromJob(first, keepPrefix))
+    if (first.status === 'done' || first.status === 'error') { setJob(first); return }
+
+    setRunning(true)
+    const ac = new AbortController()
+    streamJob(id, (ev, data) => {
+      if (attachToken.current !== token) return
+      const d = rec(data)
+      if (ev === 'stage') {
+        setViews((prev) => prev.map((v) => v.id === d.id
+          ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output, elapsedMs: (d.elapsed_ms as number) ?? v.elapsedMs }
+          : v))
+      }
+    }, ac.signal).catch(() => {})
+    try {
+      for (let i = 0; i < 400; i++) {
+        await new Promise((r) => setTimeout(r, 1500))
+        if (attachToken.current !== token) return // 使用者切去看別的 job
+        const j = await getJob(id).catch(() => null)
+        if (j) {
+          setViews(viewsFromJob(j, keepPrefix))
+          if (j.status === 'done' || j.status === 'error') {
+            setJob(j)
+            if (j.status === 'done') toast.ok(`任務 #${id} 完成`)
+            else toast.err(`任務 #${id} 失敗：${j.error ?? ''}`)
+            if (mode === 'auto' && j.status === 'done' && rec(j.result).wordpress) {
+              try {
+                const out = await publishJob(j.id, pubStatus)
+                toast.ok(`自動發布成功（${out.status}）`)
+              } catch (e) { toast.err('自動發布失敗：' + String(e)) }
+            }
+            return
+          }
+        }
+      }
+      toast.err('處理逾時（10 分鐘），稍後可從執行列接回')
+    } finally {
+      if (attachToken.current === token) setRunning(false)
+      ac.abort()
+      refreshRecent()
+    }
   }
 
   async function execute(inputObj: Record<string, unknown>, fromStage?: string) {
     const startIdx = fromStage ? stageIds.indexOf(fromStage) : 0
-    setRunning(true); setJob(null); setAutoMsg(''); setLastInput(inputObj)
-    setViews((prev) => {
-      const byId = new Map(prev.map((v) => [v.id, v]))
-      return stageIds.map((id, i) =>
-        i < startIdx ? byId.get(id) ?? { id, status: 'pending' as const } : { id, status: 'pending' as const })
-    })
+    const keepPrefix = fromStage ? views.slice(0, startIdx) : []
+    setLastInput(inputObj)
     try {
       const { id } = await createJob(PIPELINE, inputObj, fromStage)
-      const ac = new AbortController()
-      streamJob(id, (ev, data) => {
-        const d = rec(data)
-        if (ev === 'stage') {
-          setViews((prev) => prev.map((v) =>
-            v.id === d.id ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output } : v))
-        }
-      }, ac.signal).catch(() => {})
-      let finished: Job | null = null
-      for (let i = 0; i < 400; i++) {
-        await new Promise((r) => setTimeout(r, 1500))
-        const j = await getJob(id).catch(() => null)
-        if (j) {
-          applyJobToViews(j)
-          if (j.status === 'done' || j.status === 'error') { finished = j; break }
-        }
-      }
-      ac.abort()
-      if (!finished) { alert('處理逾時（10 分鐘），請到 Jobs 歷史查看'); return }
-      setJob(finished)
-      if (mode === 'auto' && finished.status === 'done' && rec(finished.result).wordpress) {
-        setAutoMsg('自動模式：發布中...')
-        try {
-          const out = await publishJob(finished.id, pubStatus)
-          setAutoMsg(`✓ 自動發布成功（${out.status}）` + (out.link ? ` · ${out.link}` : ''))
-        } catch (e) { setAutoMsg('✗ 自動發布失敗：' + String(e)) }
-      }
-    } catch (e) {
-      alert('啟動失敗：' + String(e))
-    } finally { setRunning(false) }
+      toast.info(fromStage ? `從「${fromStage}」重跑（#${id}）` : `開始處理（#${id}）`)
+      refreshRecent()
+      await attach(id, keepPrefix)
+    } catch (e) { toast.err('啟動失敗：' + String(e)) }
   }
 
-  const meta = imode === 'file' ? (uploaded ? `檔案：${uploaded.original_name}` : '') : (url ? `連結：${url}` : '')
+  const meta = (() => {
+    const i = rec(lastInput)
+    if (i.url) return `連結：${i.url}`
+    if (i.file) return `檔案：${String(i.file).split('/').pop()}`
+    return imode === 'file' ? (uploaded ? `檔案：${uploaded.original_name}` : '') : (url ? `連結：${url}` : '')
+  })()
+  const totalMs = job ? jobDurMs(job) : null
 
   return (
     <div className="grid">
@@ -233,18 +315,55 @@ function RunPanel() {
         <button className="primary" disabled={running} onClick={() => { const i = gatherInput(); if (i) execute(i) }}>
           {running ? '處理中...' : '開始處理'}
         </button>
-        {stageIds.length > 0 && <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>完整流程 {stageIds.length} 階段，每一步即時更新、可展開查看、可從任一步重跑。</p>}
+        <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
+          {running ? '可以放心離開或重新整理——回來會自動接上進度。' : `完整流程 ${stageIds.length || 7} 階段，每一步即時更新、可展開查看、可從任一步重跑。`}
+        </p>
       </div>
 
       <div className="panel">
-        <h2>處理進度與結果</h2>
+        <div className="row">
+          <h2 style={{ margin: 0 }}>處理進度與結果</h2>
+          <span className="spacer" />
+        </div>
+        {recent.length > 0 && (
+          <div className="runs-strip">
+            {recent.map((j) => (
+              <button key={j.id} className={`run-chip ${j.id === watchingId ? 'cur' : ''}`} onClick={() => attach(j.id)}
+                title={`${jobSource(j)} · ${relTime(j.created_at)}`}>
+                <span className={`dot2 ${j.status}`} />#{j.id}{j.start_stage ? '↻' : ''}
+              </button>
+            ))}
+          </div>
+        )}
         {views.length === 0
-          ? <p className="muted">選好進稿後按「開始處理」。</p>
-          : <StageList stages={views} originalInput={lastInput} meta={meta}
+          ? <p className="muted" style={{ marginTop: 10 }}>選好進稿後按「開始處理」。進行中或歷史任務可從上方執行列點開。</p>
+          : <StageList stages={views} originalInput={lastInput} meta={meta} totalMs={totalMs}
               onRerun={(sid, input) => execute(input, sid)} />}
-        {autoMsg && <div className={autoMsg.startsWith('✓') ? 'ok-box' : 'err-box'} style={{ marginTop: 10 }}>{autoMsg}</div>}
+        {job && job.status === 'done' && <ResultHero job={job} />}
         {job && mode === 'manual' && <ReviewPublish job={job} defaultStatus={pubStatus} />}
         {job?.status === 'error' && <div className="err-box" style={{ marginTop: 10 }}>處理錯誤：{job.error}</div>}
+      </div>
+    </div>
+  )
+}
+
+/** 成品區（A3）：標題/摘要/封面是主角。 */
+function ResultHero({ job }: { job: Job }) {
+  const r = rec(job.result)
+  const wp = rec(r.wordpress)
+  const cover = (r.cover_image_url as string) || ''
+  if (!wp.title) return null
+  return (
+    <div className="hero">
+      {cover && <img className="hero-cover" src={cover.startsWith('http') ? cover : cover} alt="cover" />}
+      <div className="hero-body">
+        <div className="hero-title">{String(wp.title)}</div>
+        {Boolean(wp.excerpt) && <div className="hero-excerpt">{String(wp.excerpt)}</div>}
+        <div className="row" style={{ marginTop: 6 }}>
+          {(wp.categories as unknown[] | undefined)?.map((c, i) => <span key={'c' + i} className="chip">分類 {String(rec(c).id)}</span>)}
+          {(wp.tags as unknown[] | undefined)?.slice(0, 6).map((t, i) => <span key={'t' + i} className="chip">tag {String(rec(t).id)}</span>)}
+          {Boolean(r.output_url) && <a href={String(r.output_url)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>↗ 開啟成稿（含押註/封面）</a>}
+        </div>
       </div>
     </div>
   )
@@ -254,53 +373,57 @@ function ReviewPublish({ job, defaultStatus }: { job: Job; defaultStatus: string
   const r = rec(job.result)
   const wp = rec(r.wordpress)
   const [edited, setEdited] = useState(String(wp.content || ''))
-  const outputUrl = (r.output_url as string) || ''
   if (!wp.title) return null
   return (
     <div className="review">
       <h2 style={{ marginTop: 18 }}>上稿：人工審稿 → 發布</h2>
       <label>內文校稿（可視化 / HTML 雙模式）</label>
       <RichEditor key={job.id} html={String(wp.content || '')} onChange={setEdited} />
-      {outputUrl && <p style={{ margin: '8px 0' }}><a href={outputUrl} target="_blank" rel="noreferrer">↗ 開啟組好的成稿（含押註/封面）</a></p>}
       <PublishForm job={job} editedHtml={edited} defaultStatus={defaultStatus} />
     </div>
   )
 }
 
-function JobsPanel() {
+function JobsPanel({ onOpen }: { onOpen: (id: number) => void }) {
   const [jobs, setJobs] = useState<Job[]>([])
-  const [sel, setSel] = useState<Job | null>(null)
+  const [filter, setFilter] = useState('all')
   const load = () => listJobs().then(setJobs).catch(() => {})
   useEffect(() => { load() }, [])
+  const shown = jobs.filter((j) => filter === 'all' || j.status === filter)
   return (
-    <div className="grid">
-      <div className="panel">
-        <h2>Jobs <button className="ghost" style={{ float: 'right', marginTop: -4 }} onClick={load}>重新整理</button></h2>
-        <table>
-          <thead><tr><th>#</th><th>流程</th><th>狀態</th></tr></thead>
-          <tbody>
-            {jobs.map((j) => (
-              <tr key={j.id} className="click" onClick={() => getJob(j.id).then(setSel)}>
-                <td>{j.id}</td><td>{j.workflow}{j.start_stage ? ` ↻${j.start_stage}` : ''}</td>
+    <div className="panel">
+      <div className="row" style={{ marginBottom: 10 }}>
+        <h2 style={{ margin: 0 }}>Jobs 歷史</h2>
+        <div className="seg" style={{ width: 'auto' }}>
+          {['all', 'done', 'running', 'error'].map((f) => (
+            <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
+              {f === 'all' ? '全部' : f === 'done' ? '完成' : f === 'running' ? '進行中' : '失敗'}
+            </button>
+          ))}
+        </div>
+        <span className="spacer" />
+        <button className="ghost" onClick={load}>重新整理</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>來源</th><th>流程</th><th>狀態</th><th>耗時</th><th>時間</th></tr></thead>
+        <tbody>
+          {shown.map((j) => {
+            const d = jobDurMs(j)
+            return (
+              <tr key={j.id} className="click" onClick={() => onOpen(j.id)}>
+                <td>{j.id}</td>
+                <td className="muted">{jobSource(j)}</td>
+                <td>{j.workflow}{j.start_stage ? ` ↻${j.start_stage}` : ''}</td>
                 <td><span className={`status ${j.status}`}>{j.status}</span></td>
+                <td className="muted">{j.status === 'done' && d ? `${Math.round(d / 1000)}s` : '—'}</td>
+                <td className="muted">{relTime(j.created_at)}</td>
               </tr>
-            ))}
-            {jobs.length === 0 && <tr><td colSpan={3} className="muted">還沒有 job</td></tr>}
-          </tbody>
-        </table>
-      </div>
-      <div className="panel">
-        <h2>詳情</h2>
-        {!sel ? <p className="muted">點左邊一筆 job。</p> : (
-          <>
-            <StageList grouped={false}
-              stages={(sel.stages ?? []).map((s) => ({ id: s.id, status: 'done' as const, output: s.output }))}
-              originalInput={sel.input}
-              onRerun={() => alert('請在「處理稿件」分頁重跑；歷史頁為唯讀檢視')} />
-            {sel.error && <div className="err-box">錯誤：{sel.error}</div>}
-          </>
-        )}
-      </div>
+            )
+          })}
+          {shown.length === 0 && <tr><td colSpan={6} className="muted">沒有符合的 job</td></tr>}
+        </tbody>
+      </table>
+      <p className="hint" style={{ marginTop: 8 }}>點任一筆回到「處理稿件」載入完整視圖（可查看每階段、重跑、發布）。</p>
     </div>
   )
 }

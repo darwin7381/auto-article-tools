@@ -55,7 +55,7 @@ async def s_content_ai(data: dict, ctx: RunContext) -> dict:
     up = _fill(cfg.user_prompt, data["markdown"], "markdownContent")
     out = await chat(cfg.provider, cfg.model, cfg.system_prompt, up,
                      cfg.temperature if cfg.temperature is not None else 0.3, cfg.max_tokens)
-    return {**data, "markdown": out}
+    return {**data, "model": f"{cfg.provider}/{cfg.model}", "markdown": out}
 
 
 async def s_pr_writer(data: dict, ctx: RunContext) -> dict:
@@ -63,7 +63,7 @@ async def s_pr_writer(data: dict, ctx: RunContext) -> dict:
     up = _fill(cfg.user_prompt, data["markdown"], "markdownContent")
     out = await chat(cfg.provider, cfg.model, cfg.system_prompt, up,
                      cfg.temperature if cfg.temperature is not None else 0.4, cfg.max_tokens)
-    return {**data, "markdown": out}
+    return {**data, "model": f"{cfg.provider}/{cfg.model}", "markdown": out}
 
 
 async def s_format_conversion(data: dict, ctx: RunContext) -> dict:
@@ -75,7 +75,7 @@ async def s_copy_editing(data: dict, ctx: RunContext) -> dict:
     up = _fill(cfg.user_prompt, data["html"], "content")
     params = await structured(cfg.provider, cfg.model, cfg.system_prompt, up, WordPressParams,
                               cfg.temperature if cfg.temperature is not None else 0.3, cfg.max_tokens)
-    return {**data, "wordpress": params.model_dump()}
+    return {**data, "model": f"{cfg.provider}/{cfg.model}", "wordpress": params.model_dump()}
 
 
 async def s_cover_image(data: dict, ctx: RunContext) -> dict:

@@ -30,6 +30,8 @@ async def run_workflow(
     這是「單一編排入口」—— API(SSE)、CLI、排程都共用這個，流程邏輯只有一份。
     start_stage：從這個階段開始跑（重跑中間步驟用）；input_data 即該階段的輸入態。
     """
+    import time
+
     ctx = ctx or RunContext()
     data = input_data
     try:
@@ -37,10 +39,16 @@ async def run_workflow(
         start = stage_index(name, start_stage)
         for stage in wf.stages[start:]:
             yield WorkflowEvent(event="stage", data={"id": stage.id, "status": "running"})
+            t0 = time.monotonic()
             data = await stage.run(data, ctx)
             yield WorkflowEvent(
                 event="stage",
-                data={"id": stage.id, "status": "done", "output": json_safe(data)},
+                data={
+                    "id": stage.id,
+                    "status": "done",
+                    "elapsed_ms": int((time.monotonic() - t0) * 1000),
+                    "output": json_safe(data),
+                },
             )
         yield WorkflowEvent(event="done", data={"result": json_safe(data)})
     except Exception as exc:  # noqa: BLE001  骨架階段先全捕捉；之後分階段重試
