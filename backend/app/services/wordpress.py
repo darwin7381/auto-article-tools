@@ -85,12 +85,16 @@ async def publish_post(
             "content": wp.get("content", ""),
             "excerpt": wp.get("excerpt", ""),
             "slug": wp.get("slug", ""),
-            "status": status,  # draft / publish / pending
+            "status": status,  # draft / pending / publish / private / future
         }
         if wp.get("categories"):
             payload["categories"] = [c.get("id") for c in wp["categories"] if c.get("id")]
         if wp.get("tags"):
             payload["tags"] = [t.get("id") for t in wp["tags"] if t.get("id")]
+        if wp.get("author"):  # 指定作者 ID（不填用 API 登入者）
+            payload["author"] = wp["author"]
+        if status == "future" and wp.get("date"):  # 定時發布
+            payload["date"] = wp["date"]
         if featured_media:
             payload["featured_media"] = featured_media
 

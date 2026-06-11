@@ -64,17 +64,32 @@ async def chat(
         headers["HTTP-Referer"] = "https://blocktempo.ai"
         headers["X-Title"] = "BD Content Platform"
 
-    async with httpx.AsyncClient(timeout=300) as client:
-        resp = await client.post(f"{base}/chat/completions", headers=headers, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-    choice = data["choices"][0]
-    content = choice.get("message", {}).get("content")
-    if not content:
-        raise RuntimeError(
-            f"LLM 回傳空內容（finish_reason={choice.get('finish_reason')}）"
-        )
-    return content
+    # provider 偶發空回應 / 5xx / 逾時 → 自動重試（殺掉舊系統那類「處理中途莫名失敗」）
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=300) as client:
+                resp = await client.post(f"{base}/chat/completions", headers=headers, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+            choice = data["choices"][0]
+            content = choice.get("message", {}).get("content")
+            if content:
+                return content
+            last_err = RuntimeError(
+                f"LLM 回傳空內容（finish_reason={choice.get('finish_reason')}）"
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code < 500 and exc.response.status_code != 429:
+                raise  # 4xx（key 錯/參數錯）重試沒意義
+            last_err = exc
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            last_err = exc
+        if attempt < 2:
+            import asyncio
+
+            await asyncio.sleep(2 * (attempt + 1))
+    raise RuntimeError(f"LLM 呼叫失敗（重試 3 次）：{last_err}")
 
 
 async def structured(

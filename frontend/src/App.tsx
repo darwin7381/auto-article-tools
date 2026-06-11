@@ -1,30 +1,58 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
+import { PublishForm } from './PublishForm'
 import { StageList, type StageView } from './Stages'
+import { FileDrop, UrlInput, type Uploaded } from './Upload'
 import {
   createJob, getHealth, getJob, listJobs, listWorkflows, publishJob, streamJob,
-  uploadFile, type Job, type Workflow,
+  type Job, type Workflow,
 } from './api'
 
 type Tab = 'run' | 'jobs' | 'config'
 type Mode = 'auto' | 'manual'
-type PubStatus = 'draft' | 'pending' | 'publish' | 'private' | 'future'
+type ArticleType = 'regular' | 'sponsored' | 'press-release'
 
 function rec(o: unknown): Record<string, unknown> { return (o ?? {}) as Record<string, unknown> }
+
+const PIPELINE = 'article' // 主流程固定完整 pipeline；extract/standardize 留給 CLI/API 與重跑
+
+const TYPE_OPTS: { key: ArticleType; label: string; header: string; footer: string }[] = [
+  { key: 'regular', label: '一般文章', header: 'none', footer: 'none' },
+  { key: 'sponsored', label: '廣編稿', header: 'sponsored', footer: 'sponsored' },
+  { key: 'press-release', label: '新聞稿', header: 'press-release', footer: 'none' },
+]
+const DISCLAIMER_OPTS = [
+  { key: 'none', label: '不押註' },
+  { key: 'sponsored', label: '廣編稿押註' },
+  { key: 'press-release', label: '新聞稿押註' },
+]
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('run')
   const [health, setHealth] = useState<{ status: string; workflows: string[] } | null>(null)
-  useEffect(() => { getHealth().then(setHealth).catch(() => setHealth(null)) }, [])
+  const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
+  useEffect(() => {
+    const check = () => getHealth().then(setHealth).catch(() => setHealth(null))
+    check()
+    const t = setInterval(check, 30_000) // 定時輪詢，後端重啟後自動恢復顯示
+    return () => clearInterval(t)
+  }, [])
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', light)
+    localStorage.setItem('theme', light ? 'light' : 'dark')
+  }, [light])
   return (
     <div className="app">
       <div className="topbar">
         <h1>BD 內容自動化平台</h1>
         <span className="health">
           <span className={`dot ${health?.status === 'ok' ? 'ok' : ''}`} />
-          {health ? `後端正常 · ${health.workflows.length} workflows` : '後端未連線'}
+          {health ? '後端正常' : '後端未連線'}
         </span>
+        <button className="ghost theme-btn" onClick={() => setLight((v) => !v)} title={light ? '切換到暗色模式' : '切換到亮色模式'}>
+          {light ? '🌙' : '☀️'}
+        </button>
       </div>
       <div className="tabs">
         <div className={`tab ${tab === 'run' ? 'active' : ''}`} onClick={() => setTab('run')}>處理稿件</div>
@@ -39,47 +67,56 @@ export default function App() {
 }
 
 function RunPanel() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([])
-  const [wf, setWf] = useState('article')
+  const [stageIds, setStageIds] = useState<string[]>([])
   const [mode, setMode] = useState<Mode>('manual')
-  const [pubStatus, setPubStatus] = useState<PubStatus>('draft')
-  const [imode, setImode] = useState<'file' | 'url' | 'text'>('file')
+  const [pubStatus, setPubStatus] = useState('draft')
+  const [imode, setImode] = useState<'file' | 'url'>('file')
   const [url, setUrl] = useState('')
-  const [text, setText] = useState('hello world')
-  const [uploaded, setUploaded] = useState<{ file: string; original_name: string } | null>(null)
+  const [uploaded, setUploaded] = useState<Uploaded | null>(null)
+  const [atype, setAtype] = useState<ArticleType>('press-release')
+  const [headerD, setHeaderD] = useState('press-release')
+  const [footerD, setFooterD] = useState('none')
+  const [supplier, setSupplier] = useState('')
   const [running, setRunning] = useState(false)
   const [views, setViews] = useState<StageView[]>([])
   const [job, setJob] = useState<Job | null>(null)
+  const [autoMsg, setAutoMsg] = useState('')
   const [lastInput, setLastInput] = useState<Record<string, unknown>>({})
-  const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { listWorkflows().then(setWorkflows).catch(() => {}) }, [])
-  const current = workflows.find((w) => w.name === wf)
-  useEffect(() => { setImode(wf === 'echo' ? 'text' : 'file'); setViews([]); setJob(null) }, [wf])
+  useEffect(() => {
+    listWorkflows().then((ws: Workflow[]) => {
+      setStageIds(ws.find((w) => w.name === PIPELINE)?.stages ?? [])
+    }).catch(() => {})
+  }, [])
 
-  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f) return
-    try { setUploaded(await uploadFile(f)) } catch (err) { alert('上傳失敗：' + String(err)) }
+  function pickType(t: ArticleType) {
+    setAtype(t)
+    const opt = TYPE_OPTS.find((o) => o.key === t)!
+    setHeaderD(opt.header); setFooterD(opt.footer)
   }
 
   function gatherInput(): Record<string, unknown> | null {
-    if (imode === 'text') return { text }
-    if (imode === 'url') {
-      if (!url.trim()) { alert('請先貼上網址'); return null }
-      return { url: url.trim() }
+    const base = {
+      article_type: atype,
+      header_disclaimer: headerD,
+      footer_disclaimer: footerD,
+      supplier: supplier.trim(),
     }
-    if (!uploaded) { alert('請先上傳檔案'); return null }
-    return { file: uploaded.file }
+    if (imode === 'url') {
+      if (!url.trim() || !/^https?:\/\/.+\..+/.test(url.trim())) { alert('請輸入有效的URL'); return null }
+      return { ...base, url: url.trim() }
+    }
+    if (!uploaded) { alert('請先上傳文件'); return null }
+    return { ...base, file: uploaded.file }
   }
 
-  /** 用 job 快照更新逐階段視圖（事件已即時入庫，輪詢也拿得到中途進度）。 */
   function applyJobToViews(j: Job) {
     const done = new Map((j.stages ?? []).map((s) => [s.id, s.output]))
     setViews((prev) => {
       let marked = false
       return prev.map((v) => {
         if (done.has(v.id)) return { id: v.id, status: 'done' as const, output: done.get(v.id) ?? v.output }
-        if (v.status === 'done') return v // 重跑時保留之前已完成的上游階段
+        if (v.status === 'done') return v
         if (!marked) {
           marked = true
           if (j.status === 'running' || j.status === 'pending') return { ...v, status: 'running' as const }
@@ -91,20 +128,15 @@ function RunPanel() {
   }
 
   async function execute(inputObj: Record<string, unknown>, fromStage?: string) {
-    const ids = current?.stages ?? []
-    const startIdx = fromStage ? ids.indexOf(fromStage) : 0
-    setRunning(true)
-    setJob(null)
-    setLastInput(inputObj)
+    const startIdx = fromStage ? stageIds.indexOf(fromStage) : 0
+    setRunning(true); setJob(null); setAutoMsg(''); setLastInput(inputObj)
     setViews((prev) => {
       const byId = new Map(prev.map((v) => [v.id, v]))
-      return ids.map((id, i) =>
-        i < startIdx ? byId.get(id) ?? { id, status: 'pending' as const } : { id, status: 'pending' as const },
-      )
+      return stageIds.map((id, i) =>
+        i < startIdx ? byId.get(id) ?? { id, status: 'pending' as const } : { id, status: 'pending' as const })
     })
     try {
-      const { id } = await createJob(wf, inputObj, fromStage)
-      // SSE 求即時（解析已修 \r\n）；輪詢保底（任何 proxy/串流壞掉 UI 都不會卡死）
+      const { id } = await createJob(PIPELINE, inputObj, fromStage)
       const ac = new AbortController()
       streamJob(id, (ev, data) => {
         const d = rec(data)
@@ -112,10 +144,9 @@ function RunPanel() {
           setViews((prev) => prev.map((v) =>
             v.id === d.id ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output } : v))
         }
-      }, ac.signal).catch(() => { /* SSE 斷線無妨，輪詢接手 */ })
-
+      }, ac.signal).catch(() => {})
       let finished: Job | null = null
-      for (let i = 0; i < 400; i++) { // 上限 ~10 分鐘
+      for (let i = 0; i < 400; i++) {
         await new Promise((r) => setTimeout(r, 1500))
         const j = await getJob(id).catch(() => null)
         if (j) {
@@ -124,108 +155,114 @@ function RunPanel() {
         }
       }
       ac.abort()
-      if (!finished) { alert('處理逾時（10 分鐘），請到 Jobs 歷史查看狀態'); return }
+      if (!finished) { alert('處理逾時（10 分鐘），請到 Jobs 歷史查看'); return }
       setJob(finished)
       if (mode === 'auto' && finished.status === 'done' && rec(finished.result).wordpress) {
-        await doPublish(finished, pubStatus, setJob)
+        setAutoMsg('自動模式：發布中...')
+        try {
+          const out = await publishJob(finished.id, pubStatus)
+          setAutoMsg(`✓ 自動發布成功（${out.status}）` + (out.link ? ` · ${out.link}` : ''))
+        } catch (e) { setAutoMsg('✗ 自動發布失敗：' + String(e)) }
       }
-    } catch (err) {
-      alert('啟動失敗：' + String(err))
+    } catch (e) {
+      alert('啟動失敗：' + String(e))
     } finally { setRunning(false) }
   }
 
-  function run() { const i = gatherInput(); if (i) execute(i) }
+  const meta = imode === 'file' ? (uploaded ? `檔案：${uploaded.original_name}` : '') : (url ? `連結：${url}` : '')
 
   return (
     <div className="grid">
       <div className="panel">
-        <h2>輸入</h2>
-        <label>處理模式</label>
+        <h2>1. 進稿</h2>
         <div className="seg">
-          <button className={mode === 'manual' ? 'on' : ''} onClick={() => setMode('manual')}>手動（逐步審稿）</button>
-          <button className={mode === 'auto' ? 'on' : ''} onClick={() => setMode('auto')}>自動（跑完直接發）</button>
+          <button className={imode === 'file' ? 'on' : ''} onClick={() => setImode('file')}>上傳文件</button>
+          <button className={imode === 'url' ? 'on' : ''} onClick={() => setImode('url')}>輸入連結</button>
         </div>
-        <label>發布狀態</label>
-        <select value={pubStatus} onChange={(e) => setPubStatus(e.target.value as PubStatus)}>
-          <option value="draft">草稿 draft</option>
-          <option value="pending">待審 pending</option>
-          <option value="publish">公開 publish</option>
-          <option value="private">私密 private</option>
-          <option value="future">排程 future</option>
-        </select>
+        <div style={{ marginTop: 12 }}>
+          {imode === 'file'
+            ? <FileDrop uploaded={uploaded} onUploaded={setUploaded} />
+            : <UrlInput url={url} onUrl={setUrl} />}
+        </div>
 
-        <label>Workflow</label>
-        <select value={wf} onChange={(e) => setWf(e.target.value)}>
-          {workflows.map((w) => <option key={w.name} value={w.name}>{w.name} — {w.description}</option>)}
-        </select>
+        <h2 style={{ marginTop: 22 }}>2. 文稿類型</h2>
+        <div className="seg">
+          {TYPE_OPTS.map((o) => (
+            <button key={o.key} className={atype === o.key ? 'on' : ''} onClick={() => pickType(o.key)}>{o.label}</button>
+          ))}
+        </div>
+        <div className="two-col" style={{ marginTop: 8 }}>
+          <div>
+            <label>正文開頭押註</label>
+            <select value={headerD} onChange={(e) => setHeaderD(e.target.value)}>
+              {DISCLAIMER_OPTS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label>正文末尾押註</label>
+            <select value={footerD} onChange={(e) => setFooterD(e.target.value)}>
+              {DISCLAIMER_OPTS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
+            </select>
+          </div>
+        </div>
+        <label>供稿方</label>
+        <input type="text" value={supplier} placeholder="輸入供稿方名稱（選填）" onChange={(e) => setSupplier(e.target.value)} />
+        <p className="hint">用於自動替換押註中的［撰稿方名稱］</p>
 
-        {wf !== 'echo' && (
-          <>
-            <label>進稿方式</label>
-            <div className="seg">
-              <button className={imode === 'file' ? 'on' : ''} onClick={() => setImode('file')}>檔案</button>
-              <button className={imode === 'url' ? 'on' : ''} onClick={() => setImode('url')}>網址</button>
-            </div>
-          </>
-        )}
-        {imode === 'text' && <><label>文字</label><input type="text" value={text} onChange={(e) => setText(e.target.value)} /></>}
-        {imode === 'url' && <><label>網址（Google Docs / Medium / WeChat / 網站）</label><input type="text" value={url} placeholder="https://…" onChange={(e) => setUrl(e.target.value)} /></>}
-        {imode === 'file' && (
-          <><label>檔案（PDF / DOCX / MD）</label>
-            <input ref={fileRef} type="file" accept=".pdf,.docx,.md,.txt" onChange={onPickFile} />
-            {uploaded && <p className="muted">已上傳：{uploaded.original_name}</p>}</>
-        )}
-        <button className="primary" disabled={running} onClick={run}>{running ? '處理中…' : '開始處理'}</button>
-        {current && <p className="muted" style={{ marginTop: 10 }}>{current.stages.length} 階段：{current.stages.join(' → ')}</p>}
+        <h2 style={{ marginTop: 22 }}>3. 處理模式</h2>
+        <div className="two-col">
+          <div>
+            <label>處理模式</label>
+            <select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
+              <option value="manual">手動模式（逐步審稿）</option>
+              <option value="auto">自動模式（跑完直接發）</option>
+            </select>
+          </div>
+          <div>
+            <label>預設發佈狀態</label>
+            <select value={pubStatus} onChange={(e) => setPubStatus(e.target.value)}>
+              <option value="draft">草稿</option>
+              <option value="pending">待審核</option>
+              <option value="publish">立即發佈</option>
+              <option value="private">私人</option>
+              <option value="future">定時發佈</option>
+            </select>
+          </div>
+        </div>
+
+        <button className="primary" disabled={running} onClick={() => { const i = gatherInput(); if (i) execute(i) }}>
+          {running ? '處理中...' : '開始處理'}
+        </button>
+        {stageIds.length > 0 && <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>完整流程 {stageIds.length} 階段，每一步即時更新、可展開查看、可從任一步重跑。</p>}
       </div>
 
       <div className="panel">
-        <h2>逐階段進度與結果</h2>
-        {views.length === 0 ? <p className="muted">選好輸入後按「開始處理」。每一步即時更新，完成後可展開檢視、也可從任一步重跑。</p>
-          : <StageList stages={views} originalInput={lastInput} onRerun={(sid, input) => execute(input, sid)} />}
-        {job && <ReviewPublish job={job} pubStatus={pubStatus} onJob={setJob} />}
+        <h2>處理進度與結果</h2>
+        {views.length === 0
+          ? <p className="muted">選好進稿後按「開始處理」。</p>
+          : <StageList stages={views} originalInput={lastInput} meta={meta}
+              onRerun={(sid, input) => execute(input, sid)} />}
+        {autoMsg && <div className={autoMsg.startsWith('✓') ? 'ok-box' : 'err-box'} style={{ marginTop: 10 }}>{autoMsg}</div>}
+        {job && mode === 'manual' && <ReviewPublish job={job} defaultStatus={pubStatus} />}
+        {job?.status === 'error' && <div className="err-box" style={{ marginTop: 10 }}>處理錯誤：{job.error}</div>}
       </div>
     </div>
   )
 }
 
-async function doPublish(job: Job, status: string, onJob: (j: Job) => void, content?: string) {
-  const overrides = content ? { content } : undefined
-  const out = await publishJob(job.id, status, overrides)
-  onJob({ ...job, result: { ...rec(job.result), _published: out } })
-  return out
-}
-
-function ReviewPublish({ job, pubStatus, onJob }: { job: Job; pubStatus: string; onJob: (j: Job) => void }) {
+function ReviewPublish({ job, defaultStatus }: { job: Job; defaultStatus: string }) {
   const r = rec(job.result)
   const wp = rec(r.wordpress)
   const [edited, setEdited] = useState(String(wp.content || ''))
-  const [msg, setMsg] = useState('')
-  const published = rec(r._published)
-  if (!wp.title) {
-    return job.status === 'error' ? <p className="err" style={{ marginTop: 12 }}>錯誤：{job.error}</p> : null
-  }
-  async function publish(status: string) {
-    setMsg('發布中…')
-    try {
-      const out = await doPublish(job, status, onJob, edited || undefined)
-      setMsg(`✓ 已發布（${out.status}）`); if (out.link) window.open(out.link, '_blank')
-    } catch (e) { setMsg('✗ ' + String(e)) }
-  }
+  const outputUrl = (r.output_url as string) || ''
+  if (!wp.title) return null
   return (
     <div className="review">
-      <h2 style={{ marginTop: 18 }}>人工審稿 → 發布</h2>
-      <div className="kv">
-        <span className="k">標題</span><span>{String(wp.title)}</span>
-        <span className="k">slug</span><span className="muted">{String(wp.slug || '')}</span>
-      </div>
-      <label>內文（TipTap，可直接編輯後再發布）</label>
+      <h2 style={{ marginTop: 18 }}>上稿：人工審稿 → 發布</h2>
+      <label>內文校稿（可視化 / HTML 雙模式）</label>
       <RichEditor key={job.id} html={String(wp.content || '')} onChange={setEdited} />
-      <div className="row" style={{ marginTop: 12 }}>
-        <button className="primary" style={{ width: 'auto', marginTop: 0 }} onClick={() => publish(pubStatus)}>發布到 WordPress（{pubStatus}）</button>
-        {msg && <span className="muted">{msg}</span>}
-        {Boolean(published.link) && <a href={String(published.link)} target="_blank" rel="noreferrer">↗ 開啟文章</a>}
-      </div>
+      {outputUrl && <p style={{ margin: '8px 0' }}><a href={outputUrl} target="_blank" rel="noreferrer">↗ 開啟組好的成稿（含押註/封面）</a></p>}
+      <PublishForm job={job} editedHtml={edited} defaultStatus={defaultStatus} />
     </div>
   )
 }
@@ -240,7 +277,7 @@ function JobsPanel() {
       <div className="panel">
         <h2>Jobs <button className="ghost" style={{ float: 'right', marginTop: -4 }} onClick={load}>重新整理</button></h2>
         <table>
-          <thead><tr><th>#</th><th>workflow</th><th>狀態</th></tr></thead>
+          <thead><tr><th>#</th><th>流程</th><th>狀態</th></tr></thead>
           <tbody>
             {jobs.map((j) => (
               <tr key={j.id} className="click" onClick={() => getJob(j.id).then(setSel)}>
@@ -256,12 +293,11 @@ function JobsPanel() {
         <h2>詳情</h2>
         {!sel ? <p className="muted">點左邊一筆 job。</p> : (
           <>
-            <StageList
+            <StageList grouped={false}
               stages={(sel.stages ?? []).map((s) => ({ id: s.id, status: 'done' as const, output: s.output }))}
               originalInput={sel.input}
-              onRerun={() => alert('在「處理稿件」分頁可重跑；歷史頁為唯讀檢視')}
-            />
-            {sel.error && <p className="err">錯誤：{sel.error}</p>}
+              onRerun={() => alert('請在「處理稿件」分頁重跑；歷史頁為唯讀檢視')} />
+            {sel.error && <div className="err-box">錯誤：{sel.error}</div>}
           </>
         )}
       </div>

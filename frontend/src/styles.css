@@ -12,6 +12,23 @@
   --ok: #2dd4a7;
 }
 
+:root.light {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --panel-2: #f0f2f5;
+  --border: #d8dce3;
+  --text: #1c2230;
+  --muted: #5b6472;
+  --accent: #2563eb;
+  --accent-2: #0d9d7d;
+  --warn: #b45309;
+  --err: #dc2626;
+  --ok: #0d9d7d;
+}
+:root.light pre.log { background: #f6f8fa; color: #24292f; }
+:root.light .tiptap { background: #fff; }
+:root.light .html-editor { background: #fff; color: #1c2230; }
+
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -87,6 +104,61 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 tr.click { cursor: pointer; }
 tr.click:hover td { background: var(--panel-2); }
 .banner { background: #2a2410; border: 1px solid #5a4a14; color: var(--warn); padding: 10px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; }
+
+/* 拖放上傳 */
+.dropzone { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(79,140,255,.06); }
+.dropzone .dz-icon { font-size: 22px; margin-bottom: 6px; color: var(--muted); }
+.file-card { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 10px; padding: 10px 12px; }
+.file-card .finfo { flex: 1; min-width: 0; }
+.file-card .fname { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ficon { font-size: 10px; font-weight: 700; padding: 6px 7px; border-radius: 6px; }
+.ficon.pdf { background: #3a1717; color: #f08c8c; }
+.ficon.docx { background: #16243f; color: #7aa7ff; }
+.ficon.md { background: #2a2f3a; color: var(--muted); }
+:root.light .ficon.pdf { background: #fde8e8; color: #c81e1e; }
+:root.light .ficon.docx { background: #e1ecff; color: #1d4ed8; }
+
+/* 連結輸入 */
+.url-wrap { position: relative; }
+.url-wrap .clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; }
+.url-types { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.url-types .chip.on { border-color: var(--accent); color: var(--text); background: rgba(79,140,255,.12); }
+
+/* 整體進度 */
+.overall { margin-bottom: 12px; }
+.overall .bar { height: 8px; border-radius: 6px; background: var(--panel-2); overflow: hidden; margin-top: 6px; }
+.overall .fill { height: 100%; background: var(--accent); border-radius: 6px; transition: width .5s ease; }
+.overall .fill.bad { background: var(--err); }
+
+/* 階段分組 */
+.stage-group { border-left: 2px solid var(--border); padding-left: 10px; margin: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+.group-title { font-size: 12px; color: var(--muted); letter-spacing: .04em; margin-bottom: 2px; }
+.stage-msg { padding: 0 12px 8px 38px; font-size: 12px; color: var(--accent); }
+
+/* 表單 */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+.req { color: var(--err); }
+.hint { font-size: 11.5px; color: var(--muted); margin: 4px 0 0; }
+.ok-box { background: #123a2e; border: 1px solid #1f5c49; color: var(--ok); padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+.err-box { background: #3a1717; border: 1px solid #5c1f1f; color: var(--err); padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-top: 8px; }
+:root.light .ok-box { background: #e7f7f1; }
+:root.light .err-box { background: #fdeaea; }
+.theme-btn { margin-left: 10px; padding: 4px 9px; }
+
+/* 編輯器雙模式 */
+.editor-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.editor-tabs button { background: none; border: none; padding: 8px 14px; color: var(--muted); cursor: pointer; font-size: 12.5px; border-bottom: 2px solid transparent; }
+.editor-tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.toolbar .sep { width: 1px; background: var(--border); margin: 2px 4px; }
+.insert-bar { display: flex; gap: 8px; padding: 8px; background: var(--panel-2); border-bottom: 1px solid var(--border); align-items: center; }
+.insert-bar input { flex: 1; }
+.table-bar { border-top: 1px dashed var(--border); }
+.html-editor { width: 100%; min-height: 320px; background: #0a0c10; color: #cdd3dc; border: none; padding: 12px 14px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; resize: vertical; }
+.html-editor:focus { outline: none; }
+.tiptap table { border-collapse: collapse; margin: 10px 0; }
+.tiptap td, .tiptap th { border: 1px solid var(--border); padding: 5px 9px; min-width: 48px; }
 
 .stage-list { display: flex; flex-direction: column; gap: 8px; }
 .stage-card { border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); overflow: hidden; }
