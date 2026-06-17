@@ -65,6 +65,12 @@ export const publishJob = (
   overrides?: Record<string, unknown>,
 ) => jpost<{ id: number; link: string; status: string }>('/publish', { job_id, status, overrides })
 export const importStrapi = () => jpost<{ imported: Record<string, number> }>('/site-config/import-strapi', {})
+export const getBuiltinTemplates = () => jget<{
+  article_types: { key: string; name: string; header: string; footer: string; author_id: number | null }[]
+  header_disclaimers: Record<string, string>
+  footer_disclaimers: Record<string, string>
+}>('/site-config/builtin')
+export const listSiteConfig = () => jget<{ id: string; kind: string; key: string; value: Record<string, unknown> }[]>('/site-config')
 
 export async function uploadFile(file: File): Promise<{ file: string; original_name: string; size: number }> {
   const fd = new FormData()
