@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
 import { PublishForm } from './PublishForm'
@@ -57,11 +57,27 @@ function jobSource(j: Job): string {
   return '—'
 }
 
+const NAV: { key: Tab; label: string; sub: string; icon: ReactNode }[] = [
+  {
+    key: 'run', label: '處理稿件', sub: '進稿 → AI 流程 → 上稿',
+    icon: <svg viewBox="0 0 24 24" fill="none"><path d="M5 4h10l4 4v12H5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /><path d="M14 4v5h5M8.5 13h7M8.5 16.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
+  },
+  {
+    key: 'jobs', label: 'Jobs 歷史', sub: '所有執行紀錄',
+    icon: <svg viewBox="0 0 24 24" fill="none"><path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="12" r="8.2" stroke="currentColor" strokeWidth="1.6" /></svg>,
+  },
+  {
+    key: 'config', label: '設定 / Prompt', sub: 'Agent 與押註版本',
+    icon: <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 7a2 2 0 104 0 2 2 0 00-4 0zM6 17a2 2 0 104 0 2 2 0 00-4 0z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
+  },
+]
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('run')
   const [health, setHealth] = useState<{ status: string } | null>(null)
   const [light, setLight] = pref('theme-light', false)
-  const [openJobId, setOpenJobId] = useState<number | null>(null) // Jobs 頁點開 → 跳回 run 視圖
+  const [openJobId, setOpenJobId] = useState<number | null>(null)
+  const [drawer, setDrawer] = useState(false)
   useEffect(() => {
     const check = () => getHealth().then(setHealth).catch(() => setHealth(null))
     check()
@@ -69,29 +85,60 @@ export default function App() {
     return () => clearInterval(t)
   }, [])
   useEffect(() => { document.documentElement.classList.toggle('light', light) }, [light])
+
+  const cur = NAV.find((n) => n.key === tab)!
+  const go = (k: Tab) => { setTab(k); setDrawer(false) }
+
   return (
-    <div className="app">
+    <div className="shell">
       <Toasts />
-      <div className="topbar">
-        <h1>BD 內容自動化平台</h1>
-        <span className="health">
-          <span className={`dot ${health ? 'ok' : ''}`} />
-          {health ? '後端正常' : '後端未連線'}
-        </span>
-        <button className="ghost theme-btn" onClick={() => setLight(!light)} title={light ? '切換到暗色模式' : '切換到亮色模式'}>
-          {light ? '🌙' : '☀️'}
-        </button>
+
+      <aside className={`sidebar ${drawer ? 'open' : ''}`}>
+        <div className="brand">
+          <span className="brand-mark">BD</span>
+          <span className="brand-text"><b>內容自動化</b><i>Content Platform</i></span>
+        </div>
+        <nav className="nav">
+          {NAV.map((n) => (
+            <button key={n.key} className={`nav-item ${tab === n.key ? 'on' : ''}`} onClick={() => go(n.key)}>
+              <span className="nav-ic">{n.icon}</span>
+              <span className="nav-txt"><span className="nav-label">{n.label}</span><span className="nav-sub">{n.sub}</span></span>
+            </button>
+          ))}
+        </nav>
+        <div className="side-foot">
+          <div className={`side-health ${health ? 'ok' : 'down'}`}>
+            <span className="dot" />{health ? '後端運行中' : '後端未連線'}
+          </div>
+          <button className="theme-toggle" onClick={() => setLight(!light)}>
+            <span>{light ? '☀️ 亮色' : '🌙 暗色'}</span>
+            <span className="muted">切換</span>
+          </button>
+        </div>
+      </aside>
+      {drawer && <div className="scrim" onClick={() => setDrawer(false)} />}
+
+      <div className="main">
+        <header className="topbar">
+          <button className="hamburger" onClick={() => setDrawer(true)} aria-label="選單">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+          </button>
+          <div className="page-head">
+            <h1>{cur.label}</h1>
+            <span className="page-sub">{cur.sub}</span>
+          </div>
+          <span className="spacer" />
+          <span className={`pill ${health ? 'ok' : 'down'}`}><span className="dot" />{health ? 'online' : 'offline'}</span>
+        </header>
+
+        <div className="content">
+          <div style={{ display: tab === 'run' ? 'block' : 'none' }}>
+            <RunPanel openJobId={openJobId} onOpened={() => setOpenJobId(null)} />
+          </div>
+          {tab === 'jobs' && <JobsPanel onOpen={(id) => { setOpenJobId(id); setTab('run') }} />}
+          {tab === 'config' && <ConfigPanel />}
+        </div>
       </div>
-      <div className="tabs">
-        <div className={`tab ${tab === 'run' ? 'active' : ''}`} onClick={() => setTab('run')}>處理稿件</div>
-        <div className={`tab ${tab === 'jobs' ? 'active' : ''}`} onClick={() => setTab('jobs')}>Jobs 歷史</div>
-        <div className={`tab ${tab === 'config' ? 'active' : ''}`} onClick={() => setTab('config')}>設定 / Prompt</div>
-      </div>
-      <div style={{ display: tab === 'run' ? 'block' : 'none' }}>
-        <RunPanel openJobId={openJobId} onOpened={() => setOpenJobId(null)} />
-      </div>
-      {tab === 'jobs' && <JobsPanel onOpen={(id) => { setOpenJobId(id); setTab('run') }} />}
-      {tab === 'config' && <ConfigPanel />}
     </div>
   )
 }
