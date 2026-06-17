@@ -36,6 +36,18 @@ TYPE_DEFAULTS: dict[str, dict] = {
 }
 
 
+def _disclaimer_sets() -> tuple[dict, dict]:
+    """目前生效的押註範本集：優先用具名版本(ConfigVersion scope=disclaimer)，否則內建預設。"""
+    from app.services import versions
+
+    active = versions.active_version("disclaimer")
+    if active:
+        d = active["data"]
+        return (d.get("header_disclaimers") or HEADER_DISCLAIMERS,
+                d.get("footer_disclaimers") or FOOTER_DISCLAIMERS)
+    return HEADER_DISCLAIMERS, FOOTER_DISCLAIMERS
+
+
 def resolve_disclaimers(
     article_type: str,
     supplier: str = "",
@@ -44,17 +56,18 @@ def resolve_disclaimers(
 ) -> tuple[str, str, str]:
     """回傳 (header_html, footer_html, 類型中文名)。supplier 會替換［撰稿方名稱］。
 
+    優先序：押註具名版本 > Strapi(SiteConfig) > 內建預設。
     header/footer kind: none / sponsored / press-release；未指定則用該文稿類型的預設。
-    DB SiteConfig 有資料時優先（Strapi 匯入後自動接管）。
     """
     cfg = TYPE_DEFAULTS.get(article_type, TYPE_DEFAULTS["regular"])
     hk = header_kind if header_kind is not None else cfg["header"]
     fk = footer_kind if footer_kind is not None else cfg["footer"]
+    header_set, footer_set = _disclaimer_sets()
 
-    header = site_config.header_disclaimer() or HEADER_DISCLAIMERS.get(hk, "")
+    header = site_config.header_disclaimer() or header_set.get(hk, "")
     if hk == "none":
         header = ""
-    footer = site_config.footer_disclaimer() or FOOTER_DISCLAIMERS.get(fk, "")
+    footer = site_config.footer_disclaimer() or footer_set.get(fk, "")
     if fk == "none":
         footer = ""
 

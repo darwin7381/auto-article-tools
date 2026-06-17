@@ -207,6 +207,20 @@ pre.log.content { color: #cdd3dc; }
 :root.light .source-banner.builtin { background: #fff7e6; }
 :root.light .source-banner.db { background: #e7f7f1; }
 
+/* 版本管理列 */
+.verbar { border: 1px solid var(--accent); border-radius: 9px; padding: 10px 12px; margin: 10px 0 14px; background: #16203a; }
+:root.light .verbar { background: #eef3ff; }
+.verbar-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ver-now { font-size: 13px; }
+.ver-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.ver-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; background: var(--panel-2); font-size: 13px; flex-wrap: wrap; }
+.ver-item.on { border: 1px solid var(--ok); }
+.ver-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.ver-item.on .ver-dot { background: var(--ok); }
+.ver-name { font-weight: 600; overflow-wrap: anywhere; }
+.ver-time { font-size: 11px; }
+button.link.err { color: var(--err); }
+
 /* 拖放上傳 */
 .dropzone { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
 .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(79,140,255,.06); }

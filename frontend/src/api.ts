@@ -72,6 +72,17 @@ export const getBuiltinTemplates = () => jget<{
 }>('/site-config/builtin')
 export const listSiteConfig = () => jget<{ id: string; kind: string; key: string; value: Record<string, unknown> }[]>('/site-config')
 
+// ── 設定版本管理（prompt 組合 / 押註組合）──
+export type Version = { id: number; name: string; is_active: boolean; data: Record<string, unknown>; created_at: string }
+export const listVersions = (scope: string) =>
+  jget<{ scope: string; active_id: number | null; versions: Version[] }>(`/versions/${encodeURIComponent(scope)}`)
+export const createVersion = (scope: string, name: string, data: Record<string, unknown>) =>
+  jpost<{ id: number; name: string; is_active: boolean }>(`/versions/${encodeURIComponent(scope)}`, { name, data })
+export const activateVersion = (scope: string, id: number) =>
+  jpost<{ ok: boolean }>(`/versions/${encodeURIComponent(scope)}/${id}/activate`, {})
+export const deleteVersion = (scope: string, id: number) =>
+  fetch(`${API_BASE}/versions/${encodeURIComponent(scope)}/${id}`, { method: 'DELETE' }).then((r) => r.json())
+
 export async function uploadFile(file: File): Promise<{ file: string; original_name: string; size: number }> {
   const fd = new FormData()
   fd.append('file', file)
