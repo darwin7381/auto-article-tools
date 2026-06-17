@@ -8,7 +8,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 import app.workflows  # noqa: F401  匯入即註冊所有 workflow
-from app.api import agents, files, health, jobs, publish, site_config, uploads, workflows
+from app.api import (
+    agents,
+    files,
+    health,
+    jobs,
+    publish,
+    site_config,
+    uploads,
+    versions,
+    workflows,
+)
 from app.models.job import init_db
 from app.settings import settings
 from app.worker.jobrunner import start_worker
@@ -40,6 +50,7 @@ app.include_router(uploads.router)
 app.include_router(files.router)
 app.include_router(publish.router)
 app.include_router(site_config.router)
+app.include_router(versions.router)
 
 
 # 同源托管前端 SPA（build 後的 dist）：API 路由先註冊、優先；其餘交給靜態檔。

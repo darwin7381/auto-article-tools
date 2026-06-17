@@ -55,3 +55,24 @@ def test_job_stream_replay():
 def test_unknown_workflow_404():
     with TestClient(app) as c:
         assert c.post("/jobs", json={"workflow": "nope", "input": {}}).status_code == 404
+
+
+def test_config_version_lifecycle():
+    """具名版本：建立→自動生效→get_agent_config 讀到→切換→刪除後回退。"""
+    with TestClient(app) as c:
+        scope = "agent:contentAgent"
+        # 起始無版本
+        assert c.get(f"/versions/{scope}").json()["active_id"] is None
+        v1 = c.post(f"/versions/{scope}", json={"name": "v1", "data": {"system_prompt": "AAA", "user_prompt": "${markdownContent}"}}).json()
+        v2 = c.post(f"/versions/{scope}", json={"name": "v2", "data": {"system_prompt": "BBB", "user_prompt": "${markdownContent}"}}).json()
+        # 最新建立的自動生效
+        assert c.get(f"/versions/{scope}").json()["active_id"] == v2["id"]
+        # 切回 v1
+        assert c.post(f"/versions/{scope}/{v1['id']}/activate").status_code == 200
+        assert c.get(f"/versions/{scope}").json()["active_id"] == v1["id"]
+        # 刪生效中的 v1 → 自動補 v2 生效
+        assert c.delete(f"/versions/{scope}/{v1['id']}").status_code == 200
+        assert c.get(f"/versions/{scope}").json()["active_id"] == v2["id"]
+        # 清理
+        c.delete(f"/versions/{scope}/{v2['id']}")
+        assert c.get(f"/versions/{scope}").json()["versions"] == []
