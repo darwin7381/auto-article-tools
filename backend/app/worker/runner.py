@@ -32,6 +32,8 @@ async def run_workflow(
     """
     import time
 
+    from app.services.llm import usage_var
+
     ctx = ctx or RunContext()
     data = input_data
     try:
@@ -40,13 +42,17 @@ async def run_workflow(
         for stage in wf.stages[start:]:
             yield WorkflowEvent(event="stage", data={"id": stage.id, "status": "running"})
             t0 = time.monotonic()
+            usage_var.set([])  # 收集本階段 token 用量
             data = await stage.run(data, ctx)
+            usages = usage_var.get() or []
+            tokens = sum(u.get("total_tokens", 0) for u in usages)
             yield WorkflowEvent(
                 event="stage",
                 data={
                     "id": stage.id,
                     "status": "done",
                     "elapsed_ms": int((time.monotonic() - t0) * 1000),
+                    "tokens": tokens,
                     "output": json_safe(data),
                 },
             )

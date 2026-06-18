@@ -36,7 +36,7 @@ def _stage_outputs(job: Job) -> list[dict]:
         d = ev.get("data", {})
         if ev.get("event") == "stage" and d.get("status") == "done":
             out.append({"id": d.get("id"), "output": d.get("output"),
-                        "elapsed_ms": d.get("elapsed_ms")})
+                        "elapsed_ms": d.get("elapsed_ms"), "tokens": d.get("tokens")})
     return out
 
 

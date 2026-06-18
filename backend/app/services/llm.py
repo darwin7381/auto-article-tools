@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextvars
 from typing import TypeVar
 
 import httpx
@@ -14,6 +15,19 @@ from pydantic import BaseModel
 from app.settings import settings
 
 T = TypeVar("T", bound=BaseModel)
+
+# 每階段 token 用量收集(runner 在每階段前 set 一個新 list,呼叫端不需改簽名)
+usage_var: contextvars.ContextVar[list | None] = contextvars.ContextVar("llm_usage", default=None)
+
+
+def _record(usage: dict | None) -> None:
+    lst = usage_var.get()
+    if lst is not None and usage:
+        lst.append({
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+        })
 
 _PROVIDER_BASE = {
     "openai": "https://api.openai.com/v1",
@@ -75,6 +89,7 @@ async def chat(
             choice = data["choices"][0]
             content = choice.get("message", {}).get("content")
             if content:
+                _record(data.get("usage"))
                 return content
             last_err = RuntimeError(
                 f"LLM 回傳空內容（finish_reason={choice.get('finish_reason')}）"
@@ -121,7 +136,7 @@ async def structured(
     client = instructor.from_openai(
         AsyncOpenAI(base_url=base, api_key=key), mode=instructor.Mode.JSON
     )
-    return await client.chat.completions.create(
+    obj, completion = await client.chat.completions.create_with_completion(
         model=model,
         response_model=response_model,
         max_retries=2,
@@ -132,3 +147,11 @@ async def structured(
             {"role": "user", "content": user_prompt},
         ],
     )
+    usage = getattr(completion, "usage", None)
+    if usage is not None:
+        _record({
+            "prompt_tokens": getattr(usage, "prompt_tokens", 0),
+            "completion_tokens": getattr(usage, "completion_tokens", 0),
+            "total_tokens": getattr(usage, "total_tokens", 0),
+        })
+    return obj

@@ -21,7 +21,8 @@ const SUPERIOR = [
   'gpt-image-2 streaming(根治長連線被掐斷)',
   'instructor+pydantic 結構化驗證(殺壞 JSON)',
   'Dashboard UI + RWD + 主題 + 全頁拖放',
-  '自動化測試 pytest 11/11',
+  '觀測:per-stage 耗時 + token 用量 + eval 回歸評分',
+  '自動化測試 pytest 13/13',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -32,12 +33,8 @@ const PARITY = [
   'WordPress 發布(含封面上傳媒體庫)',
 ]
 const GAPS: [string, string, string][] = [
-  ['🔴 高', '內嵌圖片抽取(D1)', '舊版 mammoth 把 docx/pdf 內嵌圖抽出存 R2;新版只抽文字 → 有配圖稿件會掉圖'],
-  ['🟡 中', '圖片 figure 包裝(D2)', '舊版圖片包 <figure class=article-image>+lazy;新版裸 <img>'],
-  ['🟡 中', '特色圖取內文首圖(D3)', '舊版可用原文首圖當特色圖;新版僅生成封面(且因 D1 內文無圖)'],
-  ['🟡 中', '作者 ID 自動帶入', '舊版依文稿類型自動填 author(廣編=1/新聞=2);新版表單需手填'],
-  ['🟢 低', '登入 / 權限(Clerk)', '舊版有;新版無(tunnel 公開有風險)'],
-  ['🟢 低', '觀測 + eval', '成本追蹤、prompt 回歸測試;兩版都還沒做'],
+  ['🟢 低（暫緩）', '登入 / 權限', '舊版有 Clerk;新版無。已與你確認此項優先級往後放。要時建議用 tunnel 層 Basic Auth(同 dc1/dc2)'],
+  ['🟢 低', 'eval 進階', '已有 golden 評分 CLU(結構不變式 + 耗時/tokens);LLM-judge 品質評分可再加'],
 ]
 const TESTED: [string, string][] = [
   ['article 完整 7 階段端到端', 'E2E job#46 + 4 份文件實測'],
@@ -50,6 +47,12 @@ const TESTED: [string, string][] = [
   ['Strapi 匯入 12 筆 + 押註分型讀取', '匯入 + resolve 實測'],
   ['影像 gpt-image-2 streaming + Pillow 壓縮', '單獨重現 + pipeline 實測'],
   ['前端:dashboard / RWD / 拖放 / 主題 / 快取修復', '隔離瀏覽器(桌面+390 手機)'],
+  ['D1 內嵌圖片抽取(docx/pdf→存儲→嵌回)', 'HashKey docx 抽到 1 圖、eval 用作特色圖'],
+  ['D2 圖片 figure 包裝 + lazy', '單元測試'],
+  ['D3 原文首圖當特色圖(省生圖)', 'eval:cover_image 0 tok/0s 用原文圖'],
+  ['作者 ID 依文稿類型自動帶入', 'article_formatting 帶入(廣編1/新聞2)'],
+  ['觀測:per-stage 耗時 + tokens', 'eval:content_ai 9078/pr_writer 10198 tok'],
+  ['eval 回歸評分(結構不變式)', 'CLI 11/11 通過(118.8s/26k tokens)'],
 ]
 
 export function StatusPanel() {
@@ -75,7 +78,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="11/11 ✓" ok />
+        <Stat label="後端測試" value="13/13 ✓" ok />
       </div>
 
       <div className="panel">
