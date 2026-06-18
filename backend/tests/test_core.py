@@ -64,6 +64,29 @@ def test_format_article_full():
 
 
 
+@pytest.mark.asyncio
+async def test_compress_cover():
+    """封面壓縮(Pillow):輸出不大於原圖、仍是有效影像、副檔名合理。"""
+    import io
+
+    from PIL import Image
+
+    from app.services.compress import compress_cover
+
+    img = Image.new("RGB", (512, 512))
+    px = img.load()
+    for y in range(512):  # 照片型漸層 → JPEG 應比 PNG 小
+        for x in range(512):
+            px[x, y] = (x % 256, y % 256, (x + y) % 256)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    src = buf.getvalue()
+    out, ext = await compress_cover(src)
+    assert ext in ("jpg", "png")
+    assert len(out) <= len(src)             # 只在更小時才採用,否則原樣
+    Image.open(io.BytesIO(out)).verify()    # 輸出仍為有效影像
+
+
 def test_eval_scorecard():
     """eval 評分:結構不變式 + 繁中比例。"""
     from app.services.evals import cjk_ratio, score_result
