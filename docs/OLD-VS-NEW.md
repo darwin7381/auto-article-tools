@@ -137,10 +137,17 @@
 
 但有**一個高優先功能缺口**必須補,才能說「完整 ≥ 舊版」：
 
-1. 🔴 **進階組稿**(G1):dropcap / 引言區 / 標題正規化 / 相關閱讀 / TG banner 移植到 `article_formatting`。
-2. 🔴 **內嵌圖片抽取**(D1):docx/pdf 內嵌圖要抽出+存儲+保留在內文,否則有圖稿件掉圖。
-3. 🟡 **圖片 figure 包裝**(D2)、**特色圖取首圖**(D3)。
-4. 🟡 **作者 ID 自動帶入**(§5):依文稿類型自動填 author。
-5. 🟢 **模型參數適配**(D4,改用 OpenAI 推理模型才需要)、登入/權限(G2)、觀測/eval(G6)、R2 輸出(G7)。
+**2026-06-18 全數補齊(除登入外)**:
+- ✅ 進階組稿(G1):dropcap/引言/標題正規化/相關閱讀/TG banner — `services/formatting.py`,寫回 wp.content,前端可開關。eval 11/11
+- ✅ 內嵌圖片抽取(D1):docx(python-docx 走 blip)/pdf(pymupdf extract_image)抽圖→存儲→嵌回內文。HashKey docx 實測抽到圖
+- ✅ 圖片 figure 包裝(D2):md→html 圖片包 `<figure class="article-image">`+lazy
+- ✅ 特色圖取原文首圖(D3):有原文配圖則用首圖當特色圖、跳過生成(省成本)。eval 實測 cover_image 0 tok
+- ✅ 作者 ID 自動帶入:依文稿類型(廣編1/新聞2)
+- ✅ 觀測:per-stage 耗時 + token 用量(contextvar 捕捉)
+- ✅ eval 回歸:golden 評分 CLI(結構不變式 + 耗時/tokens)`uv run python cli.py eval --file …`
+- ✅ Strapi 匯入(G4/D6)+ 押註讀取 bug(D5)
 
-> Strapi 匯入(G4/D6)與押註讀取 bug(D5)已於 2026-06-18 完成/修復。
+**仍緩(經確認優先級往後)**:
+- 🟢 登入/權限(G2):建議用 tunnel 層 Basic Auth(同 dc1/dc2),不動 app 碼
+- 🟢 D4 推理模型參數適配:改用 OpenAI o1/o3 才需要;目前 openrouter/gemini 無此問題
+- 🟢 LLM-judge 品質評分、R2 輸出(G7):規模到了再補

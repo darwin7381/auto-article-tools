@@ -261,7 +261,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
     let marked = false
     return ids.map((id) => {
       const so = done.get(id)
-      if (so) return { id, status: 'done' as const, output: so.output, elapsedMs: so.elapsed_ms ?? undefined }
+      if (so) return { id, status: 'done' as const, output: so.output, elapsedMs: so.elapsed_ms ?? undefined, tokens: so.tokens ?? undefined }
       const kept = keep.get(id)
       if (kept?.status === 'done') return kept
       if (!marked && (j.status === 'running' || j.status === 'pending')) { marked = true; return { id, status: 'running' as const } }
@@ -329,7 +329,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
         const d = rec(data)
         if (ev === 'stage') {
           setViews((prev) => prev.map((v) => v.id === d.id
-            ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output, elapsedMs: (d.elapsed_ms as number) ?? v.elapsedMs }
+            ? { ...v, status: d.status as StageView['status'], output: (d.output as Record<string, unknown>) ?? v.output, elapsedMs: (d.elapsed_ms as number) ?? v.elapsedMs, tokens: (d.tokens as number) ?? v.tokens }
             : v))
         }
       }, ac.signal).catch(() => {})

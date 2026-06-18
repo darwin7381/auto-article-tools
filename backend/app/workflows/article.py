@@ -16,7 +16,6 @@ from app.core.stage import RunContext, Stage
 from app.services.agent_config import get_agent_config
 from app.services.compress import compress_cover
 from app.services.image import generate_image
-from app.services.ingest import ingest_markdown
 from app.services.llm import chat, structured
 from app.services.markdown import md_to_html
 from app.services.storage import save_image, save_text
@@ -46,8 +45,11 @@ class WordPressParams(BaseModel):
 
 # ---- 各階段 ----
 async def s_extract(data: dict, ctx: RunContext) -> dict:
-    text = await ingest_markdown(data)  # 支援 {"file": ...} 或 {"url": ...}
-    return {**data, "source": data.get("file") or data.get("url"), "markdown": text}
+    from app.services.ingest import ingest
+
+    text, image_urls = await ingest(data)  # D1:含內嵌圖片
+    return {**data, "source": data.get("file") or data.get("url"),
+            "markdown": text, "source_images": image_urls}
 
 
 async def s_content_ai(data: dict, ctx: RunContext) -> dict:
@@ -80,8 +82,15 @@ async def s_copy_editing(data: dict, ctx: RunContext) -> dict:
 
 async def s_cover_image(data: dict, ctx: RunContext) -> dict:
     cfg = get_agent_config("imageGeneration")
-    wp = data.get("wordpress", {})
+    wp = dict(data.get("wordpress", {}))
     from app.services.templates import TYPE_DEFAULTS
+
+    # D3:有原文配圖且使用者未要求一律生成 → 用原文首圖當特色圖(省成本、用真圖)
+    src_imgs = data.get("source_images") or []
+    if src_imgs and not data.get("force_cover"):
+        url = src_imgs[0]
+        wp = {**wp, "featured_image": {"url": url, "alt": wp.get("title", "")}}
+        return {**data, "wordpress": wp, "cover_image_url": url, "cover_image_source": "原文首圖"}
 
     type_name = TYPE_DEFAULTS.get(data.get("article_type", ""), {}).get("name", "新聞稿")
     prompt = (cfg.prompt_template or "Cover image for: ${title}")
@@ -102,10 +111,15 @@ async def s_cover_image(data: dict, ctx: RunContext) -> dict:
 
 async def s_article_formatting(data: dict, ctx: RunContext) -> dict:
     from app.services.formatting import FormatOptions, format_article
-    from app.services.templates import resolve_disclaimers
+    from app.services.templates import TYPE_DEFAULTS, resolve_disclaimers
 
     wp = dict(data.get("wordpress", {}))
     title = wp.get("title", "")
+    # 作者 ID 自動帶入(依文稿類型;廣編=1 BTEditor / 新聞=2 BTVerse,同舊版),未指定才帶
+    if not wp.get("author"):
+        aid = TYPE_DEFAULTS.get(data.get("article_type", "regular"), {}).get("author_id")
+        if aid:
+            wp["author"] = aid
     cover = data.get("cover_image_url") or data.get("cover_image")
     body = wp.get("content") or data.get("html", "")
     article_type = data.get("article_type", "regular")

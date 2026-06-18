@@ -8,6 +8,7 @@ export type StageView = {
   status: Status
   output?: Record<string, unknown> | null
   elapsedMs?: number
+  tokens?: number
 }
 
 /** 階段中文名（對齊舊版）。 */
@@ -149,6 +150,7 @@ function StageCard({ index, stage, prevOutput, originalInput, onRerun }: {
         <span className="name">{index + 1}. {STAGE_LABELS[stage.id] ?? stage.id}</span>
         <span className={`status ${stage.status}`}>{STATUS_TEXT[stage.status] ?? stage.status}</span>
         {stage.elapsedMs != null && <span className="meta-badge">{fmtMs(stage.elapsedMs)}</span>}
+        {Boolean(stage.tokens) && <span className="meta-badge">{stage.tokens! >= 1000 ? `${(stage.tokens! / 1000).toFixed(1)}k` : stage.tokens} tok</span>}
         {model && <span className="meta-badge model">{model.split('/').pop()}</span>}
         {stage.status === 'done' && curChars > 0 && (
           <span className="meta-badge">{curChars} 字{delta != null && delta !== 0 ? ` (${delta > 0 ? '+' : ''}${delta})` : ''}</span>
