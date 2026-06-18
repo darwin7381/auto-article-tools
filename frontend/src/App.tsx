@@ -236,9 +236,11 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
     return () => { stop = true; clearInterval(t) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Jobs 頁點開某筆 → 載入完整視圖（B3）
+  // Jobs 頁點開某筆 / 分享連結 ?job=ID → 載入完整視圖（B3）。
+  // 明確指定的 job 必須優先:標記 didAutoAttach,避免啟動時「自動接回進行中任務」搶走
+  // 使用者點開/分享的那一筆(分享連結被覆蓋的 bug)。
   useEffect(() => {
-    if (openJobId != null) { attach(openJobId); onOpened() }
+    if (openJobId != null) { didAutoAttach.current = true; attach(openJobId); onOpened() }
   }, [openJobId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refreshRecent(): Promise<Job[]> {
