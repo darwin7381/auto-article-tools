@@ -3,6 +3,7 @@ import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
 import { PublishForm } from './PublishForm'
 import { StageList, type StageView } from './Stages'
+import { StatusPanel } from './Status'
 import { FileDrop, UrlInput, acceptOk, useGlobalDrop, type Uploaded } from './Upload'
 import { Toasts, toast } from './toast'
 import {
@@ -10,7 +11,7 @@ import {
   type Job, type Workflow,
 } from './api'
 
-type Tab = 'run' | 'jobs' | 'config'
+type Tab = 'run' | 'jobs' | 'config' | 'status'
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
 
@@ -69,6 +70,10 @@ const NAV: { key: Tab; label: string; sub: string; icon: ReactNode }[] = [
   {
     key: 'config', label: '設定 / Prompt', sub: 'Agent 與押註版本',
     icon: <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 7a2 2 0 104 0 2 2 0 00-4 0zM6 17a2 2 0 104 0 2 2 0 00-4 0z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
+  },
+  {
+    key: 'status', label: '建構進度', sub: '對照舊版 / 缺口 / 測試',
+    icon: <svg viewBox="0 0 24 24" fill="none"><path d="M5 19V9M10 19V5M15 19v-6M20 19v-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>,
   },
 ]
 
@@ -137,6 +142,7 @@ export default function App() {
           </div>
           {tab === 'jobs' && <JobsPanel onOpen={(id) => { setOpenJobId(id); setTab('run') }} />}
           {tab === 'config' && <ConfigPanel />}
+          {tab === 'status' && <StatusPanel />}
         </div>
       </div>
     </div>
