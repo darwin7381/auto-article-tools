@@ -142,11 +142,105 @@ def _rect_inside(inner, outer, thresh: float = 0.6) -> bool:
     return (inter.get_area() / a.get_area()) >= thresh if not inter.is_empty else False
 
 
+def _rows_to_md(rows: list[list]) -> str:
+    """二維儲存格 → markdown 表格(欄數對齊、去空列)。"""
+    clean = []
+    for r in rows or []:
+        cells = [(c or "").strip().replace("\n", " ").replace("|", "\\|") for c in r]
+        if any(cells):
+            clean.append(cells)
+    if len(clean) < 1:
+        return ""
+    ncol = max(len(r) for r in clean)
+    if ncol < 2:
+        return ""
+    norm = [(r + [""] * ncol)[:ncol] for r in clean]
+    head = norm[0]
+    md = ["| " + " | ".join(head) + " |", "| " + " | ".join("---" for _ in head) + " |"]
+    for r in norm[1:]:
+        md.append("| " + " | ".join(r) + " |")
+    return "\n".join(md)
+
+
+def _good_borderless_table(rows: list[list]) -> bool:
+    """無框線 fallback 的品質閘:擋掉把一般段落誤判成表格。
+
+    要件:>=2 列 >=2 欄、>=60% 儲存格有值、平均儲存格短(表格特徵,非長句散文)。
+    """
+    clean = [[(c or "").strip() for c in r] for r in (rows or [])]
+    clean = [r for r in clean if any(r)]
+    if len(clean) < 2:
+        return False
+    ncol = max(len(r) for r in clean)
+    if ncol < 2:
+        return False
+    flat = [c for r in clean for c in (r + [""] * ncol)[:ncol]]
+    nonempty = [c for c in flat if c]
+    if not flat or len(nonempty) / len(flat) < 0.6:
+        return False
+    avg_len = sum(len(c) for c in nonempty) / len(nonempty)
+    return avg_len < 40
+
+
+# pdfplumber / OCR 為惰性、可選依賴:沒裝或失敗都不擋主流程(graceful degradation)
+def _ocr_engine_get():
+    global _OCR_ENGINE
+    if _OCR_ENGINE is _UNSET:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+
+            _OCR_ENGINE = RapidOCR()
+        except Exception:  # noqa: BLE001  未安裝 ocr extra
+            _OCR_ENGINE = None
+    return _OCR_ENGINE
+
+
+def _ocr_page(page) -> str:
+    """掃描/圖片型 PDF 頁 → OCR 文字(RapidOCR,onnxruntime 無 torch,CJK 佳)。"""
+    eng = _ocr_engine_get()
+    if eng is None:
+        return ""
+    try:
+        png = page.get_pixmap(dpi=200).tobytes("png")
+        res, _ = eng(png)
+        return "\n".join(line[1] for line in (res or []) if line and len(line) > 1).strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+_UNSET = object()
+_OCR_ENGINE = _UNSET
+
+
+def _pdfplumber_borderless(path: str, page_no: int):
+    """fitz 沒抓到表時,用 pdfplumber 文字策略補無框線表(過品質閘)。回傳 [(bbox, md)]。"""
+    try:
+        import pdfplumber
+    except Exception:  # noqa: BLE001  未裝 pdfplumber
+        return []
+    out = []
+    try:
+        with pdfplumber.open(path) as pdf:
+            if page_no >= len(pdf.pages):
+                return []
+            pg = pdf.pages[page_no]
+            settings = {"vertical_strategy": "text", "horizontal_strategy": "text",
+                        "snap_tolerance": 4, "join_tolerance": 4}
+            for t in pg.find_tables(table_settings=settings):
+                rows = t.extract()
+                if _good_borderless_table(rows):
+                    out.append((tuple(t.bbox), _rows_to_md(rows)))
+    except Exception:  # noqa: BLE001
+        return []
+    return out
+
+
 def extract_pdf(path: str) -> tuple[str, ImgList]:
-    """位置保真:把每頁的「文字塊 / 表格 / 圖片」依座標(上→下,左→右)排序後輸出。
+    """位置保真:每頁的「文字塊 / 表格 / 圖片」依座標(上→下,左→右)排序後輸出。
 
     舊版 PDF 走 ConvertAPI→DOCX→mammoth 自然 inline;我們直接在 PDF 層做版面排序,
     避免 get_text 把圖片/表格丟失或錯位(之前的 bug:圖片全被丟到頁尾)。
+    強化:fitz 漏抓表 → pdfplumber 補無框線表;整頁無文字(掃描檔)→ RapidOCR 補文字。
     """
     import fitz
 
@@ -169,14 +263,29 @@ def extract_pdf(path: str) -> tuple[str, ImgList]:
             except Exception:  # noqa: BLE001  find_tables 偶會在奇異版面拋錯,不擋整頁
                 pass
 
+            # fitz 沒抓到任何表 → pdfplumber 補無框線/複雜表(過品質閘防誤判)
+            if not table_rects:
+                for bbox, md in _pdfplumber_borderless(path, page.number):
+                    if md:
+                        table_rects.append(fitz.Rect(bbox))
+                        items.append((bbox[1], bbox[0], "text", md))
+
             # 文字塊(排除已被表格涵蓋的)
-            for b in page.get_text("blocks"):
+            blocks = page.get_text("blocks")
+            for b in blocks:
                 x0, y0, x1, y1, txt, _no, btype = b[:7]
                 if btype != 0 or not txt.strip():
                     continue
                 if any(_rect_inside((x0, y0, x1, y1), tr) for tr in table_rects):
                     continue
                 items.append((y0, x0, "text", txt.strip()))
+
+            # 掃描/圖片型 PDF 頁(幾乎無可抽文字)→ OCR 補文字
+            page_chars = sum(len((b[4] or "").strip()) for b in blocks if b[6] == 0)
+            if page_chars < 10:
+                ocr = _ocr_page(page)
+                if ocr:
+                    items.append((-1.0, 0.0, "text", ocr))  # OCR 文字置於頁首
 
             # 圖片(含座標)→ 依位置插入;xref 全域去重(重複 logo 只留一次)
             try:
@@ -237,6 +346,54 @@ def extract_rtf(path: str) -> str:
     return rtf_to_text(Path(path).read_text(encoding="utf-8", errors="replace"))
 
 
+def _find_soffice() -> str | None:
+    """找 LibreOffice headless 執行檔(.doc/.odt 唯一可靠的 OSS 轉檔路徑)。"""
+    import glob
+    import shutil
+
+    for name in ("soffice", "libreoffice"):
+        hit = shutil.which(name)
+        if hit:
+            return hit
+    for pat in (
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+        "/opt/homebrew/bin/soffice",
+        "/usr/bin/soffice",
+        "/usr/local/bin/soffice",
+    ):
+        hits = glob.glob(pat)
+        if hits:
+            return hits[0]
+    return None
+
+
+def _soffice_to_docx(path: str) -> str:
+    """.doc/.odt → .docx(LibreOffice headless),回傳暫存 docx 路徑。"""
+    import subprocess
+    import tempfile
+
+    soffice = _find_soffice()
+    if not soffice:
+        raise ValueError(
+            f"{Path(path).suffix.lower()} 需 LibreOffice 轉檔(未偵測到 soffice);"
+            "請 `brew install --cask libreoffice`,或先另存為 .docx/.pdf 再上傳"
+        )
+    outdir = tempfile.mkdtemp(prefix="soffice_")
+    try:
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "docx", "--outdir", outdir, path],
+            check=True, capture_output=True, timeout=90,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError("LibreOffice 轉檔逾時(檔案可能過大或損毀)") from exc
+    except subprocess.CalledProcessError as exc:
+        raise ValueError(f"LibreOffice 轉檔失敗: {exc.stderr.decode()[:200]}") from exc
+    out = Path(outdir) / (Path(path).stem + ".docx")
+    if not out.exists():
+        raise ValueError("LibreOffice 轉檔未產生 .docx(檔案可能損毀)")
+    return str(out)
+
+
 def extract_document(path: str) -> tuple[str, ImgList]:
     ext = Path(path).suffix.lower()
     if ext == ".docx":
@@ -249,10 +406,8 @@ def extract_document(path: str) -> tuple[str, ImgList]:
         return extract_html(path), []
     if ext == ".rtf":
         return extract_rtf(path), []
-    if ext in (".doc", ".odt", ".pages"):
-        raise ValueError(
-            f"{ext} 需 LibreOffice 轉檔(目前環境未安裝);請先另存為 .docx 或 .pdf 再上傳"
-        )
+    if ext in (".doc", ".odt", ".pages"):  # LibreOffice 轉 docx 後走 docx 路徑(含圖/表/連結)
+        return extract_docx(_soffice_to_docx(path))
     if ext in _IMG_EXTS:
         raise ValueError(f"{ext} 為圖片檔,需 OCR(尚未支援);請提供文字稿 .docx/.pdf/.md")
     raise ValueError(f"不支援的檔案類型: {ext}")

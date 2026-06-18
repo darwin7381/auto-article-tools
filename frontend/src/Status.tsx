@@ -26,7 +26,7 @@ const SUPERIOR = [
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 30/30(含合成夾具斷言圖片排列位置)',
+  '自動化測試 pytest 32/32(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -55,29 +55,76 @@ const CONV_TESTS: Row[] = [
   ['🔑 PDF 圖片閱讀順序', '合成夾具:上文→圖→下文', '依座標插回原位 ✅(修掉舊位置 bug)', true],
   ['🔑 DOCX 超連結保真', '合成夾具', '轉 [動區連結](url) ✅(防 .text 丟連結)', true],
   ['DOCX 標題/清單結構', '合成夾具', '# 標題 · - 清單 ✅', true],
-  ['DOCX/PDF 表格→markdown', '合成 + 數碼港', '| 表頭 | + | --- | · 真檔 2 表 ✅', true],
+  ['DOCX/PDF 有框線表格→markdown', '合成 + 數碼港', '| 表頭 | + | --- | · 真檔 2 表 ✅', true],
+  ['🆕 PDF 無框線表格 fallback', '合成夾具(純文字排版無線條)', 'fitz 抓 0 → pdfplumber 補出表 ✅', true],
+  ['🆕 掃描/圖片型 PDF OCR', '合成夾具(圖片內含文字)', 'RapidOCR 辨識補回文字 ✅', true],
   ['圖片去重(xref)', '合成同圖跨兩頁 + 數碼港', '2頁→1張 · 真檔 8→4 ✅', true],
   ['HTML 檔 / RTF 檔', '合成夾具 trafilatura/striprtf', '主文/純文字抽取 ✅', true],
   ['TXT / MD 直通', '合成夾具', '原樣保留 ✅', true],
-  ['邊界:.doc/圖片/未知型別', '合成夾具', '明確報錯帶建議(LibreOffice/OCR) ✅', true],
+  ['.doc/.odt 轉檔 · 圖片/未知型別報錯', '合成夾具', 'LibreOffice 轉 docx;無則明確報錯帶指引 ✅', true],
   ['md→HTML 表格/figure/程式碼', 'md_to_html', '<table>·<figure>+lazy·<code> ✅', true],
   ['真實素材:HashKey/WEEX/Bluefin', 'extract_document', '繁/简 docx 含圖 · 純文字 PDF ✅', true],
   ['連結:Google Docs/Medium/WeChat', 'export docx / trafilatura+firecrawl', 'gdocs 788/3691字 · Medium 15圖 ✅', true],
   ['死鏈 / 反爬載入失敗', 'Cointelegraph(404) / WeChat2', '明確報錯不帶垃圾跑流程 ✅(預期失敗)', true],
 ]
-// 抽取模組:哪個依賴做哪塊(詳見 docs/EXTRACTION-MODULE.md)
-const DEPS: [string, string, string][] = [
-  ['PDF 文字/表格/圖+座標', 'PyMuPDF 1.27', '續用(預設)·⚠️AGPL 商用需確認'],
-  ['DOCX 自走抽取(連結/標題/表/圖保位)', 'python-docx 1.2', '續用·原生 DOCX 正解'],
-  ['md → HTML', 'python-markdown', '續用'],
-  ['網頁/HTML 主文', 'trafilatura 2.0 + firecrawl', '續用·正文抽取標竿 F1 0.84'],
-  ['RTF → 純文字', 'striprtf', '新增·純 Python 無重依賴'],
-  ['封面壓縮', 'Pillow', '續用(取代 TinyPNG)'],
-  ['OCR(掃描檔)', '— 未支援', '缺口·要時 opt-in PaddleOCR/RapidOCR'],
-  ['表格重/多欄 PDF', '— 未支援', '可選·Docling(MIT) 選擇性 fallback'],
+// 抽取模組:逐模組狀況 / 實現方式 / 0-99 評分(詳見 docs/EXTRACTION-MODULE.md)
+type Mod = {
+  key: string; name: string; score: number; status: string
+  deps: string; how: string; strengths: string[]; gaps: string[]
+}
+const MODULES: Mod[] = [
+  {
+    key: 'docx', name: 'DOCX 抽取', score: 92, status: '成熟 · 比舊版 mammoth 更保真',
+    deps: 'python-docx 1.2(自走 XML，無 ML)',
+    how: '依 body 順序走段落/表格交錯;段內按 run/hyperlink 順序，內嵌圖佔位符落在正確段落間;超連結→[text](url)、標題→#、清單→-、表格→markdown(欄數對齊)。',
+    strengths: ['圖片位置保真(夾在正確段落間)', '超連結保真(.text 預設會丟)', '標題/清單/表格結構保留', '同圖去重'],
+    gaps: ['巢狀表格攤平為單層(極少見)'],
+  },
+  {
+    key: 'pdf', name: 'PDF 抽取', score: 90, status: '強 · 位置保真 + 有框/無框表 + OCR',
+    deps: 'PyMuPDF 1.27 + pdfplumber(fallback) + RapidOCR(opt-in)',
+    how: '每頁文字塊/表格/圖依座標(上→下,左→右)混排;fitz 漏抓表→pdfplumber 文字策略補無框線表(過品質閘防誤判);整頁無文字(掃描檔)→RapidOCR 補;圖片 xref 全域去重。',
+    strengths: ['圖/表依閱讀順序插回原位(修舊版丟頁尾 bug)', '有框線表(fitz)+無框線表(pdfplumber)', '掃描 PDF OCR(RapidOCR)', '圖片去重'],
+    gaps: ['多欄/複雜學術版面閱讀序', '⚠️ PyMuPDF AGPL—商用需確認授權'],
+  },
+  {
+    key: 'url', name: '網頁 / URL 抽取', score: 86, status: '強 · 正文抽取標竿 + 反爬 fallback',
+    deps: 'trafilatura 2.0 + firecrawl CLI',
+    how: 'Google Docs→export docx 走 docx 路徑(含圖);Medium/WeChat/一般站→直抓+trafilatura;被擋/殼頁→firecrawl 渲染後重抽;抽取<150字→明確報錯(不帶垃圾跑流程)。',
+    strengths: ['主文抽取標竿(WCXB F1 0.84)', '反爬/JS 渲染 fallback', 'gdocs 含圖嵌入', '死鏈明確報錯'],
+    gaps: ['Twitter/X 線程未特化', 'PDF 連結未自動下載抽取'],
+  },
+  {
+    key: 'misc', name: 'HTML / RTF / 純文字檔', score: 80, status: '齊全 · 涵蓋常見離線格式',
+    deps: 'trafilatura(html) + striprtf(rtf)',
+    how: '本機 .html/.htm→trafilatura 主文;.rtf→striprtf 純文字;.md/.txt→直讀原樣保留。',
+    strengths: ['HTML 主文抽取(同 URL 路徑)', 'RTF 純 Python 無重依賴', 'md/txt 原樣直通'],
+    gaps: ['RTF 攤平、無圖/表結構', '本機 HTML 相對圖路徑可能失效'],
+  },
+  {
+    key: 'ocr', name: 'OCR(掃描 / 圖片型 PDF)', score: 76, status: '新增 · opt-in 自動觸發',
+    deps: 'RapidOCR(onnxruntime，無 torch)',
+    how: 'PDF 某頁可抽文字<10字→判定掃描頁→頁面 render 200dpi→RapidOCR 辨識→補回文字。惰性載入引擎，未裝 ocr extra 則靜默略過。',
+    strengths: ['onnxruntime 輕量(無 torch/GPU)', 'CJK 中英佳', '只在掃描頁觸發，不拖累一般檔', 'Apache-2.0 授權乾淨'],
+    gaps: ['需 `uv sync --extra ocr` 啟用', '掃描表格結構難還原', '首次跑下載模型 ~15MB'],
+  },
+  {
+    key: 'legacy', name: '.doc / .odt 舊格式', score: 70, status: '可用 · 依賴系統 LibreOffice',
+    deps: 'LibreOffice headless(soffice --convert-to)',
+    how: '偵測到 soffice→轉成 .docx 後走 DOCX 路徑(含圖/表/連結);未偵測到→明確報錯附安裝指引。為舊二進位 .doc 唯一可靠 OSS 路徑。',
+    strengths: ['唯一可靠 OSS 路徑(純 Python 無解)', '轉檔後沿用 DOCX 全保真', '逾時/失敗都有明確報錯'],
+    gaps: ['需系統裝 LibreOffice(本機尚未裝)', '轉檔額外耗時'],
+  },
+  {
+    key: 'md2html', name: 'markdown → HTML', score: 90, status: '成熟 · 與舊版 marked 對等',
+    deps: 'python-markdown(extra/tables/fenced_code…)',
+    how: 'GFM 風格轉換;<p><img></p>→<figure class="article-image">+lazy(復刻舊版);表格/程式碼/清單完整。',
+    strengths: ['表格 <table> 渲染', '圖片 figure 包裝 + lazy', '程式碼區塊', '與舊版 marked 對等'],
+    gaps: ['複雜 HTML 內嵌(iframe/embed)未特化'],
+  },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '30/30 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '32/32 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -112,7 +159,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="30/30 ✓" ok />
+        <Stat label="後端測試" value="32/32 ✓" ok />
       </div>
 
       <div className="panel">
@@ -151,21 +198,12 @@ export function StatusPanel() {
         <p className="hint">🔑 = 用程式即時造夾具,精準斷言「圖片/文字的排列位置」(肉眼難查)。後端 <code>tests/test_conversion.py</code> 30 項;模組覆蓋面/指標/依賴審計見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
       </div>
 
-      <div className="panel">
-        <h2>🧱 抽取模組 — 依賴堆疊（哪個套件做哪塊）</h2>
-        <div className="table-wrap"><table>
-          <thead><tr><th>處理環節</th><th>使用依賴</th><th>判定 / 備註</th></tr></thead>
-          <tbody>{DEPS.map(([job, dep, note]) => (
-            <tr key={job}><td>{job}</td><td><code>{dep}</code></td><td className="muted">{note}</td></tr>
-          ))}</tbody>
-        </table></div>
-        <p className="hint">2025–2026 依賴研究結論:現用堆疊整體「續用」最佳;升級候選為 Docling(表格重 PDF / AGPL 逃生門)與 opt-in OCR。詳見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
-      </div>
+      <ModulesPanel />
 
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 30/30;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 32/32;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">
@@ -178,6 +216,56 @@ export function StatusPanel() {
         </table></div>
         <p className="hint">完整逐行比對見 repo <code>docs/OLD-VS-NEW.md</code>。</p>
       </div>
+    </div>
+  )
+}
+
+function scoreColor(s: number): string {
+  if (s >= 85) return 'var(--accent)'
+  if (s >= 70) return '#e0a020'
+  return '#e06060'
+}
+
+function ModulesPanel() {
+  const [active, setActive] = useState(MODULES[0].key)
+  const m = MODULES.find((x) => x.key === active) ?? MODULES[0]
+  const avg = Math.round(MODULES.reduce((a, x) => a + x.score, 0) / MODULES.length)
+  return (
+    <div className="panel">
+      <h2>🧱 抽取模組 — 逐模組狀況 / 實現方式 / 評分　<span className="mod-avg">均分 {avg}/99</span></h2>
+      <div className="mod-tabs">
+        {MODULES.map((x) => (
+          <button key={x.key} className={`mod-tab ${x.key === active ? 'on' : ''}`} onClick={() => setActive(x.key)}>
+            <span>{x.name}</span>
+            <b style={{ color: scoreColor(x.score) }}>{x.score}</b>
+          </button>
+        ))}
+      </div>
+      <div className="mod-detail">
+        <div className="mod-head">
+          <div className="mod-bigscore" style={{ color: scoreColor(m.score) }}>{m.score}<i>/99</i></div>
+          <div className="mod-head-txt">
+            <h3>{m.name}</h3>
+            <p className="muted">{m.status}</p>
+          </div>
+        </div>
+        <div className="mod-impl">
+          <h4>實現方式 / 依賴</h4>
+          <p><code>{m.deps}</code></p>
+          <p className="muted">{m.how}</p>
+        </div>
+        <div className="mod-cols">
+          <div>
+            <h4>強項</h4>
+            <ul className="tick">{m.strengths.map((s) => <li key={s}>{s}</li>)}</ul>
+          </div>
+          <div>
+            <h4>不足 / 風險</h4>
+            <ul className="tick gap">{m.gaps.map((s) => <li key={s}>{s}</li>)}</ul>
+          </div>
+        </div>
+      </div>
+      <p className="hint">評分 = 成熟度 × 覆蓋面 × 風險的綜合;升級候選與依賴研究見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
     </div>
   )
 }

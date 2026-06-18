@@ -11,7 +11,7 @@ from app.settings import settings
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
-_ALLOWED = {".pdf", ".docx", ".md", ".txt", ".html", ".htm", ".rtf"}
+_ALLOWED = {".pdf", ".docx", ".md", ".txt", ".html", ".htm", ".rtf", ".doc", ".odt"}
 
 
 @router.post("")
