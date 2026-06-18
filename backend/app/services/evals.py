@@ -9,10 +9,14 @@ from __future__ import annotations
 import re
 
 _CJK = re.compile(r"[一-鿿]")
+_TAG = re.compile(r"<[^>]+>")
+_URL = re.compile(r"https?://\S+")
 
 
 def cjk_ratio(text: str) -> float:
-    stripped = re.sub(r"\s", "", text)
+    """量純文字的中文比例 —— 先去 HTML 標籤與 URL,否則 markup/連結會稀釋比例。"""
+    plain = _URL.sub("", _TAG.sub("", text))
+    stripped = re.sub(r"\s", "", plain)
     if not stripped:
         return 0.0
     return len(_CJK.findall(stripped)) / len(stripped)
