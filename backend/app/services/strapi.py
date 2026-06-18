@@ -34,6 +34,9 @@ async def _fetch(client: httpx.AsyncClient, ep: str, single: bool) -> list[dict]
         params = {"populate": "*"}
     headers = {"Authorization": f"Bearer {settings.strapi_api_token}"} if settings.strapi_api_token else {}
     resp = await client.get(url, params=params, headers=headers)
+    # token 失效(舊實例)但內容公開可讀 → 退回無認證重試
+    if resp.status_code == 401 and headers:
+        resp = await client.get(url, params=params)
     resp.raise_for_status()
     data = resp.json().get("data")
     if data is None:

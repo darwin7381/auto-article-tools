@@ -36,16 +36,15 @@ TYPE_DEFAULTS: dict[str, dict] = {
 }
 
 
-def _disclaimer_sets() -> tuple[dict, dict]:
-    """目前生效的押註範本集：優先用具名版本(ConfigVersion scope=disclaimer)，否則內建預設。"""
+def _disclaimer_sets_or_none() -> tuple[dict | None, dict | None]:
+    """目前生效的押註具名版本集(無則 None,讓上層退回 Strapi/內建)。"""
     from app.services import versions
 
     active = versions.active_version("disclaimer")
     if active:
         d = active["data"]
-        return (d.get("header_disclaimers") or HEADER_DISCLAIMERS,
-                d.get("footer_disclaimers") or FOOTER_DISCLAIMERS)
-    return HEADER_DISCLAIMERS, FOOTER_DISCLAIMERS
+        return d.get("header_disclaimers"), d.get("footer_disclaimers")
+    return None, None
 
 
 def resolve_disclaimers(
@@ -56,21 +55,30 @@ def resolve_disclaimers(
 ) -> tuple[str, str, str]:
     """回傳 (header_html, footer_html, 類型中文名)。supplier 會替換［撰稿方名稱］。
 
-    優先序：押註具名版本 > Strapi(SiteConfig) > 內建預設。
+    三層優先序(逐型)：押註具名版本 > Strapi(SiteConfig) > 內建預設。
     header/footer kind: none / sponsored / press-release；未指定則用該文稿類型的預設。
     """
     cfg = TYPE_DEFAULTS.get(article_type, TYPE_DEFAULTS["regular"])
     hk = header_kind if header_kind is not None else cfg["header"]
     fk = footer_kind if footer_kind is not None else cfg["footer"]
-    header_set, footer_set = _disclaimer_sets()
+    ver_header, ver_footer = _disclaimer_sets_or_none()
 
-    header = site_config.header_disclaimer() or header_set.get(hk, "")
-    if hk == "none":
-        header = ""
-    footer = site_config.footer_disclaimer() or footer_set.get(fk, "")
-    if fk == "none":
-        footer = ""
+    def pick(slot: str, kind: str) -> str:
+        if kind == "none":
+            return ""
+        # 1) 具名版本
+        ver = ver_header if slot == "header" else ver_footer
+        if ver and ver.get(kind):
+            return ver[kind]
+        # 2) Strapi(逐型)
+        strapi = site_config.disclaimer(f"{slot}_disclaimer", kind)
+        if strapi:
+            return strapi
+        # 3) 內建
+        builtin = HEADER_DISCLAIMERS if slot == "header" else FOOTER_DISCLAIMERS
+        return builtin.get(kind, "")
 
+    header, footer = pick("header", hk), pick("footer", fk)
     if supplier:
         header = header.replace("［撰稿方名稱］", supplier)
         footer = footer.replace("［撰稿方名稱］", supplier)
