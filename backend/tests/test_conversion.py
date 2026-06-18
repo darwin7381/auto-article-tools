@@ -153,6 +153,50 @@ def test_pdf_duplicate_image_deduped(tmp_path):
     assert len(images) == 1
 
 
+def test_pdf_borderless_table_via_pdfplumber(tmp_path):
+    """無框線表格(純文字排版,無線條)→ PyMuPDF find_tables 抓不到 → pdfplumber 補。"""
+    import fitz
+
+    # 用 ASCII(fitz 內建字型無法描繪 CJK 字形,與本測試的 fallback 邏輯無關)
+    doc = fitz.open()
+    page = doc.new_page()
+    cols = [72, 220, 360]
+    grid = [["Item", "Qty", "City"], ["Apple", "30", "Taipei"], ["Banana", "25", "Kaohsiung"]]
+    for ri, row in enumerate(grid):
+        for ci, cell in enumerate(row):
+            page.insert_text((cols[ci], 100 + ri * 30), cell)
+    p = str(tmp_path / "borderless.pdf")
+    doc.save(p)
+    doc.close()
+    # fitz 單獨應抓不到(無線條);整體 extract 應靠 pdfplumber fallback 補出 markdown 表
+    assert len(fitz.open(p)[0].find_tables().tables) == 0
+    text, _ = extract_document(p)
+    assert "| --- |" in text and "Qty" in text and "Kaohsiung" in text
+
+
+def test_pdf_scanned_ocr(tmp_path):
+    """掃描/圖片型 PDF(無可抽文字)→ RapidOCR 補文字(需 ocr extra)。"""
+    pytest.importorskip("rapidocr_onnxruntime")
+    import io
+
+    from PIL import Image, ImageDraw
+
+    import fitz
+
+    img = Image.new("RGB", (640, 200), "white")
+    ImageDraw.Draw(img).text((30, 80), "SCANNED OCR 2026", fill="black")
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    doc = fitz.open()
+    page = doc.new_page(width=640, height=200)
+    page.insert_image(fitz.Rect(0, 0, 640, 200), stream=buf.getvalue())
+    p = str(tmp_path / "scan.pdf")
+    doc.save(p)
+    doc.close()
+    text, _ = extract_document(p)
+    assert "SCANNEDOCR2026" in text.replace(" ", "")  # OCR 可能不還原字間空白
+
+
 # ───────────────── A. HTML / RTF / TXT / MD ─────────────────
 
 def test_html_file_extraction(tmp_path):
