@@ -511,9 +511,14 @@ def extract_odt(path: str) -> tuple[str, ImgList]:
             txt = _text(child)
             if txt:
                 parts.append(txt)
-        elif tag == "text:list":  # 清單 → -
+        elif tag == "text:list":  # 清單 → -(逐項;巢狀子項由 descendant 迴圈各自處理)
             for item in child.get_elements("descendant::text:list-item"):
-                t = _text(item)
+                # 只取 item 直屬區塊(段落/標題),逐塊各自 inline 再以空白接,避免多段被黏成一團;
+                # 巢狀子清單(text:list)不在此展開,交給外層迴圈逐項輸出
+                blocks = [c for c in item.children if c.tag in ("text:p", "text:h")]
+                t = " ".join(s for s in (_img_artifact.sub("", _inline(b)).strip() for b in blocks) if s)
+                if not blocks:  # 後備:沒有段落塊就退回整體文字
+                    t = _text(item)
                 if t:
                     parts.append("- " + t)
         elif tag == "table:table":  # 表格 → markdown
