@@ -36,7 +36,16 @@ async def _extract_gdoc(doc_id: str) -> str:
         f.write(resp.content)
         tmp = f.name
     try:
-        return await asyncio.to_thread(extract_docx, tmp)
+        text, images = await asyncio.to_thread(extract_docx, tmp)
+        from app.services.storage import save_image
+
+        for i, (blob, ext) in enumerate(images):
+            ext = "jpg" if (ext or "").lower() == "jpeg" else (ext or "png").lower()
+            _, url = save_image(blob, ext if ext in ("png", "jpg", "webp", "gif") else "png")
+            text = text.replace(f"{{{{IMG{i}}}}}", f"\n\n![]({url})\n\n")
+        import re as _re
+
+        return _re.sub(r"\{\{IMG\d+\}\}", "", text)
     finally:
         Path(tmp).unlink(missing_ok=True)
 

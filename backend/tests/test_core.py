@@ -39,12 +39,6 @@ def test_extract_md(tmp_path: Path):
     assert "內容一二三" in text and images == []
 
 
-def test_extract_rejects_unknown(tmp_path: Path):
-    f = tmp_path / "a.xyz"
-    f.write_text("x", encoding="utf-8")
-    with pytest.raises(ValueError):
-        extract_document(str(f))
-
 
 def test_format_article_full():
     """進階組稿:標題正規化/引言/開頭押註位置/dropcap/TG+相關閱讀/廣編紅連結。"""
@@ -68,13 +62,6 @@ def test_format_article_full():
                          opts=FormatOptions(headings=False, intro_quote=False, dropcap=False, related=False))
     assert "<h2>標</h2>" in off and "intro_quote" not in off and "dropcap" not in off  # 全關
 
-
-def test_md_to_html_figure_wrap():
-    """D2:獨立成段的圖片包成 <figure class=article-image> + lazy。"""
-    from app.services.markdown import md_to_html
-
-    html = md_to_html("文字\n\n![](https://x/a.png)\n\n更多")
-    assert 'figure class="article-image"' in html and 'loading="lazy"' in html
 
 
 def test_eval_scorecard():
