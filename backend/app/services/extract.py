@@ -248,7 +248,8 @@ def extract_pdf(path: str) -> tuple[str, ImgList]:
     parts: list[str] = []
     images: ImgList = []
     seen: set[int] = set()
-    unrecovered_scan = 0  # 像掃描頁(無文字+有圖)但 OCR 沒救回 → 用來擋「靜默吐空白」
+    total_pages = doc.page_count
+    unrecovered_scan = 0  # 疑似掃描頁(大圖+文字稀少)但 OCR 沒救回 → 用來擋「靜默吐空白」
     try:
         for page in doc:
             items: list[tuple[float, float, str, object]] = []  # (y0, x0, kind, payload)
@@ -287,13 +288,20 @@ def extract_pdf(path: str) -> tuple[str, ImgList]:
             except Exception:  # noqa: BLE001
                 infos = []
 
-            # 掃描/圖片型 PDF 頁(幾乎無可抽文字)→ OCR 補文字
+            # 疑似掃描/圖片頁 → OCR 補文字。判定不只看「整頁無字」(掃描檔常帶頁碼/
+            # 浮水印/頁尾這層薄文字會 >10 字而被漏判),改看「大圖佔版面過半且文字稀少」。
+            page_area = abs(page.rect.get_area()) or 1.0
+            max_img_frac = max(
+                (abs(fitz.Rect(i["bbox"]).get_area()) / page_area for i in infos if i.get("bbox")),
+                default=0.0,
+            )
             page_chars = sum(len((b[4] or "").strip()) for b in blocks if b[6] == 0)
-            if page_chars < 10:
+            suspected_scan = (max_img_frac >= 0.5 and page_chars < 100) or (page_chars < 10 and bool(infos))
+            if suspected_scan:
                 ocr = _ocr_page(page)
-                if ocr:
+                if ocr and len(ocr.strip()) >= 20:
                     items.append((-1.0, 0.0, "text", ocr))  # OCR 文字置於頁首
-                elif infos:  # 無文字卻有圖 = 像掃描頁,但 OCR 沒救回(未裝/失敗/糊掉)
+                else:  # OCR 沒救回(未裝/失敗/糊掉)→ 計為未還原的掃描頁
                     unrecovered_scan += 1
 
             # 圖片(含座標)→ 依位置插入;xref 全域去重(重複 logo 只留一次)
@@ -323,15 +331,16 @@ def extract_pdf(path: str) -> tuple[str, ImgList]:
     finally:
         doc.close()
     text = "\n\n".join(p for p in parts if p and p.strip())
-    # 防「靜默吐空白」:像掃描檔(無文字頁+有圖)且全文幾乎抽不到字 → 明確報錯,
-    # 不讓無法閱讀的掃描 PDF 帶著空內容跑完整條昂貴 AI 流程。
-    if unrecovered_scan and len(text.strip()) < 100:
-        if _ocr_engine_get() is None:
-            hint = "OCR 引擎未安裝,請 `uv sync --extra ocr` 後重試"
-        else:
-            hint = "OCR 無法辨識內容(掃描品質過低)"
+    # 防「靜默吐空白/缺頁」:掃描檔常帶薄文字層讓全文勉強過字數門檻,因此除了「全文過短」
+    # 也用「未還原掃描頁佔比過半」把關 —— 任一成立就明確報錯,不讓無法閱讀的掃描 PDF
+    # 帶著空白/殘缺內容跑完整條昂貴 AI 流程。
+    sparse = len(text.strip()) < 100
+    mostly_scanned = total_pages > 0 and unrecovered_scan / total_pages >= 0.5
+    if unrecovered_scan and (sparse or mostly_scanned):
+        hint = ("OCR 引擎未安裝,請 `uv sync --extra ocr` 後重試"
+                if _ocr_engine_get() is None else "OCR 無法辨識內容(掃描品質過低)")
         raise ValueError(
-            f"PDF 疑為掃描/圖片型且文字無法擷取({unrecovered_scan} 頁):{hint};"
+            f"PDF 疑為掃描/圖片型,{unrecovered_scan}/{total_pages} 頁文字無法擷取:{hint};"
             "或改提供可選取文字的 PDF/DOCX"
         )
     return text, images
