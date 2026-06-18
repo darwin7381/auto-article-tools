@@ -75,7 +75,7 @@
 |---|---|---|---|
 | **PyMuPDF 1.27** | PDF 文字/表格/圖+座標 | **續用（預設）** | 最快、無 ML、原生 PDF→markdown 且文字+表格+圖排序正確。⚠️ **授權 AGPL-3.0**：對外託管產品需確認合規（或購商業授權）。 |
 | **pdfplumber 0.11** | PDF 無框線/複雜表 fallback | **新增** | MIT、純 Python（pdfminer.six）；fitz `find_tables` 抓 0 時用文字策略補，過品質閘（≥2列≥2欄、≥60%有值、平均儲存格短）防把散文誤判成表。 |
-| **RapidOCR**（opt-in） | 掃描/圖片型 PDF OCR | **新增** | Apache-2.0、onnxruntime（**無 torch/GPU**）、CJK 佳；整頁可抽文字<10字才觸發、引擎惰性載入。`uv sync --extra ocr` 啟用。 |
+| **RapidOCR**（opt-in） | 掃描/圖片型 PDF OCR | **新增** | Apache-2.0、onnxruntime（**無 torch/GPU**）、CJK 佳；判定掃描頁=「大圖佔版面過半且文字稀少」(不只看整頁無字,因掃描檔常帶頁碼/頁尾薄文字層);引擎惰性載入。`uv sync --extra ocr` 啟用。**守門**:OCR 不可用/失敗或「未還原掃描頁佔比≥半」→丟 `ValueError`,不讓空白/漏頁靜默跑下游。 |
 | **LibreOffice headless** | .doc/.odt 轉檔 | **新增（系統依賴）** | 舊二進位 `.doc` 唯一可靠 OSS 路徑（純 Python 無解）；轉 docx 後沿用全保真路徑，逾時/失敗皆報錯。 |
 | **python-docx 1.2** | DOCX 自走抽取 | **續用** | 原生 DOCX 手走 body 順序是正解（確定性、真順序、表格/圖/連結全可控）；mammoth/markitdown 反而會丟巢狀表。 |
 | **python-markdown** | md→HTML | **續用** | 與抽取正交，無更換理由。 |

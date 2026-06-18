@@ -184,18 +184,18 @@ def test_pdf_scanned_ocr(tmp_path):
 
     import fitz
 
-    img = Image.new("RGB", (640, 200), "white")
-    ImageDraw.Draw(img).text((30, 80), "SCANNED OCR 2026", fill="black")
+    img = Image.new("RGB", (820, 200), "white")
+    ImageDraw.Draw(img).text((30, 80), "SCANNED OCR TEST CONTENT LINE 2026", fill="black")
     buf = io.BytesIO()
     img.save(buf, "PNG")
     doc = fitz.open()
-    page = doc.new_page(width=640, height=200)
-    page.insert_image(fitz.Rect(0, 0, 640, 200), stream=buf.getvalue())
+    page = doc.new_page(width=820, height=200)
+    page.insert_image(fitz.Rect(0, 0, 820, 200), stream=buf.getvalue())
     p = str(tmp_path / "scan.pdf")
     doc.save(p)
     doc.close()
     text, _ = extract_document(p)
-    assert "SCANNEDOCR2026" in text.replace(" ", "")  # OCR 可能不還原字間空白
+    assert "SCANNEDOCRTESTCONTENTLINE2026" in text.replace(" ", "")  # OCR 可能不還原字間空白
 
 
 def test_pdf_scanned_without_ocr_raises(tmp_path, monkeypatch):
@@ -219,6 +219,36 @@ def test_pdf_scanned_without_ocr_raises(tmp_path, monkeypatch):
     page = doc.new_page(width=640, height=200)
     page.insert_image(fitz.Rect(0, 0, 640, 200), stream=buf.getvalue())
     p = str(tmp_path / "scan_noocr.pdf")
+    doc.save(p)
+    doc.close()
+    with pytest.raises(ValueError, match="掃描"):
+        extract_document(p)
+
+
+def test_pdf_multipage_scan_with_thin_text_layer_raises(tmp_path, monkeypatch):
+    """多頁掃描檔常帶薄文字層(頁碼/頁尾)讓全文勉強過字數門檻 → 仍須被佔比守門擋下。"""
+    import io
+
+    from PIL import Image, ImageDraw
+
+    import fitz
+
+    from app.services import extract as ex
+
+    monkeypatch.setattr(ex, "_ocr_page", lambda page: "")
+    monkeypatch.setattr(ex, "_ocr_engine_get", lambda: None)
+
+    scan = Image.new("RGB", (560, 720), "white")
+    ImageDraw.Draw(scan).text((40, 300), "scanned body (unreadable)", fill="black")
+    buf = io.BytesIO()
+    scan.save(buf, "PNG")
+    png = buf.getvalue()
+    doc = fitz.open()
+    for i in range(3):
+        page = doc.new_page(width=560, height=720)
+        page.insert_image(fitz.Rect(0, 0, 560, 720), stream=png)  # 整頁掃描影像
+        page.insert_text((40, 700), f"Confidential report page {i} footer line bottom")  # 薄文字層
+    p = str(tmp_path / "multiscan.pdf")
     doc.save(p)
     doc.close()
     with pytest.raises(ValueError, match="掃描"):
