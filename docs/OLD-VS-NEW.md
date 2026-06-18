@@ -94,14 +94,53 @@
 
 ---
 
+## 5.5 🔬 深入逐行比對 — 模組層看不到的具體功能缺口(2026-06-18 追查)
+
+> 第一次報告只到「模組有無」。這輪逐行讀舊版 agent / 轉換 / 抽取程式碼,找出新版實際缺的**行為**。
+
+### D1 🔴 內嵌圖片抽取 — 新版會「掉圖」
+- 舊版 `docxService.ts` 用 **mammoth**,`convertImage` 把 DOCX 內嵌圖片讀成 base64 → **上傳 R2** → 內文保留 `<img src=R2url>`。PDF 走 ConvertAPI→DOCX→mammoth 同樣保圖。圖片一路流到成稿。
+- 新版 `extract.py` 用 python-docx(只取 paragraphs+tables 文字)/ pymupdf(`get_text` 純文字)→ **內嵌圖片全部丟失**。
+- 影響:有配圖/圖表的新聞稿/廣編稿,新版產出**完全沒有那些圖**。這是最具體的功能退步,高優先。
+
+### D2 🟡 圖片 HTML 包裝
+- 舊版 `markdownToHtmlService` 用 marked + 自訂 renderer:圖片包成 `<figure class="article-image"><img loading="lazy" class="max-w-full rounded-lg">`。
+- 新版 `md_to_html` 用 python-markdown(已含 tables/nl2br,對等 gfm+breaks),但圖片只輸出裸 `<img>`,無 figure/lazy/樣式。
+
+### D3 🟡 copyEditor 特色圖來源
+- 舊版 copyEditor prompt 要求 `featured_image: 從內容中提取第一張圖片`(用原文首圖當特色圖),另有封面生成階段。
+- 新版特色圖只來自 gpt-image-2 生成。且因 D1 內文無圖,即使 prompt 相同也無圖可取。
+
+### D4 🟢 模型參數適配
+- 舊版 `agentUtils`:`createModelAdaptedConfig` 對**推理模型**(o1/o3、gemini reasoning)自動**移除 temperature/top_p**(這些模型不支援);`isReasoningModel`/`isGeminiModel` 偵測;支援 `topP`;有**原生 Gemini API** 路徑(callGeminiAPI)。
+- 新版 `llm.py`:統一走 OpenAI 相容端點(openrouter 跑 gemini),temperature 一律送、不支援 topP、無原生 Gemini 路徑。
+- 影響:目前用 openrouter/gemini-2.5-pro 沒問題;但若改用 OpenAI 推理模型(o1/o3)會因送 temperature 報錯。邊緣風險。
+
+### D5 ✅ 已修(這輪)：Strapi 押註讀取 bug
+- Strapi 押註內容存在 `template` 欄位、且分 sponsored/press-release 兩筆;舊 `site_config` 只找 `content/html/text` 且只取第一筆 → 匯入後押註會讀成**空字串**。
+- 已修:讀 `template` 欄位 + **逐型(sponsored/press-release)比對** + 三層優先序(具名版本 > Strapi > 內建)。實測廣編/新聞各自正確、供稿方替換正常。
+
+### D6 ✅ 已完成(這輪)：Strapi 設定實際匯入
+- 啟動本機 Strapi(`~/Development/media/btai-cms`,develop 模式),撈進 DB **12 筆**:5 作者 / 2 頁首押註 / 1 頁尾押註 / 3 文章預設 / 1 預設內容。
+- 註:.env.local 的 token 是舊實例的已失效(401),但這些 content type 公開可讀 → importer 改成 token 401 時退回無認證重試,順利撈到。
+
+### 對等 / 非退步(逐行確認)
+- EMBARGOED 過濾、英數空格、連結數限制(≤3)、TG/LINE 連結過濾:舊版註明「歸屬 AI 階段」(寫在 prompt 裡)。新版用**同一份 R2 匯出的 prompt** → 行為對等。
+- copyEditor JSON 解析:舊版手動 `JSON.parse` + 正則抓 fence 修復;新版 instructor+pydantic 自動驗證重試 → **新版更穩**。
+- 分類/標籤:兩版都由 AI 直接吐 ID,皆未對 WordPress taxonomy 實查。
+
+---
+
 ## 6. 結論與建議補強優先序
 
 新版在**架構、可靠性、可維護性、可程式化、設定管理**上全面超越舊版,而且把舊版的核心痛點(卡、不可 API 化、易 bug、付費依賴)都解了。
 
 但有**一個高優先功能缺口**必須補,才能說「完整 ≥ 舊版」：
 
-1. 🔴 **進階組稿**(G1):把 ArticleFormattingProcessor 的 dropcap / 引言區 / 標題正規化 / 相關閱讀 / TG banner 移植到新版 `article_formatting` stage。這是新版產出能不能直接上 BlockTempo 的關鍵。
-2. 🟡 **作者 ID 自動帶入**(§5):依文稿類型自動填 author。小改。
-3. 🟡 **Strapi 匯入或拍板用內建範本**(G4):決定是否開 Strapi。
-4. 🟡 **登入/權限或至少 tunnel 加密**(G2):若要長期公開。
-5. 🟢 觀測/eval(G6)、R2 輸出(G7):規模到了再補。
+1. 🔴 **進階組稿**(G1):dropcap / 引言區 / 標題正規化 / 相關閱讀 / TG banner 移植到 `article_formatting`。
+2. 🔴 **內嵌圖片抽取**(D1):docx/pdf 內嵌圖要抽出+存儲+保留在內文,否則有圖稿件掉圖。
+3. 🟡 **圖片 figure 包裝**(D2)、**特色圖取首圖**(D3)。
+4. 🟡 **作者 ID 自動帶入**(§5):依文稿類型自動填 author。
+5. 🟢 **模型參數適配**(D4,改用 OpenAI 推理模型才需要)、登入/權限(G2)、觀測/eval(G6)、R2 輸出(G7)。
+
+> Strapi 匯入(G4/D6)與押註讀取 bug(D5)已於 2026-06-18 完成/修復。
