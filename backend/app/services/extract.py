@@ -248,6 +248,7 @@ def extract_pdf(path: str) -> tuple[str, ImgList]:
     parts: list[str] = []
     images: ImgList = []
     seen: set[int] = set()
+    unrecovered_scan = 0  # 像掃描頁(無文字+有圖)但 OCR 沒救回 → 用來擋「靜默吐空白」
     try:
         for page in doc:
             items: list[tuple[float, float, str, object]] = []  # (y0, x0, kind, payload)
@@ -280,18 +281,22 @@ def extract_pdf(path: str) -> tuple[str, ImgList]:
                     continue
                 items.append((y0, x0, "text", txt.strip()))
 
+            # 圖片資訊(含座標)—— 先取,供 OCR 判定「是否真為掃描頁」與後續插入用
+            try:
+                infos = page.get_image_info(xrefs=True)
+            except Exception:  # noqa: BLE001
+                infos = []
+
             # 掃描/圖片型 PDF 頁(幾乎無可抽文字)→ OCR 補文字
             page_chars = sum(len((b[4] or "").strip()) for b in blocks if b[6] == 0)
             if page_chars < 10:
                 ocr = _ocr_page(page)
                 if ocr:
                     items.append((-1.0, 0.0, "text", ocr))  # OCR 文字置於頁首
+                elif infos:  # 無文字卻有圖 = 像掃描頁,但 OCR 沒救回(未裝/失敗/糊掉)
+                    unrecovered_scan += 1
 
             # 圖片(含座標)→ 依位置插入;xref 全域去重(重複 logo 只留一次)
-            try:
-                infos = page.get_image_info(xrefs=True)
-            except Exception:  # noqa: BLE001
-                infos = []
             for info in infos:
                 xref = info.get("xref") or 0
                 bbox = info.get("bbox")
@@ -317,7 +322,19 @@ def extract_pdf(path: str) -> tuple[str, ImgList]:
                 parts.append(f"{{{{IMG{len(images) - 1}}}}}")
     finally:
         doc.close()
-    return "\n\n".join(p for p in parts if p and p.strip()), images
+    text = "\n\n".join(p for p in parts if p and p.strip())
+    # 防「靜默吐空白」:像掃描檔(無文字頁+有圖)且全文幾乎抽不到字 → 明確報錯,
+    # 不讓無法閱讀的掃描 PDF 帶著空內容跑完整條昂貴 AI 流程。
+    if unrecovered_scan and len(text.strip()) < 100:
+        if _ocr_engine_get() is None:
+            hint = "OCR 引擎未安裝,請 `uv sync --extra ocr` 後重試"
+        else:
+            hint = "OCR 無法辨識內容(掃描品質過低)"
+        raise ValueError(
+            f"PDF 疑為掃描/圖片型且文字無法擷取({unrecovered_scan} 頁):{hint};"
+            "或改提供可選取文字的 PDF/DOCX"
+        )
+    return text, images
 
 
 # ───────────────────── HTML / RTF / 純文字 ─────────────────────

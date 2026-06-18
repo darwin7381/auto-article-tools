@@ -26,7 +26,7 @@ const SUPERIOR = [
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 32/32(含合成夾具斷言圖片排列位置)',
+  '自動化測試 pytest 33/33(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -58,6 +58,7 @@ const CONV_TESTS: Row[] = [
   ['DOCX/PDF 有框線表格→markdown', '合成 + 數碼港', '| 表頭 | + | --- | · 真檔 2 表 ✅', true],
   ['🆕 PDF 無框線表格 fallback', '合成夾具(純文字排版無線條)', 'fitz 抓 0 → pdfplumber 補出表 ✅', true],
   ['🆕 掃描/圖片型 PDF OCR', '合成夾具(圖片內含文字)', 'RapidOCR 辨識補回文字 ✅', true],
+  ['🆕 掃描 PDF 但 OCR 不可用', '合成夾具(停用 OCR)', '明確報錯,不靜默吐空白給下游 ✅', true],
   ['圖片去重(xref)', '合成同圖跨兩頁 + 數碼港', '2頁→1張 · 真檔 8→4 ✅', true],
   ['HTML 檔 / RTF 檔', '合成夾具 trafilatura/striprtf', '主文/純文字抽取 ✅', true],
   ['TXT / MD 直通', '合成夾具', '原樣保留 ✅', true],
@@ -105,7 +106,7 @@ const MODULES: Mod[] = [
     key: 'ocr', name: 'OCR(掃描 / 圖片型 PDF)', score: 76, status: '新增 · opt-in 自動觸發',
     deps: 'RapidOCR(onnxruntime，無 torch)',
     how: 'PDF 某頁可抽文字<10字→判定掃描頁→頁面 render 200dpi→RapidOCR 辨識→補回文字。惰性載入引擎，未裝 ocr extra 則靜默略過。',
-    strengths: ['onnxruntime 輕量(無 torch/GPU)', 'CJK 中英佳', '只在掃描頁觸發，不拖累一般檔', 'Apache-2.0 授權乾淨'],
+    strengths: ['onnxruntime 輕量(無 torch/GPU)', 'CJK 中英佳', '只在掃描頁觸發，不拖累一般檔', 'OCR 不可用/失敗會明確報錯，不靜默吐空白給下游'],
     gaps: ['需 `uv sync --extra ocr` 啟用', '掃描表格結構難還原', '首次跑下載模型 ~15MB'],
   },
   {
@@ -124,7 +125,7 @@ const MODULES: Mod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '32/32 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '33/33 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -159,7 +160,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="32/32 ✓" ok />
+        <Stat label="後端測試" value="33/33 ✓" ok />
       </div>
 
       <div className="panel">
@@ -203,7 +204,7 @@ export function StatusPanel() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 32/32;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 33/33;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">
