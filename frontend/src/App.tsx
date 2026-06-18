@@ -155,6 +155,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const [headerD, setHeaderD] = useState(() => TYPE_OPTS.find((o) => o.key === 'press-release')!.header)
   const [footerD, setFooterD] = useState('none')
   const [supplier, setSupplier] = useState('')
+  const [fmt, setFmt] = pref('formatting', { headings: true, intro_quote: true, dropcap: true, related: true })
   const [running, setRunning] = useState(false)
   const [views, setViews] = useState<StageView[]>([])
   const [job, setJob] = useState<Job | null>(null)
@@ -232,7 +233,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   }
 
   function gatherInput(): Record<string, unknown> | null {
-    const base = { article_type: atype, header_disclaimer: headerD, footer_disclaimer: footerD, supplier: supplier.trim() }
+    const base = { article_type: atype, header_disclaimer: headerD, footer_disclaimer: footerD, supplier: supplier.trim(), formatting: fmt }
     if (imode === 'url') {
       if (!url.trim() || !/^https?:\/\/.+\..+/.test(url.trim())) { toast.err('請輸入有效的URL'); return null }
       return { ...base, url: url.trim() }
@@ -435,7 +436,24 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
         <input type="text" value={supplier} placeholder="輸入供稿方名稱（選填）" onChange={(e) => setSupplier(e.target.value)} />
         <p className="hint">用於自動替換押註中的［撰稿方名稱］</p>
 
-        <h2 style={{ marginTop: 22 }}>3. 處理模式</h2>
+        <h2 style={{ marginTop: 22 }}>3. 進階組稿</h2>
+        <div className="fmt-grid">
+          {([
+            ['headings', '標題層級正規化', 'h2→h3 符合上稿層級'],
+            ['intro_quote', '引言區塊', '用摘要生成 intro_quote'],
+            ['dropcap', '首字放大 Dropcap', '正文首字放大'],
+            ['related', 'TG Banner + 相關閱讀', '文末官方橫幅與相關報導'],
+          ] as const).map(([k, label, desc]) => (
+            <button key={k} type="button" className={`fmt-toggle ${fmt[k] ? 'on' : ''}`}
+              onClick={() => setFmt({ ...fmt, [k]: !fmt[k] })}>
+              <span className="fmt-check">{fmt[k] ? '✓' : ''}</span>
+              <span className="fmt-txt"><b>{label}</b><i>{desc}</i></span>
+            </button>
+          ))}
+        </div>
+        <p className="hint">套用 BlockTempo 上稿規範到「上稿內文」;相關閱讀為預設連結,可在審稿時於編輯器替換。</p>
+
+        <h2 style={{ marginTop: 22 }}>4. 處理模式</h2>
         <div className="two-col">
           <div>
             <label>處理模式</label>

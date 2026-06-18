@@ -101,28 +101,39 @@ async def s_cover_image(data: dict, ctx: RunContext) -> dict:
 
 
 async def s_article_formatting(data: dict, ctx: RunContext) -> dict:
+    from app.services.formatting import FormatOptions, format_article
     from app.services.templates import resolve_disclaimers
 
-    wp = data.get("wordpress", {})
+    wp = dict(data.get("wordpress", {}))
     title = wp.get("title", "")
     cover = data.get("cover_image_url") or data.get("cover_image")
     body = wp.get("content") or data.get("html", "")
-    # 文稿類型/押註/供稿方（輸入帶入；未帶用 regular 預設=無押註）
+    article_type = data.get("article_type", "regular")
+
     header, footer, _ = resolve_disclaimers(
-        data.get("article_type", "regular"),
+        article_type,
         supplier=data.get("supplier", ""),
         header_kind=data.get("header_disclaimer"),
         footer_kind=data.get("footer_disclaimer"),
     )
-    parts = [f"<h1>{title}</h1>"]
-    if header:
-        parts.append(f'<section class="header-disclaimer">{header}</section>')
-    if cover:
-        parts.append(f'<figure class="featured-image"><img src="{cover}" alt="{title}"/></figure>')
-    parts.append(body)
-    if footer:
-        parts.append(f'<section class="footer-disclaimer">{footer}</section>')
-    final_html = "\n".join(parts)
+    fmt = data.get("formatting", {})  # 前端「進階組稿」開關;預設全開
+    opts = FormatOptions(
+        headings=fmt.get("headings", True),
+        intro_quote=fmt.get("intro_quote", True),
+        dropcap=fmt.get("dropcap", True),
+        related=fmt.get("related", True),
+        sponsored=(article_type == "sponsored"),
+    )
+    # 進階組稿 → 寫回 wp.content（發布用的就是格式化後內容）
+    formatted = format_article(
+        body, excerpt=wp.get("excerpt", ""),
+        header_disclaimer=header, footer_disclaimer=footer, opts=opts,
+    )
+    wp["content"] = formatted
+
+    # viewer 預覽文件：標題 + 封面 + 格式化內文（含 dropcap/intro_quote 樣式)
+    cover_fig = f'<figure class="featured-image"><img src="{cover}" alt="{title}"/></figure>' if cover else ""
+    final_html = f"<h1>{title}</h1>\n{cover_fig}\n{formatted}"
     # viewer 檔包成完整 HTML 文件：沒有 <meta charset> 的裸 fragment 在拿不到
     # response header 的情境（手機 app 內建預覽/下載後本地開啟）會變亂碼
     doc = (
@@ -132,13 +143,16 @@ async def s_article_formatting(data: dict, ctx: RunContext) -> dict:
         "<style>body{max-width:760px;margin:32px auto;padding:0 20px;"
         "font-family:-apple-system,'PingFang TC','Microsoft JhengHei',sans-serif;"
         "line-height:1.85;color:#222}img{max-width:100%;height:auto}"
-        "h1{line-height:1.4}.header-disclaimer,.footer-disclaimer{font-size:14px}"
+        "h1{line-height:1.4}"
+        ".intro_quote{border-left:3px solid #ddd;padding:6px 0 6px 14px;color:#555;font-size:15px}"
+        ".dropcap{float:left;font-size:3.1em;line-height:.82;font-weight:700;"
+        "padding:4px 8px 0 0}"
         ".alert{background:#fff7e6;border:1px solid #e8c97a;border-radius:8px;"
         "padding:12px 16px;color:#7a5b00}</style></head><body>"
         f"{final_html}</body></html>"
     )
     _, output_url = save_text(doc, "html")  # 輸出持久化 + viewer URL
-    return {**data, "final_html": final_html, "output_url": output_url}
+    return {**data, "wordpress": wp, "final_html": final_html, "output_url": output_url}
 
 
 register(
