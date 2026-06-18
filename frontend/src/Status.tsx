@@ -22,7 +22,11 @@ const SUPERIOR = [
   'instructor+pydantic 結構化驗證(殺壞 JSON)',
   'Dashboard UI + RWD + 主題 + 全頁拖放',
   '觀測:per-stage 耗時 + token 用量 + eval 回歸評分',
-  '自動化測試 pytest 18/18',
+  '抽取位置保真:PDF 圖/表依座標插回原位(舊版圖片會被丟到頁尾)',
+  'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
+  '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
+  '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
+  '自動化測試 pytest 30/30(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -45,20 +49,35 @@ const E2E_TESTS: Row[] = [
   ['完整流程經 SSE + 從某階段重跑', 'job#46 隔離瀏覽器', '7/7 階段 · 格式化進 wp.content', true],
   ['實際發布到 WordPress 測試站', '隔離瀏覽器 → wp.blocktempo.ai', '草稿+正式皆成功(post 上線,驗後刪)', true],
 ]
-// 格式轉換保真度(最易掉東西的環節)—— 真實素材實測圖/表
+// 格式轉換保真度(最易掉東西的環節)—— 合成夾具斷言排列位置 + 真實素材
 const CONV_TESTS: Row[] = [
-  ['DOCX 繁中(HashKey)', 'extract_document', '文字 ✅ · 內嵌圖 1 ✅', true],
-  ['DOCX 简中(WEEX)', 'extract_document', '文字 ✅ · 內嵌圖 1 ✅', true],
-  ['PDF 英文純文字(Bluefin)', 'extract_document', '文字 ✅ · 無圖(正確)', true],
-  ['PDF 含表格+圖(數碼港)', 'extract_document', '表格 2→markdown ✅ · 圖 4(去重 8→4)✅', true],
-  ['Google Docs(中/英)', 'export docx 抽取', '788/3691 字 ✅(已修 tuple regression)', true],
-  ['Medium / WeChat / Bybit / OKX', 'trafilatura + firecrawl fallback', 'Medium 3529字15圖 · WeChat/Bybit/OKX ✅', true],
-  ['markdown→HTML 表格', 'md_to_html', '<table> 正確渲染 ✅', true],
-  ['markdown→HTML 圖片 figure 包裝', 'md_to_html', '<figure>+lazy ✅', true],
+  ['🔑 DOCX 圖片位置', '合成夾具:前段→圖→後段', 'index(前)<{{IMG0}}<index(後) ✅(非丟頁尾)', true],
+  ['🔑 PDF 圖片閱讀順序', '合成夾具:上文→圖→下文', '依座標插回原位 ✅(修掉舊位置 bug)', true],
+  ['🔑 DOCX 超連結保真', '合成夾具', '轉 [動區連結](url) ✅(防 .text 丟連結)', true],
+  ['DOCX 標題/清單結構', '合成夾具', '# 標題 · - 清單 ✅', true],
+  ['DOCX/PDF 表格→markdown', '合成 + 數碼港', '| 表頭 | + | --- | · 真檔 2 表 ✅', true],
+  ['圖片去重(xref)', '合成同圖跨兩頁 + 數碼港', '2頁→1張 · 真檔 8→4 ✅', true],
+  ['HTML 檔 / RTF 檔', '合成夾具 trafilatura/striprtf', '主文/純文字抽取 ✅', true],
+  ['TXT / MD 直通', '合成夾具', '原樣保留 ✅', true],
+  ['邊界:.doc/圖片/未知型別', '合成夾具', '明確報錯帶建議(LibreOffice/OCR) ✅', true],
+  ['md→HTML 表格/figure/程式碼', 'md_to_html', '<table>·<figure>+lazy·<code> ✅', true],
+  ['真實素材:HashKey/WEEX/Bluefin', 'extract_document', '繁/简 docx 含圖 · 純文字 PDF ✅', true],
+  ['連結:Google Docs/Medium/WeChat', 'export docx / trafilatura+firecrawl', 'gdocs 788/3691字 · Medium 15圖 ✅', true],
   ['死鏈 / 反爬載入失敗', 'Cointelegraph(404) / WeChat2', '明確報錯不帶垃圾跑流程 ✅(預期失敗)', true],
 ]
+// 抽取模組:哪個依賴做哪塊(詳見 docs/EXTRACTION-MODULE.md)
+const DEPS: [string, string, string][] = [
+  ['PDF 文字/表格/圖+座標', 'PyMuPDF 1.27', '續用(預設)·⚠️AGPL 商用需確認'],
+  ['DOCX 自走抽取(連結/標題/表/圖保位)', 'python-docx 1.2', '續用·原生 DOCX 正解'],
+  ['md → HTML', 'python-markdown', '續用'],
+  ['網頁/HTML 主文', 'trafilatura 2.0 + firecrawl', '續用·正文抽取標竿 F1 0.84'],
+  ['RTF → 純文字', 'striprtf', '新增·純 Python 無重依賴'],
+  ['封面壓縮', 'Pillow', '續用(取代 TinyPNG)'],
+  ['OCR(掃描檔)', '— 未支援', '缺口·要時 opt-in PaddleOCR/RapidOCR'],
+  ['表格重/多欄 PDF', '— 未支援', '可選·Docling(MIT) 選擇性 fallback'],
+]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '18/18 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '30/30 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -93,7 +112,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="18/18 ✓" ok />
+        <Stat label="後端測試" value="30/30 ✓" ok />
       </div>
 
       <div className="panel">
@@ -127,15 +146,26 @@ export function StatusPanel() {
       </div>
 
       <div className="panel">
-        <h2>🔧 格式轉換保真度測試（最易掉東西的環節 — 真實素材實測圖/表）</h2>
+        <h2>🔧 格式轉換保真度測試（最易掉東西的環節 — 合成夾具斷言排列位置 + 真實素材）</h2>
         <TestTable rows={CONV_TESTS} />
-        <p className="hint">後端 <code>tests/test_conversion.py</code> 以 input-example 真實素材跑 extract_document / md_to_html;表格(→markdown)、內嵌圖、去重、死鏈逐項驗。</p>
+        <p className="hint">🔑 = 用程式即時造夾具,精準斷言「圖片/文字的排列位置」(肉眼難查)。後端 <code>tests/test_conversion.py</code> 30 項;模組覆蓋面/指標/依賴審計見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
+      </div>
+
+      <div className="panel">
+        <h2>🧱 抽取模組 — 依賴堆疊（哪個套件做哪塊）</h2>
+        <div className="table-wrap"><table>
+          <thead><tr><th>處理環節</th><th>使用依賴</th><th>判定 / 備註</th></tr></thead>
+          <tbody>{DEPS.map(([job, dep, note]) => (
+            <tr key={job}><td>{job}</td><td><code>{dep}</code></td><td className="muted">{note}</td></tr>
+          ))}</tbody>
+        </table></div>
+        <p className="hint">2025–2026 依賴研究結論:現用堆疊整體「續用」最佳;升級候選為 Docling(表格重 PDF / AGPL 逃生門)與 opt-in OCR。詳見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
       </div>
 
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 18/18;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 30/30;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">

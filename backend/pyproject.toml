@@ -23,7 +23,8 @@ ai = [
     "boto3>=1.35",        # Cloudflare R2（S3 相容）
     "pymupdf>=1.25",
     "python-docx>=1.1",
-    "trafilatura>=2.0",   # URL 進稿：網頁主文抽取 → markdown
+    "trafilatura>=2.0",   # URL 進稿 + 本機 HTML 檔：網頁主文抽取 → markdown
+    "striprtf>=0.0.26",   # RTF 進稿（純 Python，無重依賴）
     "pillow>=11.0",       # 封面壓縮（本地，取代 TinyPNG API）
 ]
 dev = [
