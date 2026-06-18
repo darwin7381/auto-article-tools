@@ -22,7 +22,7 @@ const SUPERIOR = [
   'instructor+pydantic 結構化驗證(殺壞 JSON)',
   'Dashboard UI + RWD + 主題 + 全頁拖放',
   '觀測:per-stage 耗時 + token 用量 + eval 回歸評分',
-  '自動化測試 pytest 13/13',
+  '自動化測試 pytest 18/18',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -39,14 +39,26 @@ const GAPS: [string, string, string][] = [
 // [項目, 方式, 結果/評分, 通過?]
 type Row = [string, string, string, boolean]
 const E2E_TESTS: Row[] = [
-  ['完整 7 階段(WEEX 简中 docx 含圖 / 廣編稿)', 'job#47 console 路徑從頭跑 + eval 評分', '11/11 · 137.4s · 21.6k tok · 简→繁76% · 封面用原文圖', true],
-  ['完整 7 階段(docx 繁中 / 新聞稿)', 'eval CLI:HashKey docx', '11/11 · 118.8s · 26k tok · 封面用原文圖', true],
-  ['完整流程經 SSE + 從某階段重跑', 'job#46 隔離瀏覽器', '7/7 階段 · 格式化進 wp.content ✅', true],
-  ['上稿:實際發布到 WordPress 測試站', '隔離瀏覽器 → wp.blocktempo.ai', '草稿+正式皆成功(post 上線,驗後刪)', true],
-  ['進稿全來源(docx 简繁/pdf 英繁/md/URL)', 'CLI + URL 抽取', 'docx/pdf/md ✅ · URL 5/5(gdocs中英/Medium/WeChat/OKX)', true],
+  ['完整 7 階段(數碼港 PDF:4圖+2表 / 新聞稿)', 'job#49 console 從頭跑', '成稿保留 5 圖 1 表(extract 4圖2表;content_ai 丟 1 表→待補)', true],
+  ['完整 7 階段(WEEX 简中 docx 含圖 / 廣編稿)', 'job#47 + eval 評分', '11/11 · 137.4s · 简→繁76% · 封面用原文圖', true],
+  ['完整 7 階段(HashKey 繁中 docx / 新聞稿)', 'eval CLI', '11/11 · 118.8s · 26k tok', true],
+  ['完整流程經 SSE + 從某階段重跑', 'job#46 隔離瀏覽器', '7/7 階段 · 格式化進 wp.content', true],
+  ['實際發布到 WordPress 測試站', '隔離瀏覽器 → wp.blocktempo.ai', '草稿+正式皆成功(post 上線,驗後刪)', true],
+]
+// 格式轉換保真度(最易掉東西的環節)—— 真實素材實測圖/表
+const CONV_TESTS: Row[] = [
+  ['DOCX 繁中(HashKey)', 'extract_document', '文字 ✅ · 內嵌圖 1 ✅', true],
+  ['DOCX 简中(WEEX)', 'extract_document', '文字 ✅ · 內嵌圖 1 ✅', true],
+  ['PDF 英文純文字(Bluefin)', 'extract_document', '文字 ✅ · 無圖(正確)', true],
+  ['PDF 含表格+圖(數碼港)', 'extract_document', '表格 2→markdown ✅ · 圖 4(去重 8→4)✅', true],
+  ['Google Docs(中/英)', 'export docx 抽取', '788/3691 字 ✅(已修 tuple regression)', true],
+  ['Medium / WeChat / Bybit / OKX', 'trafilatura + firecrawl fallback', 'Medium 3529字15圖 · WeChat/Bybit/OKX ✅', true],
+  ['markdown→HTML 表格', 'md_to_html', '<table> 正確渲染 ✅', true],
+  ['markdown→HTML 圖片 figure 包裝', 'md_to_html', '<figure>+lazy ✅', true],
+  ['死鏈 / 反爬載入失敗', 'Cointelegraph(404) / WeChat2', '明確報錯不帶垃圾跑流程 ✅(預期失敗)', true],
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '13/13 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '18/18 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -81,7 +93,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="13/13 ✓" ok />
+        <Stat label="後端測試" value="18/18 ✓" ok />
       </div>
 
       <div className="panel">
@@ -115,9 +127,15 @@ export function StatusPanel() {
       </div>
 
       <div className="panel">
+        <h2>🔧 格式轉換保真度測試（最易掉東西的環節 — 真實素材實測圖/表）</h2>
+        <TestTable rows={CONV_TESTS} />
+        <p className="hint">後端 <code>tests/test_conversion.py</code> 以 input-example 真實素材跑 extract_document / md_to_html;表格(→markdown)、內嵌圖、去重、死鏈逐項驗。</p>
+      </div>
+
+      <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 13/13;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 18/18;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">
