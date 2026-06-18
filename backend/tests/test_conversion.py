@@ -88,10 +88,11 @@ def _make_pdf_dup_image(path: str) -> None:
 
     png = _png("green")
     doc = fitz.open()
-    for _ in range(2):
+    for i in range(2):
         page = doc.new_page()
         page.insert_image(fitz.Rect(72, 100, 172, 200), stream=png)
-        page.insert_text((72, 300), "頁面文字")
+        # ASCII(fitz 內建字型無法描繪 CJK;需足量文字避免被當成掃描頁)
+        page.insert_text((72, 300), f"Page {i} body text content here for the dedup fixture.")
     doc.save(path)
     doc.close()
 
@@ -195,6 +196,33 @@ def test_pdf_scanned_ocr(tmp_path):
     doc.close()
     text, _ = extract_document(p)
     assert "SCANNEDOCR2026" in text.replace(" ", "")  # OCR 可能不還原字間空白
+
+
+def test_pdf_scanned_without_ocr_raises(tmp_path, monkeypatch):
+    """掃描 PDF 但 OCR 不可用/失敗 → 明確報錯,不讓空白內容靜默跑下游 AI 流程。"""
+    import io
+
+    from PIL import Image, ImageDraw
+
+    import fitz
+
+    from app.services import extract as ex
+
+    monkeypatch.setattr(ex, "_ocr_page", lambda page: "")     # OCR 救不回
+    monkeypatch.setattr(ex, "_ocr_engine_get", lambda: None)  # 模擬未安裝
+
+    img = Image.new("RGB", (640, 200), "white")
+    ImageDraw.Draw(img).text((30, 80), "UNREADABLE SCAN", fill="black")
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    doc = fitz.open()
+    page = doc.new_page(width=640, height=200)
+    page.insert_image(fitz.Rect(0, 0, 640, 200), stream=buf.getvalue())
+    p = str(tmp_path / "scan_noocr.pdf")
+    doc.save(p)
+    doc.close()
+    with pytest.raises(ValueError, match="掃描"):
+        extract_document(p)
 
 
 # ───────────────── A. HTML / RTF / TXT / MD ─────────────────
