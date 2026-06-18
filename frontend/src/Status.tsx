@@ -26,7 +26,7 @@ const SUPERIOR = [
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 34/34(含合成夾具斷言圖片排列位置)',
+  '自動化測試 pytest 37/37(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -57,13 +57,15 @@ const CONV_TESTS: Row[] = [
   ['DOCX 標題/清單結構', '合成夾具', '# 標題 · - 清單 ✅', true],
   ['DOCX/PDF 有框線表格→markdown', '合成 + 數碼港', '| 表頭 | + | --- | · 真檔 2 表 ✅', true],
   ['🆕 PDF 無框線表格 fallback', '合成夾具(純文字排版無線條)', 'fitz 抓 0 → pdfplumber 補出表 ✅', true],
-  ['🆕 掃描/圖片型 PDF OCR', '合成夾具(圖片內含文字)', 'RapidOCR 辨識補回文字 ✅', true],
+  ['🆕 掃描/圖片型 PDF OCR(PP-OCRv5)', '合成夾具(圖片內含文字)', 'RapidOCR 辨識補回文字 ✅', true],
+  ['🆕 掃描表格 → markdown', '合成夾具(整頁表格影像)', 'OCR+RapidTable 還原表結構 ✅', true],
   ['🆕 掃描 PDF 但 OCR 不可用', '合成夾具(停用 OCR)', '明確報錯,不靜默吐空白給下游 ✅', true],
   ['🆕 多頁掃描檔(帶薄文字層)', '合成夾具(頁尾文字+整頁掃描影像)', '未還原頁佔比過半→報錯,不漏頁靜默過關 ✅', true],
   ['圖片去重(xref)', '合成同圖跨兩頁 + 數碼港', '2頁→1張 · 真檔 8→4 ✅', true],
+  ['🆕 .odt 純 Python(odfdo)', '合成夾具(標題/圖/清單/表)', '免 LibreOffice · 圖位/結構保真 ✅', true],
   ['HTML 檔 / RTF 檔', '合成夾具 trafilatura/striprtf', '主文/純文字抽取 ✅', true],
   ['TXT / MD 直通', '合成夾具', '原樣保留 ✅', true],
-  ['.doc/.odt 轉檔 · 圖片/未知型別報錯', '合成夾具', 'LibreOffice 轉 docx;無則明確報錯帶指引 ✅', true],
+  ['.doc 轉檔 · 圖片/未知型別報錯', '合成夾具', 'LibreOffice 轉 docx;無則明確報錯帶指引 ✅', true],
   ['md→HTML 表格/figure/程式碼', 'md_to_html', '<table>·<figure>+lazy·<code> ✅', true],
   ['真實素材:HashKey/WEEX/Bluefin', 'extract_document', '繁/简 docx 含圖 · 純文字 PDF ✅', true],
   ['連結:Google Docs/Medium/WeChat', 'export docx / trafilatura+firecrawl', 'gdocs 788/3691字 · Medium 15圖 ✅', true],
@@ -101,21 +103,21 @@ const MODULES: Mod[] = [
     deps: 'trafilatura(html) + striprtf(rtf)',
     how: '本機 .html/.htm→trafilatura 主文;.rtf→striprtf 純文字;.md/.txt→直讀原樣保留。',
     strengths: ['HTML 主文抽取(同 URL 路徑)', 'RTF 純 Python 無重依賴', 'md/txt 原樣直通'],
-    gaps: ['RTF 攤平、無圖/表結構', '本機 HTML 相對圖路徑可能失效'],
+    gaps: ['RTF 攤平、無圖/表結構(研究確認無維護中的純 Python 替代)', '本機 HTML 相對圖路徑可能失效'],
   },
   {
-    key: 'ocr', name: 'OCR(掃描 / 圖片型 PDF)', score: 76, status: '新增 · opt-in 自動觸發',
-    deps: 'RapidOCR(onnxruntime，無 torch)',
-    how: '判定掃描頁=「大圖佔版面過半且文字稀少」(不只看整頁無字，因掃描檔常帶頁碼/頁尾薄文字層)→render 200dpi→RapidOCR 辨識→補回文字。引擎惰性載入。',
-    strengths: ['onnxruntime 輕量(無 torch/GPU)', 'CJK 中英佳', '只在掃描頁觸發，不拖累一般檔', 'OCR 不可用/失敗或未還原頁佔比過半→明確報錯，不靜默吐空白/漏頁'],
-    gaps: ['需 `uv sync --extra ocr` 啟用', '掃描表格結構難還原', '首次跑下載模型 ~15MB'],
+    key: 'ocr', name: 'OCR(掃描 / 圖片型 PDF)', score: 86, status: '升級 · PP-OCRv5 + 掃描表格結構',
+    deps: 'rapidocr(PP-OCRv5，onnxruntime 無 torch) + rapid_table',
+    how: '判定掃描頁=「大圖佔版面過半且文字稀少」→render 200dpi→RapidOCR(PP-OCRv5)辨識;若 RapidTable 還原出結構良好表格(過品質閘)則回傳 markdown 表，否則逐行文字。引擎惰性載入。',
+    strengths: ['PP-OCRv5:CJK 含繁體中文一級支援(v4 較弱)', 'onnxruntime 輕量(無 torch/GPU)', 'RapidTable 還原掃描表格結構→markdown', 'OCR 不可用/失敗或未還原頁佔比過半→明確報錯，不靜默吐空白/漏頁'],
+    gaps: ['需 `uv sync --extra ocr` 啟用', '首次跑下載 PP-OCRv5 模型 ~數十 MB', '極端版面(手寫/公式)需 VLM(離線跑)'],
   },
   {
-    key: 'legacy', name: '.doc / .odt 舊格式', score: 70, status: '可用 · 依賴系統 LibreOffice',
-    deps: 'LibreOffice headless(soffice --convert-to)',
-    how: '偵測到 soffice→轉成 .docx 後走 DOCX 路徑(含圖/表/連結);未偵測到→明確報錯附安裝指引。為舊二進位 .doc 唯一可靠 OSS 路徑。',
-    strengths: ['唯一可靠 OSS 路徑(純 Python 無解)', '轉檔後沿用 DOCX 全保真', '逾時/失敗都有明確報錯'],
-    gaps: ['需系統裝 LibreOffice(本機尚未裝)', '轉檔額外耗時'],
+    key: 'legacy', name: '.doc / .odt 舊格式', score: 80, status: '.odt 純 Python 全保真 · .doc 需 LibreOffice',
+    deps: 'odfdo(.odt，純 Python) + LibreOffice headless(.doc)',
+    how: '.odt→odfdo 直接走 body 順序(標題/段落/清單/表格/內嵌圖保位)，免 LibreOffice;.doc(舊二進位，無純 Python 路徑)→LibreOffice 轉 docx 後走 DOCX 路徑;未裝 soffice→明確報錯附指引。',
+    strengths: ['.odt 免 LibreOffice、與 DOCX 同級保真(文字+表+圖保位)', '.doc 走 LibreOffice 轉檔後全保真', '研究確認 odfdo 是最佳維護中純 Python ODF 庫', '逾時/失敗明確報錯'],
+    gaps: ['.doc 仍需系統裝 LibreOffice(本機尚未裝)', '.doc 轉檔額外耗時(可換 unoserver 常駐加速)'],
   },
   {
     key: 'md2html', name: 'markdown → HTML', score: 90, status: '成熟 · 與舊版 marked 對等',
@@ -126,7 +128,7 @@ const MODULES: Mod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '34/34 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '37/37 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -161,7 +163,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="34/34 ✓" ok />
+        <Stat label="後端測試" value="37/37 ✓" ok />
       </div>
 
       <div className="panel">
@@ -205,7 +207,7 @@ export function StatusPanel() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 34/34;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 37/37;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">

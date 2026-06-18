@@ -182,34 +182,101 @@ def _good_borderless_table(rows: list[list]) -> bool:
     return avg_len < 40
 
 
-# pdfplumber / OCR 為惰性、可選依賴:沒裝或失敗都不擋主流程(graceful degradation)
+# pdfplumber / OCR / 表格還原 為惰性、可選依賴:沒裝或失敗都不擋主流程(graceful degradation)
 def _ocr_engine_get():
-    global _OCR_ENGINE
+    """建 OCR 引擎。優先用統一 rapidocr + PP-OCRv5(CJK 含繁中最佳、onnxruntime 無 torch),
+    退回舊 rapidocr-onnxruntime(PP-OCRv4)。回傳 engine;種類記在 _OCR_KIND。"""
+    global _OCR_ENGINE, _OCR_KIND
     if _OCR_ENGINE is _UNSET:
+        _OCR_ENGINE, _OCR_KIND = None, None
         try:
-            from rapidocr_onnxruntime import RapidOCR
+            from rapidocr import ModelType, OCRVersion, RapidOCR
 
-            _OCR_ENGINE = RapidOCR()
-        except Exception:  # noqa: BLE001  未安裝 ocr extra
-            _OCR_ENGINE = None
+            _OCR_ENGINE = RapidOCR(params={
+                "Det.ocr_version": OCRVersion.PPOCRV5, "Det.model_type": ModelType.MOBILE,
+                "Rec.ocr_version": OCRVersion.PPOCRV5, "Rec.model_type": ModelType.MOBILE,
+            })
+            _OCR_KIND = "unified"
+        except Exception:  # noqa: BLE001  統一包未裝 → 退回舊包
+            try:
+                from rapidocr_onnxruntime import RapidOCR as _LegacyRapidOCR
+
+                _OCR_ENGINE, _OCR_KIND = _LegacyRapidOCR(), "legacy"
+            except Exception:  # noqa: BLE001  未安裝 ocr extra
+                _OCR_ENGINE, _OCR_KIND = None, None
     return _OCR_ENGINE
 
 
+def _table_engine_get():
+    """RapidTable(掃描表格結構還原 → HTML)。僅統一 rapidocr 路徑可用;惰性載入。"""
+    global _TABLE_ENGINE
+    if _TABLE_ENGINE is _UNSET:
+        try:
+            from rapid_table import RapidTable, RapidTableInput
+
+            _TABLE_ENGINE = RapidTable(RapidTableInput())
+        except Exception:  # noqa: BLE001
+            _TABLE_ENGINE = None
+    return _TABLE_ENGINE
+
+
+def _html_table_rows(html: str) -> list[list[str]]:
+    import re
+
+    rows = []
+    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", html or "", re.S | re.I):
+        cells = [re.sub(r"<[^>]+>", "", c).strip()
+                 for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S | re.I)]
+        if cells:
+            rows.append(cells)
+    return rows
+
+
 def _ocr_page(page) -> str:
-    """掃描/圖片型 PDF 頁 → OCR 文字(RapidOCR,onnxruntime 無 torch,CJK 佳)。"""
+    """掃描/圖片型 PDF 頁 → OCR 文字(PP-OCRv5,CJK 佳)。
+
+    若 RapidTable 可用且該頁辨識出結構良好的表格(過品質閘),回傳 markdown 表格;
+    否則回傳逐行 OCR 文字。表格頁優先給結構化內容,直接補上掃描表格結構這塊缺口。
+    """
     eng = _ocr_engine_get()
     if eng is None:
         return ""
     try:
         png = page.get_pixmap(dpi=200).tobytes("png")
-        res, _ = eng(png)
-        return "\n".join(line[1] for line in (res or []) if line and len(line) > 1).strip()
+        res = eng(png)
+        if _OCR_KIND == "unified":
+            txts = list(res.txts or [])
+            tbl = _ocr_table_md(png, res)  # 掃描表格 → markdown(過閘才採用)
+            if tbl:
+                return tbl
+        else:  # legacy:回傳 (result, elapse),result 為 [[box, text, score], ...]
+            data = res[0] if isinstance(res, tuple) else res
+            txts = [ln[1] for ln in (data or []) if ln and len(ln) > 1]
+        return "\n".join(t for t in txts if t).strip()
     except Exception:  # noqa: BLE001
         return ""
 
 
+def _ocr_table_md(png: bytes, ocr_res) -> str:
+    """RapidTable 把掃描表格還原成 HTML → 解析 → 過結構閘 → markdown。非表格(散文)會被閘擋下。"""
+    eng = _table_engine_get()
+    if eng is None:
+        return ""
+    try:
+        out = eng(png, [(ocr_res.boxes, ocr_res.txts, ocr_res.scores)])
+        html = (out.pred_htmls or [""])[0]
+        rows = _html_table_rows(html)
+        if _good_borderless_table(rows):  # 至少 2x2、短格、>=60% 有值 → 才當表格
+            return _rows_to_md(rows)
+    except Exception:  # noqa: BLE001
+        return ""
+    return ""
+
+
 _UNSET = object()
 _OCR_ENGINE = _UNSET
+_OCR_KIND = None
+_TABLE_ENGINE = _UNSET
 
 
 def _pdfplumber_borderless(path: str, page_no: int):
@@ -372,6 +439,71 @@ def extract_rtf(path: str) -> str:
     return rtf_to_text(Path(path).read_text(encoding="utf-8", errors="replace"))
 
 
+def extract_odt(path: str) -> tuple[str, ImgList]:
+    """.odt(OpenDocument)→ 純 Python 抽取(odfdo,免 LibreOffice)。
+
+    依 body 順序走標題/段落/清單/表格/圖,保位 —— 與 DOCX 路徑同級保真。
+    """
+    import re
+
+    from odfdo import Document
+
+    doc = Document(path)
+    parts: list[str] = []
+    images: ImgList = []
+    # odfdo 的 inner_text 會把圖框渲染成「(Pictures/xxx.png)」混進文字,清掉(href 必為 Pictures/)
+    _img_artifact = re.compile(r"\(Pictures/[^)]*\)")
+
+    def _text(el) -> str:
+        return _img_artifact.sub("", el.inner_text).strip()
+
+    def emit_images(el) -> None:
+        for img in el.get_elements("descendant::draw:image"):
+            url = img.get_attribute("xlink:href")
+            if not url:
+                continue
+            try:
+                blob = doc.get_part(url)
+            except Exception:  # noqa: BLE001
+                continue
+            if not blob:
+                continue
+            ext = url.rsplit(".", 1)[-1] if "." in url else "png"
+            images.append((blob, _norm_ext(ext)))
+            parts.append(f"{{{{IMG{len(images) - 1}}}}}")
+
+    for child in doc.body.children:
+        tag = child.tag
+        if tag == "text:h":  # 標題 → #
+            lvl = child.get_attribute("text:outline-level") or "2"
+            level = int(lvl) if str(lvl).isdigit() else 2
+            emit_images(child)
+            txt = _text(child)
+            if txt:
+                parts.append("#" * min(level, 6) + " " + txt)
+        elif tag == "text:p":  # 段落(內嵌圖落在段落位置)
+            emit_images(child)
+            txt = _text(child)
+            if txt:
+                parts.append(txt)
+        elif tag == "text:list":  # 清單 → -
+            for item in child.get_elements("descendant::text:list-item"):
+                t = _text(item)
+                if t:
+                    parts.append("- " + t)
+        elif tag == "table:table":  # 表格 → markdown
+            try:
+                rows = child.get_values()
+            except Exception:  # noqa: BLE001
+                rows = []
+            md = _rows_to_md([["" if c is None else str(c) for c in r] for r in rows])
+            if md:
+                parts.append(md)
+        elif tag == "draw:frame":  # body 層浮動圖框
+            emit_images(child)
+    return "\n\n".join(p for p in parts if p and p.strip()), images
+
+
 def _find_soffice() -> str | None:
     """找 LibreOffice headless 執行檔(.doc/.odt 唯一可靠的 OSS 轉檔路徑)。"""
     import glob
@@ -432,7 +564,9 @@ def extract_document(path: str) -> tuple[str, ImgList]:
         return extract_html(path), []
     if ext == ".rtf":
         return extract_rtf(path), []
-    if ext in (".doc", ".odt", ".pages"):  # LibreOffice 轉 docx 後走 docx 路徑(含圖/表/連結)
+    if ext == ".odt":  # 純 Python(odfdo),免 LibreOffice
+        return extract_odt(path)
+    if ext in (".doc", ".pages"):  # 舊二進位無純 Python 路徑 → LibreOffice 轉 docx
         return extract_docx(_soffice_to_docx(path))
     if ext in _IMG_EXTS:
         raise ValueError(f"{ext} 為圖片檔,需 OCR(尚未支援);請提供文字稿 .docx/.pdf/.md")
