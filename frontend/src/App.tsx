@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
 import { PublishForm } from './PublishForm'
@@ -11,7 +12,7 @@ import {
   type Job, type Workflow,
 } from './api'
 
-type Tab = 'run' | 'jobs' | 'config' | 'status'
+type Tab = '/' | '/history' | '/settings' | '/status'
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
 
@@ -60,28 +61,33 @@ function jobSource(j: Job): string {
 
 const NAV: { key: Tab; label: string; sub: string; icon: ReactNode }[] = [
   {
-    key: 'run', label: '處理稿件', sub: '進稿 → AI 流程 → 上稿',
+    key: '/', label: '處理稿件', sub: '進稿 → AI 流程 → 上稿',
     icon: <svg viewBox="0 0 24 24" fill="none"><path d="M5 4h10l4 4v12H5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /><path d="M14 4v5h5M8.5 13h7M8.5 16.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
   },
   {
-    key: 'jobs', label: 'Jobs 歷史', sub: '所有執行紀錄',
+    key: '/history', label: 'Jobs 歷史', sub: '所有執行紀錄',
     icon: <svg viewBox="0 0 24 24" fill="none"><path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="12" r="8.2" stroke="currentColor" strokeWidth="1.6" /></svg>,
   },
   {
-    key: 'config', label: '設定 / Prompt', sub: 'Agent 與押註版本',
+    key: '/settings', label: '設定 / Prompt', sub: 'Agent 與押註版本',
     icon: <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 7a2 2 0 104 0 2 2 0 00-4 0zM6 17a2 2 0 104 0 2 2 0 00-4 0z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
   },
   {
-    key: 'status', label: '建構進度', sub: '對照舊版 / 缺口 / 測試',
+    key: '/status', label: '建構進度', sub: '對照舊版 / 缺口 / 測試',
     icon: <svg viewBox="0 0 24 24" fill="none"><path d="M5 19V9M10 19V5M15 19v-6M20 19v-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>,
   },
 ]
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('run')
+  const loc = useLocation()
+  const navigate = useNavigate()
+  const [sp, setSp] = useSearchParams()
+  // 容忍尾斜線(伺服器/反代會把 /status 正規化成 /status/),否則重整後比對不到會退回首頁
+  const path0 = (loc.pathname.replace(/\/+$/, '') || '/')
+  const tab: Tab = (NAV.find((n) => n.key === path0)?.key ?? '/')
   const [health, setHealth] = useState<{ status: string } | null>(null)
   const [light, setLight] = pref('theme-light', false)
-  const [openJobId, setOpenJobId] = useState<number | null>(null)
+  const [collapsed, setCollapsed] = pref('side-collapsed', false)
   const [drawer, setDrawer] = useState(false)
   useEffect(() => {
     const check = () => getHealth().then(setHealth).catch(() => setHealth(null))
@@ -92,10 +98,12 @@ export default function App() {
   useEffect(() => { document.documentElement.classList.toggle('light', light) }, [light])
 
   const cur = NAV.find((n) => n.key === tab)!
-  const go = (k: Tab) => { setTab(k); setDrawer(false) }
+  const go = (k: Tab) => { navigate(k); setDrawer(false) }
+  // 深連結:Jobs 歷史點開某筆 → /?job=ID(可分享/重整保留);RunPanel 接手後清掉參數
+  const openJobId = sp.get('job') ? Number(sp.get('job')) : null
 
   return (
-    <div className="shell">
+    <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
       <Toasts />
 
       <aside className={`sidebar ${drawer ? 'open' : ''}`}>
@@ -105,19 +113,27 @@ export default function App() {
         </div>
         <nav className="nav">
           {NAV.map((n) => (
-            <button key={n.key} className={`nav-item ${tab === n.key ? 'on' : ''}`} onClick={() => go(n.key)}>
+            <button key={n.key} title={n.label} className={`nav-item ${tab === n.key ? 'on' : ''}`} onClick={() => go(n.key)}>
               <span className="nav-ic">{n.icon}</span>
               <span className="nav-txt"><span className="nav-label">{n.label}</span><span className="nav-sub">{n.sub}</span></span>
             </button>
           ))}
         </nav>
         <div className="side-foot">
-          <div className={`side-health ${health ? 'ok' : 'down'}`}>
-            <span className="dot" />{health ? '後端運行中' : '後端未連線'}
+          <div className={`side-health ${health ? 'ok' : 'down'}`} title={health ? '後端運行中' : '後端未連線'}>
+            <span className="dot" /><span className="side-foot-txt">{health ? '後端運行中' : '後端未連線'}</span>
           </div>
-          <button className="theme-toggle" onClick={() => setLight(!light)}>
-            <span>{light ? '☀️ 亮色' : '🌙 暗色'}</span>
-            <span className="muted">切換</span>
+          <button className="theme-toggle" onClick={() => setLight(!light)} title="切換主題">
+            <span className="side-foot-txt">{light ? '☀️ 亮色' : '🌙 暗色'}</span>
+            <span className="muted side-foot-txt">切換</span>
+            <span className="tt-ic">{light ? '☀️' : '🌙'}</span>
+          </button>
+          <button className="side-collapse" onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? '展開側邊欄' : '收合側邊欄'} aria-label="收合側邊欄">
+            <svg viewBox="0 0 24 24" fill="none" className={collapsed ? 'flip' : ''}>
+              <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="side-foot-txt">收合</span>
           </button>
         </div>
       </aside>
@@ -137,12 +153,13 @@ export default function App() {
         </header>
 
         <div className="content">
-          <div style={{ display: tab === 'run' ? 'block' : 'none' }}>
-            <RunPanel openJobId={openJobId} onOpened={() => setOpenJobId(null)} />
+          {/* RunPanel 永遠掛載(display 切換),這樣切到其他頁再回來,進行中的串流/接回狀態不會斷 */}
+          <div style={{ display: tab === '/' ? 'block' : 'none' }}>
+            <RunPanel openJobId={openJobId} onOpened={() => { if (sp.has('job')) { sp.delete('job'); setSp(sp, { replace: true }) } }} />
           </div>
-          {tab === 'jobs' && <JobsPanel onOpen={(id) => { setOpenJobId(id); setTab('run') }} />}
-          {tab === 'config' && <ConfigPanel />}
-          {tab === 'status' && <StatusPanel />}
+          {tab === '/history' && <JobsPanel onOpen={(id) => navigate(`/?job=${id}`)} />}
+          {tab === '/settings' && <ConfigPanel />}
+          {tab === '/status' && <StatusPanel />}
         </div>
       </div>
     </div>

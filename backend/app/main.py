@@ -57,10 +57,21 @@ app.include_router(versions.router)
 # 這樣前端用相對路徑打 API，免 CORS、只需一條 tunnel。
 class _SpaStatic(StaticFiles):
     """index.html 一律 no-cache（否則瀏覽器啟發式快取 → 使用者卡在舊 bundle）；
-    hashed assets 永久快取。"""
+    hashed assets 永久快取。前端用 history 路由（/history、/settings、/status…），
+    這些路徑沒有對應檔案 → 回退 index.html，讓深連結/重整不會 404。"""
 
     async def get_response(self, path: str, scope):  # type: ignore[override]
-        resp = await super().get_response(path, scope)
+        from starlette.exceptions import HTTPException as _HTTPExc
+        from starlette.responses import FileResponse
+
+        try:
+            resp = await super().get_response(path, scope)
+        except _HTTPExc as exc:
+            if exc.status_code != 404 or path.startswith("assets/"):
+                raise  # 真正缺漏的 asset 仍回 404，不要假裝成功
+            # SPA 回退：直接回 index.html 檔（不可用 get_response(".")，那會被當目錄
+            # 觸發補斜線 307 重導 → /status/，且反代下會降級成 http 造成 Mixed Content）
+            resp = FileResponse(_FRONTEND_DIST / "index.html")
         if path.startswith("assets/"):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         else:

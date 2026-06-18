@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { getHealth, listJobs, listSiteConfig, listWorkflows, type Job } from './api'
 
 const STAGES = [
@@ -231,7 +232,9 @@ function scoreColor(s: number): string {
 }
 
 function ModulesPanel() {
-  const [active, setActive] = useState(MODULES[0].key)
+  const [sp, setSp] = useSearchParams()
+  const active = MODULES.find((x) => x.key === sp.get('mod'))?.key ?? MODULES[0].key
+  const setActive = (k: string) => { sp.set('mod', k); setSp(sp, { replace: true }) }
   const m = MODULES.find((x) => x.key === active) ?? MODULES[0]
   const avg = Math.round(MODULES.reduce((a, x) => a + x.score, 0) / MODULES.length)
   return (
