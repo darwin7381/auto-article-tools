@@ -297,6 +297,20 @@ pre.log.content { color: #cdd3dc; }
 :root.light .source-banner.builtin { background: #fff7e6; }
 :root.light .source-banner.db { background: #e7f7f1; }
 
+/* 進階組稿開關 */
+.fmt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 520px) { .fmt-grid { grid-template-columns: 1fr; } }
+.fmt-toggle { display: flex; align-items: flex-start; gap: 9px; text-align: left; padding: 10px 11px;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--panel-2); color: var(--text);
+  cursor: pointer; transition: border-color .14s, background .14s; }
+.fmt-toggle.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.fmt-check { width: 18px; height: 18px; flex: none; border-radius: 5px; border: 1px solid var(--border);
+  display: grid; place-items: center; font-size: 12px; color: var(--accent-ink); margin-top: 1px; }
+.fmt-toggle.on .fmt-check { background: var(--accent); border-color: var(--accent); }
+.fmt-txt { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
+.fmt-txt b { font-size: 13px; font-weight: 600; }
+.fmt-txt i { font-size: 11px; color: var(--muted); font-style: normal; }
+
 /* 版本管理列 */
 .verbar { border: 1px solid var(--accent); border-radius: 9px; padding: 10px 12px; margin: 10px 0 14px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
 :root.light .verbar { background: #eef3ff; }
