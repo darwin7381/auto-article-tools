@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 export type Uploaded = { file: string; original_name: string; size: number }
 
-export const ACCEPT = '.pdf,.docx,.md,.txt'
+export const ACCEPT = '.pdf,.docx,.md,.txt,.html,.htm,.rtf'
 
 export function acceptOk(name: string): boolean {
   const ext = '.' + (name.split('.').pop()?.toLowerCase() ?? '')
