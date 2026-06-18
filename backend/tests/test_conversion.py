@@ -354,6 +354,10 @@ def test_odt_pure_python_extraction(tmp_path):
     lst = List()
     lst.append(ListItem("項目一"))
     lst.append(ListItem("項目二"))
+    multi = ListItem()             # 多段落清單項 → 不可被黏成一團
+    multi.append(Paragraph("多段一"))
+    multi.append(Paragraph("多段二"))
+    lst.append(multi)
     b.append(lst)
     t = Table("T")
     t.set_values([["表頭A", "表頭B"], ["值1", "值2"]])
@@ -367,6 +371,7 @@ def test_odt_pure_python_extraction(tmp_path):
     assert "# ODT 標題" in text
     assert "[動區連結](https://blocktempo.ai/)" in text  # 超連結保真,對齊 DOCX 路徑
     assert "- 項目一" in text and "- 項目二" in text
+    assert "- 多段一 多段二" in text and "多段一多段二" not in text  # 多段落不被黏成一團
     assert "| 表頭A | 表頭B |" in text and "| 值1 | 值2 |" in text
     assert "Pictures/" not in text  # 圖框 href 殘影要清乾淨
 
