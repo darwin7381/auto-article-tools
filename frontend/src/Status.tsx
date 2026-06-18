@@ -36,23 +36,26 @@ const GAPS: [string, string, string][] = [
   ['🟢 低（暫緩）', '登入 / 權限', '舊版有 Clerk;新版無。已與你確認此項優先級往後放。要時建議用 tunnel 層 Basic Auth(同 dc1/dc2)'],
   ['🟢 低', 'eval 進階', '已有 golden 評分 CLU(結構不變式 + 耗時/tokens);LLM-judge 品質評分可再加'],
 ]
-const TESTED: [string, string][] = [
-  ['article 完整 7 階段端到端', 'E2E job#46 + 4 份文件實測'],
-  ['進稿:docx 简繁/pdf 英繁/md', 'CLI 抽取實測'],
-  ['進稿:Google Docs 中英/Medium/WeChat/OKX', 'URL 抽取 5/5 通過'],
-  ['Durable job:建立/SSE/刷新接回/從任一步重跑', '隔離瀏覽器實測'],
-  ['版本管理:agent + 押註(建立/切換/刪除)', 'pytest + 瀏覽器實測'],
-  ['進階組稿:正規化/引言/dropcap/TG/押註替換', '單元六項 + E2E job#46(進到 wp.content)'],
-  ['WordPress 實際發布到測試站', '草稿+正式皆驗(驗後刪除)'],
-  ['Strapi 匯入 12 筆 + 押註分型讀取', '匯入 + resolve 實測'],
-  ['影像 gpt-image-2 streaming + Pillow 壓縮', '單獨重現 + pipeline 實測'],
-  ['前端:dashboard / RWD / 拖放 / 主題 / 快取修復', '隔離瀏覽器(桌面+390 手機)'],
-  ['D1 內嵌圖片抽取(docx/pdf→存儲→嵌回)', 'HashKey docx 抽到 1 圖、eval 用作特色圖'],
-  ['D2 圖片 figure 包裝 + lazy', '單元測試'],
-  ['D3 原文首圖當特色圖(省生圖)', 'eval:cover_image 0 tok/0s 用原文圖'],
-  ['作者 ID 依文稿類型自動帶入', 'article_formatting 帶入(廣編1/新聞2)'],
-  ['觀測:per-stage 耗時 + tokens', 'eval:content_ai 9078/pr_writer 10198 tok'],
-  ['eval 回歸評分(結構不變式)', 'CLI 11/11 通過(118.8s/26k tokens)'],
+// [項目, 方式, 結果/評分, 通過?]
+type Row = [string, string, string, boolean]
+const E2E_TESTS: Row[] = [
+  ['完整 7 階段(WEEX 简中 docx 含圖 / 廣編稿)', 'job#47 console 路徑從頭跑 + eval 評分', '11/11 · 137.4s · 21.6k tok · 简→繁76% · 封面用原文圖', true],
+  ['完整 7 階段(docx 繁中 / 新聞稿)', 'eval CLI:HashKey docx', '11/11 · 118.8s · 26k tok · 封面用原文圖', true],
+  ['完整流程經 SSE + 從某階段重跑', 'job#46 隔離瀏覽器', '7/7 階段 · 格式化進 wp.content ✅', true],
+  ['上稿:實際發布到 WordPress 測試站', '隔離瀏覽器 → wp.blocktempo.ai', '草稿+正式皆成功(post 上線,驗後刪)', true],
+  ['進稿全來源(docx 简繁/pdf 英繁/md/URL)', 'CLI + URL 抽取', 'docx/pdf/md ✅ · URL 5/5(gdocs中英/Medium/WeChat/OKX)', true],
+]
+const UNIT_TESTS: Row[] = [
+  ['後端自動化測試 pytest', 'uv run pytest', '13/13 通過', true],
+  ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
+  ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
+  ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
+  ['eval 評分器(結構不變式 + 繁中比例)', 'test_eval_scorecard', '通過', true],
+  ['版本管理生命週期(建立/切換/刪除/回退)', 'test_config_version_lifecycle', '通過', true],
+  ['durable job 端到端 + SSE 重播 + 404', 'test_api', '通過', true],
+  ['Strapi 匯入 + 押註分型讀取', '匯入 12 筆 + resolve 實測', '廣編/新聞各正確 ✅', true],
+  ['影像 gpt-image-2 streaming + Pillow 壓縮', '單獨重現(183s 斷→72s 成功)', '通過 · 省 84%', true],
+  ['前端 dashboard / RWD / 拖放 / 主題 / 快取', '隔離瀏覽器(桌面 1440 + 390 手機)', '無溢出 ✅', true],
 ]
 
 export function StatusPanel() {
@@ -106,11 +109,15 @@ export function StatusPanel() {
       </div>
 
       <div className="panel">
-        <h2>🧪 已測試項目（{TESTED.length}）</h2>
-        <div className="table-wrap"><table>
-          <thead><tr><th>項目</th><th>驗證方式</th></tr></thead>
-          <tbody>{TESTED.map(([w, how]) => <tr key={w}><td>{w}</td><td className="muted">{how}</td></tr>)}</tbody>
-        </table></div>
+        <h2>🧪 完整流程測試（E2E,跑整條 pipeline）</h2>
+        <TestTable rows={E2E_TESTS} />
+        <p className="hint">最近一次完整重跑:見第一列 job#47(2026-06-18 console 路徑從頭跑)。</p>
+      </div>
+
+      <div className="panel">
+        <h2>🔬 單項測試（unit / 元件）</h2>
+        <TestTable rows={UNIT_TESTS} />
+        <p className="hint">後端 <code>uv run pytest</code> 13/13;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">
@@ -124,6 +131,24 @@ export function StatusPanel() {
         <p className="hint">完整逐行比對見 repo <code>docs/OLD-VS-NEW.md</code>。</p>
       </div>
     </div>
+  )
+}
+
+function TestTable({ rows }: { rows: Row[] }) {
+  return (
+    <div className="table-wrap"><table className="test-table">
+      <thead><tr><th>項目</th><th>測試方式</th><th>結果 / 評分</th><th>狀態</th></tr></thead>
+      <tbody>
+        {rows.map(([item, how, result, ok]) => (
+          <tr key={item}>
+            <td>{item}</td>
+            <td className="muted">{how}</td>
+            <td>{result}</td>
+            <td><span className={`status ${ok ? 'done' : 'error'}`}>{ok ? '通過' : '失敗'}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table></div>
   )
 }
 
