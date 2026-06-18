@@ -19,12 +19,13 @@
 | **.txt** | ✅ | 直讀 | ✅ | — | — | — | — | — |
 | **.html/.htm** | ✅ | trafilatura（本機檔） | ✅ | ✅ | URL | 主文順序 | ✅ | ✅ |
 | **.rtf** | ✅ | striprtf（純文字） | ✅ | 攤平 | ❌ | — | 純文字 | — |
+| **.odt** | ✅ | **odfdo（純 Python，免 LibreOffice）** | ✅ | ✅ | ✅ | ✅ inline 保位 | ✅ | ✅ `#`/`-` |
 | **.doc**（舊版 Word） | ✅* | LibreOffice headless → docx 路徑 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **.odt / .pages** | ✅* | LibreOffice headless → docx 路徑 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **.pages** | ✅* | LibreOffice headless → docx 路徑 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **圖片檔**(png/jpg…) | ⛔ 明確報錯 | 需 OCR（建議轉 PDF 走掃描路徑） | — | — | — | — | — | — |
 | 其他副檔名 | ⛔ 明確報錯 | — | — | — | — | — | — | — |
 
-> *`.doc/.odt` 需系統有 LibreOffice（`brew install --cask libreoffice`）；未偵測到 `soffice` 時丟 `ValueError` 附安裝指引，不靜默。
+> *`.doc/.pages` 需系統有 LibreOffice（`brew install --cask libreoffice`）；未偵測到 `soffice` 時丟 `ValueError` 附安裝指引，不靜默。`.odt` 已改用純 Python 的 odfdo，**不需** LibreOffice。
 
 > 「明確報錯」= 丟 `ValueError` 並帶可行動建議（例「請先另存為 .docx/.pdf」），不靜默帶殼跑完整 AI 流程。
 
@@ -75,8 +76,9 @@
 |---|---|---|---|
 | **PyMuPDF 1.27** | PDF 文字/表格/圖+座標 | **續用（預設）** | 最快、無 ML、原生 PDF→markdown 且文字+表格+圖排序正確。⚠️ **授權 AGPL-3.0**：對外託管產品需確認合規（或購商業授權）。 |
 | **pdfplumber 0.11** | PDF 無框線/複雜表 fallback | **新增** | MIT、純 Python（pdfminer.six）；fitz `find_tables` 抓 0 時用文字策略補，過品質閘（≥2列≥2欄、≥60%有值、平均儲存格短）防把散文誤判成表。 |
-| **RapidOCR**（opt-in） | 掃描/圖片型 PDF OCR | **新增** | Apache-2.0、onnxruntime（**無 torch/GPU**）、CJK 佳；判定掃描頁=「大圖佔版面過半且文字稀少」(不只看整頁無字,因掃描檔常帶頁碼/頁尾薄文字層);引擎惰性載入。`uv sync --extra ocr` 啟用。**守門**:OCR 不可用/失敗或「未還原掃描頁佔比≥半」→丟 `ValueError`,不讓空白/漏頁靜默跑下游。 |
-| **LibreOffice headless** | .doc/.odt 轉檔 | **新增（系統依賴）** | 舊二進位 `.doc` 唯一可靠 OSS 路徑（純 Python 無解）；轉 docx 後沿用全保真路徑，逾時/失敗皆報錯。 |
+| **rapidocr（PP-OCRv5）+ rapid_table**（opt-in） | 掃描/圖片型 PDF OCR + 掃描表格結構 | **升級** | 統一 `rapidocr` 走 **PP-OCRv5** 模型(CJK 含**繁體中文**一級支援,v4 較弱)、onnxruntime（**無 torch/GPU**）;**RapidTable** 把掃描表格還原成 HTML→過品質閘→markdown。判定掃描頁=「大圖佔版面過半且文字稀少」;引擎惰性載入。`uv sync --extra ocr` 啟用。**守門**:OCR 不可用/失敗或「未還原掃描頁佔比≥半」→丟 `ValueError`。 |
+| **odfdo**（.odt） | .odt 抽取 | **新增** | ~132★、Apache-2.0、**純 Python（lxml）免 LibreOffice**;走 body 順序取標題/段落/清單/表格/內嵌圖,與 DOCX 同級保真。研究確認為最佳維護中的純 Python ODF 庫(勝 odfpy/ezodf)。 |
+| **LibreOffice headless** | .doc/.pages 轉檔 | **新增（系統依賴）** | 舊二進位 `.doc` 唯一可靠 OSS 路徑（純 Python 無解,antiword/textract 皆已死）；轉 docx 後沿用全保真路徑。可選 unoserver 常駐加速(仍需系統 LO)。 |
 | **python-docx 1.2** | DOCX 自走抽取 | **續用** | 原生 DOCX 手走 body 順序是正解（確定性、真順序、表格/圖/連結全可控）；mammoth/markitdown 反而會丟巢狀表。 |
 | **python-markdown** | md→HTML | **續用** | 與抽取正交，無更換理由。 |
 | **trafilatura 2.0 + firecrawl** | 網頁/HTML 主文 | **續用** | 文章正文抽取標竿（WCXB F1 0.841）。 |
@@ -90,14 +92,17 @@
 
 ## 5. 本輪已補（從缺口 → 已實作）
 
-- ✅ **掃描 PDF / 圖片型 PDF OCR** — RapidOCR（onnxruntime，無 torch），整頁無文字才自動觸發；`uv sync --extra ocr` 啟用。
+- ✅ **掃描 PDF / 圖片型 PDF OCR** — rapidocr **PP-OCRv5**（onnxruntime，無 torch；含繁中），大圖+文字稀少才自動觸發；`uv sync --extra ocr` 啟用。
+- ✅ **掃描表格結構還原** — RapidTable（ONNX，無 torch）把掃描表格還原成 HTML→過品質閘→markdown。
 - ✅ **PDF 無框線 / 複雜表格** — pdfplumber 文字策略 fallback（過品質閘防誤判），補 fitz 漏抓。
-- ✅ **.doc / .odt** — LibreOffice headless 轉 docx 後走全保真路徑；未裝 soffice 明確報錯附指引。
+- ✅ **.odt 免 LibreOffice** — odfdo 純 Python 全保真（文字+表+圖保位）。
+- ✅ **.doc / .pages** — LibreOffice headless 轉 docx 後走全保真路徑；未裝 soffice 明確報錯附指引。
+- ✅ **掃描檔靜默把關** — OCR 救不回 / 未還原頁佔比≥半 → 明確報錯，不讓空白/漏頁跑下游。
 
 ## 6. 仍未竟與路線
 
 1. **多欄 / 複雜學術版面閱讀序** — PyMuPDF 對多欄較弱；必要時路由到 Docling（MIT，重 ML，feature flag）。
-2. **掃描表格結構還原** — OCR 目前回純文字行，掃描表格的格狀結構難重建。
-3. **DOCX 巢狀表格 / 浮動圖錨點** — 巢狀表格攤平為單層；極少見，待真實案例再補。
-4. **AGPL 授權** — 對外商用前需決策:購 PyMuPDF 商業授權，或把 Docling(MIT) 升為主路徑。
-5. **圖片檔 OCR / Twitter 線程 / PDF 連結自動下載** — 尚未特化。
+2. **DOCX 巢狀表格 / 浮動圖錨點** — 巢狀表格攤平為單層；極少見，待真實案例再補。
+3. **AGPL 授權** — 對外商用前需決策:購 PyMuPDF 商業授權，或把 Docling(MIT) 升為主路徑。
+4. **.doc 轉檔加速** — 可由 per-file `soffice` 換成 unoserver 常駐(仍需系統 LO)。
+5. **圖片檔 OCR / Twitter 線程 / PDF 連結自動下載 / 手寫·公式(VLM)** — 尚未特化。

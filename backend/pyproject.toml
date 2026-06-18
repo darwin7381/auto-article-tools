@@ -26,12 +26,15 @@ ai = [
     "pdfplumber>=0.11",   # PDF 無框線/複雜表格 fallback（MIT，純 Python；補 PyMuPDF find_tables 漏抓）
     "trafilatura>=2.0",   # URL 進稿 + 本機 HTML 檔：網頁主文抽取 → markdown
     "striprtf>=0.0.26",   # RTF 進稿（純 Python，無重依賴）
+    "odfdo>=3.20",        # .odt 進稿（純 Python，lxml 而已；免 LibreOffice，文字+表+圖保位）
     "pillow>=11.0",       # 封面壓縮（本地，取代 TinyPNG API）
 ]
-# 掃描 PDF / 圖片型 PDF 的 OCR（opt-in：onnxruntime，無 torch，CJK 佳）。
+# 掃描 PDF / 圖片型 PDF 的 OCR（opt-in：onnxruntime，無 torch，CJK 含繁中佳）。
+# rapidocr 統一包走 PP-OCRv5 模型；rapid_table 還原掃描表格結構 → HTML → markdown。
 # 用 `uv sync --extra ai --extra ocr` 啟用；未裝時掃描頁會給明確提示。
 ocr = [
-    "rapidocr-onnxruntime>=1.4",
+    "rapidocr>=3.8",
+    "rapid_table>=3.0",
 ]
 dev = [
     "ruff>=0.9",

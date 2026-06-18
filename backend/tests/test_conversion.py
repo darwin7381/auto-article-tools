@@ -32,6 +32,12 @@ def _png(color: str = "red", size: int = 12) -> bytes:
     return buf.getvalue()
 
 
+def _png_path(tmp_path, color: str = "red") -> str:
+    p = tmp_path / f"img_{color}.png"
+    p.write_bytes(_png(color))
+    return str(p)
+
+
 def _make_docx(path: str) -> None:
     """造一份「全功能」DOCX:標題 / 段落 / 內嵌圖(夾在兩段之間)/ 超連結 / 清單 / 表格。"""
     import docx
@@ -176,8 +182,8 @@ def test_pdf_borderless_table_via_pdfplumber(tmp_path):
 
 
 def test_pdf_scanned_ocr(tmp_path):
-    """掃描/圖片型 PDF(無可抽文字)→ RapidOCR 補文字(需 ocr extra)。"""
-    pytest.importorskip("rapidocr_onnxruntime")
+    """掃描/圖片型 PDF(無可抽文字)→ RapidOCR(PP-OCRv5)補文字(需 ocr extra)。"""
+    pytest.importorskip("rapidocr")
     import io
 
     from PIL import Image, ImageDraw
@@ -196,6 +202,54 @@ def test_pdf_scanned_ocr(tmp_path):
     doc.close()
     text, _ = extract_document(p)
     assert "SCANNEDOCRTESTCONTENTLINE2026" in text.replace(" ", "")  # OCR 可能不還原字間空白
+
+
+def test_ocr_html_table_helper():
+    """RapidTable 輸出的 HTML 表 → markdown(解析器 + 結構閘,確定性、不依賴模型)。"""
+    from app.services.extract import _html_table_rows, _rows_to_md
+
+    html = ("<html><body><table>"
+            "<tr><td>Item</td><td>Qty</td></tr>"
+            "<tr><td>Apple</td><td>30</td></tr>"
+            "<tr><td></td><td></td></tr></table></body></html>")
+    rows = _html_table_rows(html)
+    assert ["Item", "Qty"] in rows
+    md = _rows_to_md(rows)
+    assert "| Item | Qty |" in md and "| Apple | 30 |" in md
+
+
+def test_scanned_table_to_markdown(tmp_path):
+    """端到端:掃描表格影像 PDF → OCR(PP-OCRv5)+ RapidTable → markdown 表格。"""
+    pytest.importorskip("rapidocr")
+    pytest.importorskip("rapid_table")
+    import io
+
+    from PIL import Image, ImageDraw
+
+    import fitz
+
+    img = Image.new("RGB", (400, 160), "white")
+    d = ImageDraw.Draw(img)
+    for x in (10, 140, 270, 390):
+        d.line([(x, 10), (x, 150)], fill="black")
+    for y in (10, 50, 90, 130, 150):
+        d.line([(10, y), (390, y)], fill="black")
+    cells = [["Item", "Qty", "City"], ["Apple", "30", "Taipei"], ["Banana", "25", "Osaka"]]
+    for r, row in enumerate(cells):
+        for c, t in enumerate(row):
+            d.text((20 + c * 130, 20 + r * 40), t, fill="black")
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=160)
+    page.insert_image(fitz.Rect(0, 0, 400, 160), stream=buf.getvalue())
+    p = str(tmp_path / "scan_table.pdf")
+    doc.save(p)
+    doc.close()
+    text, _ = extract_document(p)
+    # 結構化為 markdown 表(小圖 OCR 可能個別字噪訊,驗結構 + 數個可靠儲存格)
+    assert "| --- |" in text
+    assert "Apple" in text and "Banana" in text and "Taipei" in text
 
 
 def test_pdf_scanned_without_ocr_raises(tmp_path, monkeypatch):
@@ -279,6 +333,38 @@ def test_rtf_file_extraction(tmp_path):
     p.write_text(r"{\rtf1\ansi\ansicpg950 Hello RTF 內容 World.}", encoding="utf-8")
     text, images = extract_document(str(p))
     assert "Hello RTF" in text and "World" in text and images == []
+
+
+def test_odt_pure_python_extraction(tmp_path):
+    """.odt 純 Python(odfdo,免 LibreOffice):標題/段落/內嵌圖保位/清單/表格。"""
+    from odfdo import Document, Frame, Header, List, ListItem, Paragraph, Table
+
+    d = Document("text")
+    b = d.body
+    b.append(Header(1, "ODT 標題"))
+    b.append(Paragraph("ALPHA 前段文字"))
+    uri = d.add_file(_png_path(tmp_path))
+    pimg = Paragraph("")
+    pimg.append(Frame.image_frame(uri, size=("3cm", "3cm")))
+    b.append(pimg)
+    b.append(Paragraph("BRAVO 後段文字"))
+    lst = List()
+    lst.append(ListItem("項目一"))
+    lst.append(ListItem("項目二"))
+    b.append(lst)
+    t = Table("T")
+    t.set_values([["表頭A", "表頭B"], ["值1", "值2"]])
+    b.append(t)
+    p = str(tmp_path / "doc.odt")
+    d.save(p)
+
+    text, images = extract_document(p)
+    assert len(images) == 1
+    assert text.index("ALPHA 前段文字") < text.index("{{IMG0}}") < text.index("BRAVO 後段文字")
+    assert "# ODT 標題" in text
+    assert "- 項目一" in text and "- 項目二" in text
+    assert "| 表頭A | 表頭B |" in text and "| 值1 | 值2 |" in text
+    assert "Pictures/" not in text  # 圖框 href 殘影要清乾淨
 
 
 def test_txt_and_md_passthrough(tmp_path):
