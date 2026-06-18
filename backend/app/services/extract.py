@@ -454,8 +454,33 @@ def extract_odt(path: str) -> tuple[str, ImgList]:
     # odfdo 的 inner_text 會把圖框渲染成「(Pictures/xxx.png)」混進文字,清掉(href 必為 Pictures/)
     _img_artifact = re.compile(r"\(Pictures/[^)]*\)")
 
+    def _inline(el) -> str:
+        """依文件順序走段落內聯內容:超連結→[text](url)、text:s→空白、換行/tab,圖框略過。"""
+        out = [el.text or ""]
+        for c in el.children:
+            tag = c.tag
+            if tag == "text:a":  # 超連結 → [text](url)(保真,對齊 DOCX 路徑)
+                href = c.get_attribute("xlink:href") or ""
+                inner = _inline(c)
+                out.append(f"[{inner}]({href})" if href else inner)
+            elif tag == "text:s":  # 空白(可帶 text:c 計數)
+                n = c.get_attribute("text:c")
+                out.append(" " * (int(n) if n and str(n).isdigit() else 1))
+            elif tag == "text:tab":
+                out.append(" ")
+            elif tag == "text:line-break":
+                out.append("\n")
+            elif tag in ("draw:frame", "draw:image"):
+                pass  # 圖片由 emit_images 另外處理(置於佔位符)
+            elif tag == "text:list":
+                pass  # 巢狀清單由外層 descendant::text:list-item 迴圈統一處理,避免重複
+            else:
+                out.append(_inline(c))  # text:span 等 → 遞迴
+            out.append(c.tail or "")
+        return "".join(out)
+
     def _text(el) -> str:
-        return _img_artifact.sub("", el.inner_text).strip()
+        return _img_artifact.sub("", _inline(el)).strip()
 
     def emit_images(el) -> None:
         for img in el.get_elements("descendant::draw:image"):

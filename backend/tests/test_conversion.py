@@ -337,7 +337,7 @@ def test_rtf_file_extraction(tmp_path):
 
 def test_odt_pure_python_extraction(tmp_path):
     """.odt 純 Python(odfdo,免 LibreOffice):標題/段落/內嵌圖保位/清單/表格。"""
-    from odfdo import Document, Frame, Header, List, ListItem, Paragraph, Table
+    from odfdo import Document, Frame, Header, Link, List, ListItem, Paragraph, Table
 
     d = Document("text")
     b = d.body
@@ -348,6 +348,9 @@ def test_odt_pure_python_extraction(tmp_path):
     pimg.append(Frame.image_frame(uri, size=("3cm", "3cm")))
     b.append(pimg)
     b.append(Paragraph("BRAVO 後段文字"))
+    link_para = Paragraph("前綴 ")
+    link_para.append(Link(url="https://blocktempo.ai/", text="動區連結"))
+    b.append(link_para)
     lst = List()
     lst.append(ListItem("項目一"))
     lst.append(ListItem("項目二"))
@@ -362,6 +365,7 @@ def test_odt_pure_python_extraction(tmp_path):
     assert len(images) == 1
     assert text.index("ALPHA 前段文字") < text.index("{{IMG0}}") < text.index("BRAVO 後段文字")
     assert "# ODT 標題" in text
+    assert "[動區連結](https://blocktempo.ai/)" in text  # 超連結保真,對齊 DOCX 路徑
     assert "- 項目一" in text and "- 項目二" in text
     assert "| 表頭A | 表頭B |" in text and "| 值1 | 值2 |" in text
     assert "Pictures/" not in text  # 圖框 href 殘影要清乾淨
