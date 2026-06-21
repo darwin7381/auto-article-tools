@@ -73,6 +73,28 @@ async def test_ingest_requires_file_or_url():
         await ing.ingest({})
 
 
+async def test_ingest_url_only_collects_http_images(monkeypatch):
+    """URL 路徑只收 http(s) 圖;data:/相對路徑不被當圖 URL(記錄此行為)。"""
+    from app.services import ingest as ing
+
+    async def fake(url):
+        return "文 ![](https://x/a.png) ![](data:image/png;base64,AAAA) ![](/local/b.png)"
+
+    monkeypatch.setattr(ing, "extract_url", fake)
+    _, urls = await ing.ingest({"url": "https://e.com"})
+    assert urls == ["https://x/a.png"]
+
+
+def test_extract_html_fragment_fallback(tmp_path):
+    """非 article 結構的 HTML 片段 → trafilatura 抽不到主文 → 退回去標籤純文字(不回空)。"""
+    from app.services.extract import extract_document
+
+    p = tmp_path / "frag.html"
+    p.write_text("<div><span>純片段沒有文章結構</span><b>只有零碎標籤</b></div>", encoding="utf-8")
+    text, images = extract_document(str(p))
+    assert "純片段沒有文章結構" in text and images == []
+
+
 # ───────────────────────── url_extract:派發 / 死鏈守門 / fallback ─────────────────────────
 
 async def test_extract_url_dispatch_and_dead_link(monkeypatch):

@@ -27,7 +27,7 @@ const SUPERIOR = [
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 48/48(含合成夾具斷言圖片排列位置)',
+  '自動化測試 pytest 95/95(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -300,7 +300,7 @@ const MAIN_MODULES: MainMod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '48/48 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '95/95 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -314,16 +314,17 @@ const UNIT_TESTS: Row[] = [
 
 // Subagent 獨立稽核(走訂閱、不燒 API;輔助佐證,不覆寫上方模組分數)。
 // 紀錄:evals/records/2026-06-21-module-capability-auditor-batch.md;角色:evals/agents/
-const AUDITS: { mod: string; owner: number; audit: number; finding: string }[] = [
-  { mod: '進稿抽取', owner: 86, audit: 84, finding: '.doc 成功路徑、RTF 非 utf8、gdoc 圖嵌入分支未測' },
-  { mod: 'AI 內容處理', owner: 82, audit: 32, finding: '3 個 LLM agent + chat()/structured() 零直接測試' },
-  { mod: '封面圖生成', owner: 82, audit: 58, finding: 'generate_image 串流/重試/stage 編排零測' },
-  { mod: '進階組稿', owner: 88, audit: 58, finding: '押註 3-tier 解析、供稿方替換、寫回未測' },
-  { mod: '任務系統', owner: 90, audit: 58, finding: 'crash recovery、rerun-from-stage、WAL、error path 未測' },
-  { mod: '設定 / 版本', owner: 84, audit: 38, finding: 'config overlay、押註解析、Strapi 匯入零測' },
-  { mod: 'WordPress 發布', owner: 82, audit: 41, finding: '零自動測試;封面掉失不回報、重複發布風險' },
-  { mod: '觀測 / 評測', owner: 80, audit: 64, finding: '結構評分有測;未運維化、整合未測' },
-  { mod: '前端 Dashboard', owner: 84, audit: 83, finding: '前端零自動化測試(僅人工瀏覽器)' },
+// audit2 = 補完測試後的第二輪獨立稽核分(↑ 自第一輪 audit1)。
+const AUDITS: { mod: string; owner: number; audit1: number; audit: number; finding: string }[] = [
+  { mod: '進稿抽取', owner: 86, audit1: 84, audit: 84, finding: '剩 .doc 成功路徑、RTF 編碼、gdoc 圖嵌入分支' },
+  { mod: 'AI 內容處理', owner: 82, audit1: 32, audit: 71, finding: '剩 structured() 內部、usage 計量、agent_config overlay(此處 mock)' },
+  { mod: '封面圖生成', owner: 82, audit1: 58, audit: 74, finding: '剩 retry 復原、TypeError fallback、prompt_template 代換' },
+  { mod: '進階組稿', owner: 88, audit1: 58, audit: 84, finding: '剩 dropcap 邊界、無 intro 押註路徑、intro link/cover 分支' },
+  { mod: '任務系統', owner: 90, audit1: 58, audit: 74, finding: '剩 crash-recovery re-queue、Semaphore 上限、WAL' },
+  { mod: '設定 / 版本', owner: 84, audit1: 38, audit: 71, finding: '剩 strapi.import_all 整段、activate/delete False 分支' },
+  { mod: 'WordPress 發布', owner: 82, audit1: 41, audit: 68, finding: '剩 publish.py 端點層、cover_image_path 分支、_auth' },
+  { mod: '觀測 / 評測', owner: 80, audit1: 64, audit: 73, finding: '剩 token contextvar 真實 round-trip、運維化(聚合/儀表板/告警)' },
+  { mod: '前端 Dashboard', owner: 84, audit1: 83, audit: 83, finding: '剩 前端零自動化測試(僅人工瀏覽器)' },
 ]
 
 function AuditsPanel() {
@@ -331,25 +332,25 @@ function AuditsPanel() {
     <div className="panel">
       <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
       <p className="hint" style={{ marginTop: 0 }}>
-        9 個獨立 Claude subagent(<code>module-capability-auditor</code>)各自讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴 ——
-        與維護者分數的差距 ≈ <b>自動化測試債</b>。<b>此為輔助佐證,不覆寫上方模組分數。</b>
-        紀錄 <code>evals/records/2026-06-21-…-batch.md</code>;角色 <code>evals/agents/</code>。
+        獨立 Claude subagent(<code>module-capability-auditor</code>)讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴。
+        <b>第一輪</b>發現多模組缺單元測試 → <b>本輪補了 47 個測試(pytest 48→95)</b> → <b>第二輪</b>稽核分明顯回升。
+        <b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
       </p>
       <div className="table-wrap"><table>
-        <thead><tr><th>模組</th><th>維護者分</th><th>獨立稽核分</th><th>差距</th><th>主要待補(測試)</th></tr></thead>
+        <thead><tr><th>模組</th><th>維護者分</th><th>稽核①</th><th>稽核②(補測後)</th><th>仍待補(測試)</th></tr></thead>
         <tbody>{AUDITS.map((a) => (
           <tr key={a.mod}>
             <td>{a.mod}</td>
             <td><b style={{ color: scoreColor(a.owner) }}>{a.owner}</b></td>
-            <td><b style={{ color: scoreColor(a.audit) }}>{a.audit}</b></td>
-            <td className="muted">{a.owner - a.audit > 0 ? `−${a.owner - a.audit}` : '0'}</td>
+            <td className="muted">{a.audit1}</td>
+            <td><b style={{ color: scoreColor(a.audit) }}>{a.audit}</b>{a.audit > a.audit1 ? <span style={{ color: 'var(--accent)', fontSize: 11 }}> ↑{a.audit - a.audit1}</span> : null}</td>
             <td className="muted">{a.finding}</td>
           </tr>
         ))}</tbody>
       </table></div>
       <p className="hint">
         另有 <code>content-faithfulness</code> 評審角色(比對原文 vs 成稿,抓丟內容/幻覺):需真實 article「原文+成稿」配對才跑,尚未執行。
-        共同主題:多數模組邏輯經 code-review + 人工/整合驗證可用,但缺自動化單元測試 —— 補測順序見紀錄。
+        仍待補的多為 edge/整合分支與 strapi 匯入/crash-recovery 等較深路徑(見紀錄)。
       </p>
     </div>
   )
@@ -378,7 +379,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="48/48 ✓" ok />
+        <Stat label="後端測試" value="95/95 ✓" ok />
       </div>
 
       <div className="panel">
@@ -424,7 +425,7 @@ export function StatusPanel() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 48/48;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 95/95;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">

@@ -125,3 +125,23 @@ def test_eval_scorecard():
         "output_url": "/files/output/x.html",
     }, [{"id": "extract", "elapsed_ms": 100, "tokens": 0}])
     assert card["passed"] >= 9 and card["metrics"]["total_ms"] == 100
+
+
+def test_eval_scorecard_negative():
+    """缺欄位時對應 check 應為 False(不是默默全過)。"""
+    from app.services.evals import score_result
+
+    card = score_result({"wordpress": {"title": "標題"}})  # 缺 slug/分類/標籤/摘要/內文…
+    assert card["passed"] < len(card["checks"])
+    assert "有英文 slug" in card["failed"] and "有分類" in card["failed"]
+    assert card["checks"]["有標題"] is True
+
+
+def test_cjk_ratio_edges():
+    """空字串→0;HTML 標籤/URL 先去除再算比例。"""
+    from app.services.evals import cjk_ratio
+
+    assert cjk_ratio("") == 0.0
+    assert cjk_ratio("<p>hello world all plain english</p>") == 0.0
+    # 標籤與 URL 被剝除後,純中文比例應高(不被 markup/連結稀釋)
+    assert cjk_ratio('<a href="https://example.com/very/long/path">這是繁體中文內容</a>') > 0.8
