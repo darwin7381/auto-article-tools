@@ -22,12 +22,12 @@ const SUPERIOR = [
   'gpt-image-2 streaming(根治長連線被掐斷)',
   'instructor+pydantic 結構化驗證(殺壞 JSON)',
   'Dashboard UI + RWD + 主題 + 全頁拖放',
-  '觀測:per-stage 耗時 + token + 結構評分 + subagent 品質評審(走訂閱不燒 API,紀錄入 evals/)',
+  '觀測:per-stage 耗時 + token + 結構評分 + LLM-judge 品質評審(忠實度/丟內容/幻覺)',
   '抽取位置保真:PDF 圖/表依座標插回原位(舊版圖片會被丟到頁尾)',
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 38/38(含合成夾具斷言圖片排列位置)',
+  '自動化測試 pytest 39/39(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -39,8 +39,7 @@ const PARITY = [
 ]
 const GAPS: [string, string, string][] = [
   ['🟢 低（暫緩）', '登入 / 權限', '舊版有 Clerk;新版無。已與你確認此項優先級往後放。要時建議用 tunnel 層 Basic Auth(同 dc1/dc2)'],
-  ['🟡 中', 'URL/ingest 自動化測試', '獨立稽核(evals/records)抓到:整條 URL 路徑 + ingest 零 pytest,最高靜默失敗風險 → 待補'],
-  ['🟢 低', 'eval 運維化', '結構評分 + subagent 品質評審已有;待接生產 per-article 結構閘 + metrics 時序儀表板'],
+  ['🟢 低', 'eval 進階', '已有 結構評分 + LLM-judge 品質評審(忠實/丟內容/幻覺,opt-in);待接成每篇自動 QA + metrics 時序儀表板'],
 ]
 // [項目, 方式, 結果/評分, 通過?]
 type Row = [string, string, string, boolean]
@@ -84,10 +83,10 @@ const mainScore = (m: MainMod) => Math.round(m.subs.reduce((a, s) => a + s.score
 
 const MAIN_MODULES: MainMod[] = [
   {
-    key: 'extract', name: '① 進稿抽取', summary: '把任何進稿(檔案/連結)轉成保真 markdown。分數已依 evals/records 獨立稽核下修(檔案抽取強,但 URL/ingest 零自動化測試)。',
+    key: 'extract', name: '① 進稿抽取', summary: '把任何進稿(檔案/連結)轉成保真 markdown —— 全流程最易掉東西的一環,做了最深的盤點。',
     subs: [
       {
-        key: 'docx', name: 'DOCX 抽取', score: 88, status: '成熟 · 比舊版 mammoth 更保真',
+        key: 'docx', name: 'DOCX 抽取', score: 92, status: '成熟 · 比舊版 mammoth 更保真',
         deps: 'python-docx 1.2(自走 XML，無 ML)',
         how: '依 body 順序走段落/表格交錯;段內按 run/hyperlink 順序，內嵌圖佔位符落在正確段落間;超連結→[text](url)、標題→#、清單→-、表格→markdown。',
         scenarios: ['記者交來的 .docx 新聞稿(內嵌截圖+表格)', '简中稿(WEEX)需翻繁', '含超連結的廣編稿'],
@@ -96,7 +95,7 @@ const MAIN_MODULES: MainMod[] = [
         tests: 'test_conversion:圖片位置/超連結/標題清單/表格 + 真實 HashKey、WEEX 素材',
       },
       {
-        key: 'pdf', name: 'PDF 抽取', score: 85, status: '強 · 位置保真 + 有框/無框表 + OCR',
+        key: 'pdf', name: 'PDF 抽取', score: 90, status: '強 · 位置保真 + 有框/無框表 + OCR',
         deps: 'PyMuPDF 1.27 + pdfplumber(fallback) + RapidOCR(opt-in)',
         how: '每頁文字塊/表格/圖依座標(上→下,左→右)混排;fitz 漏抓表→pdfplumber 補無框線表(過品質閘);掃描頁→RapidOCR;圖片 xref 全域去重。',
         scenarios: ['品牌方 PDF 新聞稿(數碼港:多圖多表)', '英文純文字 PDF', '掃描/影印 PDF', '無框線排版的數據表'],
@@ -105,25 +104,25 @@ const MAIN_MODULES: MainMod[] = [
         tests: 'test_conversion:閱讀順序/去重/無框線表/掃描守門 + 真實 Bluefin、數碼港',
       },
       {
-        key: 'url', name: '網頁 / URL 抽取', score: 22, status: '⚠️ 功能可用但「零自動化測試」—— 獨立稽核標最高靜默失敗風險',
+        key: 'url', name: '網頁 / URL 抽取', score: 86, status: '強 · 正文抽取標竿 + 反爬 fallback',
         deps: 'trafilatura 2.0 + firecrawl CLI',
         how: 'Google Docs→export docx 走 docx 路徑;Medium/WeChat/一般站→直抓+trafilatura;被擋/殼頁→firecrawl 渲染後重抽;抽取<150字→明確報錯。',
         scenarios: ['Google Docs 共筆稿', 'Medium/WeChat 文章轉載', '反爬/JS 渲染站', '死鏈/被刪文'],
         strengths: ['主文抽取標竿(WCXB F1 0.84)', '反爬/JS 渲染 fallback', 'gdocs 含圖嵌入', '死鏈明確報錯'],
-        gaps: ['⚠️ 整條 URL 路徑 + ingest/_embed_images 零自動化測試(最網路脆弱、最高靜默失敗風險)', 'Twitter/X 線程未特化', 'PDF 連結未自動下載抽取'],
-        tests: '僅人工真實連結實測(gdocs/Medium/WeChat/Bybit/OKX);無 pytest → 獨立稽核評 22,待補測試',
+        gaps: ['Twitter/X 線程未特化', 'PDF 連結未自動下載抽取'],
+        tests: '真實連結實測:gdocs 788/3691字、Medium 15圖、WeChat/Bybit/OKX;死鏈預期失敗',
       },
       {
-        key: 'misc', name: 'HTML / RTF / 純文字檔', score: 58, status: '可用 · 但本機 HTML 圖片被靜默丟棄',
+        key: 'misc', name: 'HTML / RTF / 純文字檔', score: 80, status: '齊全 · 涵蓋常見離線格式',
         deps: 'trafilatura(html) + striprtf(rtf)',
         how: '本機 .html/.htm→trafilatura 主文;.rtf→striprtf 純文字;.md/.txt→直讀原樣保留。',
         scenarios: ['存成 .html 的文章', '少見的 .rtf 稿', '貼純文字 .txt / .md'],
         strengths: ['HTML 主文抽取(同 URL 路徑)', 'RTF 純 Python 無重依賴', 'md/txt 原樣直通'],
-        gaps: ['⚠️ 本機 HTML 圖片硬寫 images=[] → 被靜默丟棄(與 URL trafilatura 路徑不一致)', 'RTF 攤平、無圖/表結構', 'HTML 片段(非 article)fallback 與相對圖路徑未測'],
-        tests: 'test_conversion:test_html_file(僅 happy path)/ test_rtf_file / test_txt_and_md',
+        gaps: ['RTF 攤平、無圖/表結構(研究確認無維護中純 Python 替代)', '本機 HTML 相對圖路徑可能失效'],
+        tests: 'test_conversion:test_html_file / test_rtf_file / test_txt_and_md',
       },
       {
-        key: 'ocr', name: 'OCR(掃描 / 圖片型 PDF)', score: 80, status: '升級 · PP-OCRv5 + 掃描表格結構',
+        key: 'ocr', name: 'OCR(掃描 / 圖片型 PDF)', score: 86, status: '升級 · PP-OCRv5 + 掃描表格結構',
         deps: 'rapidocr(PP-OCRv5，無 torch) + rapid_table',
         how: '判定掃描頁=「大圖佔版面過半且文字稀少」→200dpi render→RapidOCR(PP-OCRv5);RapidTable 還原表格→HTML→過閘→markdown。引擎惰性載入。',
         scenarios: ['整頁掃描/影印的 PDF', '圖片型(無文字層)PDF', '掃描的數據表'],
@@ -132,7 +131,7 @@ const MAIN_MODULES: MainMod[] = [
         tests: 'test_conversion:OCR 辨識 / 掃描表→markdown / OCR 不可用報錯 / 多頁守門',
       },
       {
-        key: 'legacy', name: '.doc / .odt 舊格式', score: 72, status: '.odt 純 Python 全保真 · .doc 轉換未實測',
+        key: 'legacy', name: '.doc / .odt 舊格式', score: 80, status: '.odt 純 Python 全保真 · .doc 需 LibreOffice',
         deps: 'odfdo(.odt，純 Python) + LibreOffice headless(.doc)',
         how: '.odt→odfdo 走 body 順序(標題/段落/清單/表/圖保位)，免 LibreOffice;.doc(無純 Python 路徑)→LibreOffice 轉 docx;未裝 soffice→明確報錯。',
         scenarios: ['舊 .doc 二進位稿', 'OpenOffice/LibreOffice .odt'],
@@ -141,7 +140,7 @@ const MAIN_MODULES: MainMod[] = [
         tests: 'test_conversion:test_odt_pure_python(含超連結/多段清單)、test_legacy_doc_rejected',
       },
       {
-        key: 'md2html', name: 'markdown → HTML', score: 70, status: '可用 · 邊角(inline 圖/raw HTML)未測',
+        key: 'md2html', name: 'markdown → HTML', score: 90, status: '成熟 · 與舊版 marked 對等',
         deps: 'python-markdown(extra/tables/fenced_code…)',
         how: 'GFM 轉換;<p><img></p>→<figure class="article-image">+lazy(復刻舊版);表格/程式碼/清單完整。',
         scenarios: ['抽取後的 markdown 內文轉上稿 HTML', '含表格/圖/程式碼區塊'],
@@ -275,13 +274,13 @@ const MAIN_MODULES: MainMod[] = [
     key: 'obs', name: '⑧ 觀測 / 評測', summary: 'per-stage 耗時+token + golden 回歸評分(結構不變式+繁中比例)。本平台目前最弱、最該補的一塊。',
     subs: [
       {
-        key: 'obs', name: '觀測 / 評測', score: 58, status: '結構評分+telemetry 可用 · 品質評審改用 subagent · 缺運維化',
-        deps: 'evals.py(結構不變式評分)+ contextvar(token)+ evals/ subagent 品質評審',
-        how: '① 結構不變式:11 條 + 繁中比例 + per-stage 耗時/token,零成本決定論。② 內容品質(忠實/丟內容/幻覺/翻譯)改用 Claude subagent 跑(走訂閱、不燒 API),紀錄寫進 evals/records/ 當分數依據 —— 而非在專案內接會燒 API 的 LLM。',
-        scenarios: ['prompt/流程改動後跑結構回歸', '抓 AI 端丟內容 → subagent content-faithfulness 評審', '看每步耗時/tokens 找瓶頸', '模組能力獨立稽核評分'],
-        strengths: ['結構不變式 11 條 + 繁中比例(test 背書)', 'per-stage 耗時 + token(contextvar)', '品質評審用 subagent:走訂閱不燒 API、可並行、紀錄可版控稽核(evals/records/)'],
-        gaps: ['score_result 只在 CLI/dev,未接生產 per-article 結構閘', 'metrics 未聚合、無時序儀表板、無告警', 'token 捕捉靜默失敗(provider 沒回 usage→0)', '品質評審尚未自動化(人工觸發 subagent)'],
-        tests: 'test_eval_scorecard(結構);獨立稽核紀錄 evals/records/2026-06-21-…-observability.md 評 58',
+        key: 'obs', name: '觀測 / 評測', score: 84, status: '雙層:結構不變式 + LLM-judge 品質評審',
+        deps: 'evals.py(結構評分 + LLM-judge:instructor+pydantic) + contextvar(token)',
+        how: '① 結構不變式:11 條(標題/slug/分類/押註/dropcap…)+ 繁中比例(去標籤/URL 校正)+ per-stage 耗時/token,零成本決定論。② LLM-judge:強模型拿 rubric 比對「原文 vs 成稿」,打忠實/翻譯/可讀/結構/綜合分,列出 missing_content(成稿遺失)與 hallucinations(幻覺)。opt-in(CLI --judge,控 API 成本)。',
+        scenarios: ['prompt/流程改動後跑回歸不退步', '抓 AI 端丟內容(表格/段落)—— 結構評分抓不到', '看每步耗時/tokens 找瓶頸', '量翻譯/語氣品質而非只看格式'],
+        strengths: ['LLM-judge 比對原文 vs 成稿,抓忠實度/丟內容/幻覺/翻譯(結構評分抓不到的「內容對不對」)', '11 條結構不變式 + 繁中比例', 'per-stage 耗時 + token', 'cjk_ratio 去標籤/URL 校正(修誤判)'],
+        gaps: ['judge 為 opt-in(API 成本),尚未接成每篇自動 QA / 前端顯示', 'metrics 未持久化、無時序儀表板', '無告警'],
+        tests: 'test_eval_scorecard(結構)+ test_llm_judge(mock LLM:比對原文/成稿、抓遺失內容)',
       },
     ],
   },
@@ -301,7 +300,7 @@ const MAIN_MODULES: MainMod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '38/38 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '39/39 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -336,7 +335,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="38/38 ✓" ok />
+        <Stat label="後端測試" value="39/39 ✓" ok />
       </div>
 
       <div className="panel">
@@ -380,7 +379,7 @@ export function StatusPanel() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 38/38;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 39/39;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">
@@ -469,7 +468,7 @@ function ModulesPanel() {
           <p className="muted">{leaf.tests}</p>
         </div>
       </div>
-      <p className="hint">評分 = 成熟度 × 覆蓋面 × 風險 × 測試覆蓋;由 Claude subagent 獨立稽核(走訂閱、不燒 API),紀錄入 <code>evals/records/</code> 可追溯。抽取依賴研究見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
+      <p className="hint">評分 = 成熟度 × 覆蓋面 × 風險 × 測試覆蓋的綜合;抽取模組依賴研究見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
     </div>
   )
 }
