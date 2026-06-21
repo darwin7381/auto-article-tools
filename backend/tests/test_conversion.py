@@ -335,6 +335,36 @@ def test_rtf_file_extraction(tmp_path):
     assert "Hello RTF" in text and "World" in text and images == []
 
 
+def test_rtf_non_utf8_bytes_does_not_crash(tmp_path):
+    """RTF 帶非 utf-8(cp950)位元組:errors='replace' 不崩潰,ASCII 內容仍在。"""
+    p = tmp_path / "b.rtf"
+    p.write_bytes(rb"{\rtf1\ansi\ansicpg950 Hello \'a4\'a4 World.}")  # \'a4\'a4 為 cp950 位元組
+    text, images = extract_document(str(p))
+    assert "Hello" in text and "World" in text and images == []
+
+
+def test_doc_success_path_via_libreoffice_or_skip(tmp_path):
+    """.doc 成功路徑:有 LibreOffice 才跑(無則 skip);錯誤路徑已由 test_legacy_doc_rejected 覆蓋。"""
+    from app.services.extract import _find_soffice
+    if _find_soffice() is None:
+        pytest.skip("環境無 LibreOffice;.doc 成功路徑略過(報錯路徑另有測試)")
+    import subprocess
+
+    # 用 LibreOffice 自己把一份 docx 轉成 .doc 當素材,再驗 extract_document 能讀回
+    import docx
+    d = docx.Document()
+    d.add_paragraph("DOC 成功路徑內容")
+    src = tmp_path / "s.docx"
+    d.save(str(src))
+    subprocess.run([_find_soffice(), "--headless", "--convert-to", "doc", "--outdir", str(tmp_path), str(src)],
+                   check=True, capture_output=True, timeout=90)
+    doc_path = tmp_path / "s.doc"
+    if not doc_path.exists():
+        pytest.skip("LibreOffice 未產出 .doc")
+    text, _ = extract_document(str(doc_path))
+    assert "DOC 成功路徑內容" in text
+
+
 def test_odt_pure_python_extraction(tmp_path):
     """.odt 純 Python(odfdo,免 LibreOffice):標題/段落/內嵌圖保位/清單/表格。"""
     from odfdo import Document, Frame, Header, Link, List, ListItem, Paragraph, Table

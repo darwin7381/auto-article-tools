@@ -107,3 +107,18 @@ def test_get_job_slim_vs_full():
         full = c.get(f"/jobs/{jid}?full=true").json()
         assert "result" not in slim and "done_stages" in slim   # slim 不帶 result
         assert "stages" in full and full["result"] is not None   # full 帶逐階段 + result
+
+
+def test_sse_replay_finished_job():
+    with TestClient(app) as c:
+        jid = c.post("/jobs", json={"workflow": "test_steps", "input": {}}).json()["id"]
+        _poll(c, jid)
+        r = c.get(f"/jobs/{jid}/stream")                         # 已完成 → 只重播
+        assert r.status_code == 200
+        body = r.text
+        assert "stage" in body and ("done" in body or "replayed" in body)
+
+
+def test_sse_stream_404():
+    with TestClient(app) as c:
+        assert c.get("/jobs/99999999/stream").status_code == 404
