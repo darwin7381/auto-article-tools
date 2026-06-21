@@ -1,17 +1,21 @@
-"""eval / 回歸 —— 結構不變式評分(快、零成本、決定論)。
+"""eval / 回歸。
 
-確認沒退步(標題/slug/分類標籤、繁中、押註/dropcap/引言/相關閱讀都在)+ per-stage 耗時/tokens。
-CLI:`uv run python cli.py eval --file ...`。
+1. 結構不變式評分(score_result):快、零成本、決定論。確認沒退步(標題/slug/分類標籤、
+   繁中、押註/dropcap/引言/相關閱讀都在)+ per-stage 耗時/tokens。CLI:`uv run python cli.py eval`。
 
-內容「品質」評審(忠實度/丟內容/幻覺/翻譯/語氣)**不在這裡、也不放進專案** —— 那是開發/
-評估範疇,改用 **Claude subagent(走訂閱 usage、不燒 API)**,角色定義與評估紀錄在 repo 的
-`evals/`。生產端 LLM 只有 pipeline 那幾個 agent(content_ai/pr_writer/copy_editing/cover);
-品質評審不是生產 agent,不該是專案內的 API 呼叫。
+2. llm_judge(內容品質評審,**非生產、選用的開發工具**):比對原文 vs 成稿,抓忠實度/丟內容/
+   幻覺/翻譯。⚠️ 界線:**生產 pipeline 不使用本函式**;它只在開發者明確 opt-in(CLI --judge /
+   程式呼叫)時才跑,且因專案碼只能用 API key 認證,跑起來會用 key。
+   → 日常品質評審建議走 `evals/` 的 **Claude subagent(走訂閱、不燒 API)**;本函式留在專案
+   供需要時程式化選用。生產端用 key 的只有 pipeline 那幾隻 agent(content_ai/pr_writer/
+   copy_editing/cover)。
 """
 
 from __future__ import annotations
 
 import re
+
+from pydantic import BaseModel, Field
 
 _CJK = re.compile(r"[一-鿿]")
 _TAG = re.compile(r"<[^>]+>")
@@ -59,3 +63,58 @@ def score_result(result: dict, stages: list[dict] | None = None) -> dict:
     failed = [k for k, v in checks.items() if not v]
     return {"checks": checks, "passed": len(passed), "failed": failed,
             "score": f"{len(passed)}/{len(checks)}", "metrics": metrics}
+
+
+# ──────────────── llm_judge:非生產、選用的開發工具(見檔頭界線說明)────────────────
+
+class JudgeResult(BaseModel):
+    """LLM 拿 rubric 比對「原文 vs 成稿」的結構化評分(0-100)。"""
+
+    faithfulness: int = Field(ge=0, le=100,
+        description="忠實度:成稿是否完整保留原文資訊(表格/數據/段落/重點),無遺漏、無捏造")
+    translation: int = Field(ge=0, le=100,
+        description="翻譯/語言品質(简→繁正確、用詞自然);原文已繁中、無翻譯需求時給 100")
+    readability: int = Field(ge=0, le=100, description="新聞稿語氣與可讀性")
+    structure: int = Field(ge=0, le=100, description="標題/段落/結構完整度")
+    overall: int = Field(ge=0, le=100, description="綜合品質")
+    missing_content: list[str] = Field(default_factory=list,
+        description="原文有、成稿卻缺的具體項目(某張表/某段/某組數據/某張圖)")
+    hallucinations: list[str] = Field(default_factory=list,
+        description="成稿有、原文卻沒有的捏造內容")
+    issues: list[str] = Field(default_factory=list, description="其他品質問題")
+
+
+_JUDGE_SYS = (
+    "你是嚴格的繁體中文財經/區塊鏈新聞編輯品質評審。逐項比對【原文】與【成稿】,評估成稿"
+    "是否忠實、完整、翻譯與語氣到位。寬鬆是大忌,寧嚴勿鬆。特別注意:原文有的表格/數據/段落/"
+    "圖片,成稿是否遺失;成稿是否出現原文沒有的內容(幻覺)。只輸出符合 schema 的 JSON。"
+)
+
+
+def _judge_user(source: str, output: str, article_type: str) -> str:
+    return (
+        f"【文稿類型】{article_type}\n\n"
+        f"【原文(抽取後 markdown,{{IMGn}} 為圖片佔位)】\n{source[:12000]}\n\n"
+        f"【成稿(發布用 HTML)】\n{output[:12000]}\n\n"
+        "逐項比對後嚴格評分(0-100)。把原文有、成稿遺失的表格/數據/段落列入 missing_content;"
+        "成稿多出的捏造內容列入 hallucinations。"
+    )
+
+
+async def llm_judge(source: str, output: str, article_type: str = "press-release",
+                    provider: str | None = None, model: str | None = None) -> JudgeResult:
+    """⚠️ 非生產、選用的開發工具。生產 pipeline 不呼叫本函式(見檔頭界線)。
+
+    明確 opt-in 時用 LLM 比對原文與成稿。provider/model 未指定時沿用 copyEditorAgent 設定
+    (因專案碼只能用 API key 認證;routine 品質評審建議改走 evals/ 的 subagent 走訂閱)。
+    """
+    from app.services.llm import structured
+
+    if not provider or not model:
+        from app.services.agent_config import get_agent_config
+
+        cfg = get_agent_config("copyEditorAgent")
+        provider, model = provider or cfg.provider, model or cfg.model
+    return await structured(provider, model, _JUDGE_SYS,
+                            _judge_user(source, output, article_type),
+                            JudgeResult, temperature=0.0, max_tokens=4000)
