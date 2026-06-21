@@ -188,3 +188,47 @@ async def test_chat_unknown_provider_raises():
 
     with pytest.raises(RuntimeError, match="provider"):
         await chat("nope", "m", "s", "u")
+
+
+async def test_structured_returns_obj_and_records_usage(monkeypatch):
+    """structured():instructor 包裝回 pydantic 物件 + usage 入 contextvar(mock instructor/openai)。"""
+    import instructor
+
+    from app.services import llm
+    from app.workflows.article import WordPressParams
+
+    class _Completions:
+        async def create_with_completion(self, **kw):
+            assert kw["response_model"] is WordPressParams
+            comp = SimpleNamespace(usage=SimpleNamespace(prompt_tokens=1, completion_tokens=2, total_tokens=3))
+            return WordPressParams(title="T", content="C"), comp
+
+    class _FakeClient:
+        chat = SimpleNamespace(completions=_Completions())
+
+    monkeypatch.setattr(llm, "_api_key", lambda p: "k")
+    monkeypatch.setattr("openai.AsyncOpenAI", lambda **kw: object())
+    monkeypatch.setattr(instructor, "from_openai", lambda client, mode=None: _FakeClient())
+
+    llm.usage_var.set([])
+    obj = await llm.structured("openrouter", "m", "s", "u", WordPressParams)
+    assert obj.title == "T"
+    assert llm.usage_var.get()[0]["total_tokens"] == 3   # usage 記入 contextvar
+
+
+async def test_runner_captures_stage_tokens():
+    """token contextvar 經真實 runner round-trip:stage 內 _record → runner 彙總成 stage 事件 tokens。"""
+    from app.core.registry import WORKFLOWS, Workflow, register
+    from app.core.stage import Stage
+    from app.services import llm
+    from app.worker.runner import run_workflow
+
+    async def rec(data, ctx):
+        llm._record({"total_tokens": 7})   # 模擬 LLM 呼叫記 token
+        return data
+
+    if "test_tok" not in WORKFLOWS:
+        register(Workflow(name="test_tok", stages=[Stage("rec", rec)]))
+    events = [e async for e in run_workflow("test_tok", {})]
+    done = next(e for e in events if e.event == "stage" and e.data.get("status") == "done")
+    assert done.data["tokens"] == 7

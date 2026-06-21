@@ -40,7 +40,7 @@ function pref<T>(key: string, init: T): [T, (v: T) => void] {
   return [v, (nv: T) => { setV(nv); localStorage.setItem('pref:' + key, JSON.stringify(nv)) }]
 }
 
-function relTime(iso: string): string {
+export function relTime(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso + (iso.endsWith('Z') ? '' : 'Z')).getTime()) / 1000)
   if (s < 60) return `${Math.floor(s)} 秒前`
   if (s < 3600) return `${Math.floor(s / 60)} 分鐘前`
@@ -52,7 +52,7 @@ function jobDurMs(j: Job): number | null {
   const b = new Date(j.updated_at + (j.updated_at.endsWith('Z') ? '' : 'Z')).getTime()
   return b > a ? b - a : null
 }
-function jobSource(j: Job): string {
+export function jobSource(j: Job): string {
   const i = rec(j.input)
   if (i.url) return String(i.url).replace(/^https?:\/\//, '').slice(0, 42)
   if (i.file) return String(i.file).split('/').pop()?.slice(0, 42) ?? '檔案'

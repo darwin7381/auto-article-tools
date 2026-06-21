@@ -27,7 +27,7 @@ const SUPERIOR = [
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 95/95(含合成夾具斷言圖片排列位置)',
+  '自動化測試 pytest 132/132(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -300,7 +300,8 @@ const MAIN_MODULES: MainMod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '95/95 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '132/132 通過', true],
+  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '12/12 通過(路由/側邊欄/acceptOk/helpers)', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -314,17 +315,17 @@ const UNIT_TESTS: Row[] = [
 
 // Subagent 獨立稽核(走訂閱、不燒 API;輔助佐證,不覆寫上方模組分數)。
 // 紀錄:evals/records/2026-06-21-module-capability-auditor-batch.md;角色:evals/agents/
-// audit2 = 補完測試後的第二輪獨立稽核分(↑ 自第一輪 audit1)。
+// audit1 = 第一輪(補測前);audit = 第三輪(三輪補測後最終獨立稽核分)。
 const AUDITS: { mod: string; owner: number; audit1: number; audit: number; finding: string }[] = [
-  { mod: '進稿抽取', owner: 86, audit1: 84, audit: 84, finding: '剩 .doc 成功路徑、RTF 編碼、gdoc 圖嵌入分支' },
-  { mod: 'AI 內容處理', owner: 82, audit1: 32, audit: 71, finding: '剩 structured() 內部、usage 計量、agent_config overlay(此處 mock)' },
-  { mod: '封面圖生成', owner: 82, audit1: 58, audit: 74, finding: '剩 retry 復原、TypeError fallback、prompt_template 代換' },
-  { mod: '進階組稿', owner: 88, audit1: 58, audit: 84, finding: '剩 dropcap 邊界、無 intro 押註路徑、intro link/cover 分支' },
-  { mod: '任務系統', owner: 90, audit1: 58, audit: 74, finding: '剩 crash-recovery re-queue、Semaphore 上限、WAL' },
-  { mod: '設定 / 版本', owner: 84, audit1: 38, audit: 71, finding: '剩 strapi.import_all 整段、activate/delete False 分支' },
-  { mod: 'WordPress 發布', owner: 82, audit1: 41, audit: 68, finding: '剩 publish.py 端點層、cover_image_path 分支、_auth' },
-  { mod: '觀測 / 評測', owner: 80, audit1: 64, audit: 73, finding: '剩 token contextvar 真實 round-trip、運維化(聚合/儀表板/告警)' },
-  { mod: '前端 Dashboard', owner: 84, audit1: 83, audit: 83, finding: '剩 前端零自動化測試(僅人工瀏覽器)' },
+  { mod: '進稿抽取', owner: 86, audit1: 84, audit: 84, finding: '剩 .doc 成功路徑(需系統 LibreOffice,已 skip-test)、多欄 PDF' },
+  { mod: 'AI 內容處理', owner: 82, audit1: 32, audit: 78, finding: '剩 完整 7 階段整合鏈、chat 429/耗盡分支' },
+  { mod: '封面圖生成', owner: 82, audit1: 58, audit: 81, finding: '剩 retry 耗盡訊息、APITimeout/InternalServerError 分支' },
+  { mod: '進階組稿', owner: 88, audit1: 58, audit: 88, finding: '剩 dropcap 特殊字元 guard、stage formatting 開關、HTML 跳脫' },
+  { mod: '任務系統', owner: 90, audit1: 58, audit: 80, finding: '剩 SSE live tail/去重、真實併發限流實證' },
+  { mod: '設定 / 版本', owner: 84, audit1: 38, audit: 79, finding: '剩 site_config /effective 端點、delete-active 自動接棒(API 層)' },
+  { mod: 'WordPress 發布', owner: 82, audit1: 41, audit: 80, finding: '剩 502 失敗分支、媒體 from-path 分支、真實 _auth' },
+  { mod: '觀測 / 評測', owner: 80, audit1: 64, audit: 80, finding: '剩 多階段 token 加總、chat/structured 真實 usage 抽取' },
+  { mod: '前端 Dashboard', owner: 84, audit1: 83, audit: 88, finding: '剩 RunPanel 完整狀態機(attach/SSE/poll 合併)整合測試' },
 ]
 
 function AuditsPanel() {
@@ -333,11 +334,11 @@ function AuditsPanel() {
       <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
       <p className="hint" style={{ marginTop: 0 }}>
         獨立 Claude subagent(<code>module-capability-auditor</code>)讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴。
-        <b>第一輪</b>發現多模組缺單元測試 → <b>本輪補了 47 個測試(pytest 48→95)</b> → <b>第二輪</b>稽核分明顯回升。
-        <b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
+        <b>第一輪</b>發現多模組缺單元測試 → <b>分三輪補了 84+ 個測試(pytest 48→132 + 前端 12 vitest)</b> → 稽核分全面回升至 78–88。
+        欄位:稽核①=補測前、稽核③=最終。<b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
       </p>
       <div className="table-wrap"><table>
-        <thead><tr><th>模組</th><th>維護者分</th><th>稽核①</th><th>稽核②(補測後)</th><th>仍待補(測試)</th></tr></thead>
+        <thead><tr><th>模組</th><th>維護者分</th><th>稽核①</th><th>稽核③(最終)</th><th>仍待補(較深路徑)</th></tr></thead>
         <tbody>{AUDITS.map((a) => (
           <tr key={a.mod}>
             <td>{a.mod}</td>
@@ -379,7 +380,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="95/95 ✓" ok />
+        <Stat label="後端測試" value="132/132 ✓" ok />
       </div>
 
       <div className="panel">
@@ -425,7 +426,7 @@ export function StatusPanel() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 95/95;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 132/132;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">

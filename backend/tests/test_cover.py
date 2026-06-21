@@ -140,3 +140,90 @@ async def test_compress_corrupt_bytes_returns_original(monkeypatch):
 
     out, ext = await compress_cover(b"not-an-image")
     assert out == b"not-an-image" and ext == "png"            # 壞資料 → 原樣回傳,不丟例外
+
+
+async def test_generate_image_retries_then_succeeds(monkeypatch):
+    import httpx
+    from openai import APIConnectionError
+
+    from app.services.image import generate_image
+
+    b64 = _png_b64("blue")
+    calls = {"n": 0}
+
+    class _Images:
+        async def generate(self, **kw):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise APIConnectionError(request=httpx.Request("POST", "http://x"))
+            return _Stream([_Event("image_generation.completed", b64)])
+
+    class _FakeOpenAI:
+        def __init__(self, **kw):
+            self.images = _Images()
+
+    monkeypatch.setattr("openai.AsyncOpenAI", _FakeOpenAI)
+    out = await generate_image("p")
+    assert out == base64.b64decode(b64) and calls["n"] == 2   # 第一次連線錯 → 重試成功
+
+
+async def test_generate_image_typeerror_fallback(monkeypatch):
+    from app.services.image import generate_image
+
+    b64 = _png_b64("red")
+
+    class _Images:
+        async def generate(self, **kw):
+            if kw.get("stream"):
+                raise TypeError("stream unsupported")          # SDK 不支援 stream
+            return SimpleNamespace(data=[SimpleNamespace(b64_json=b64)])
+
+    class _FakeOpenAI:
+        def __init__(self, **kw):
+            self.images = _Images()
+
+    monkeypatch.setattr("openai.AsyncOpenAI", _FakeOpenAI)
+    out = await generate_image("p")
+    assert out == base64.b64decode(b64)                        # 退回非串流路徑
+
+
+async def test_cover_prompt_template_substitution(monkeypatch):
+    from app.workflows import article
+
+    monkeypatch.setattr(article, "get_agent_config", lambda n: SimpleNamespace(
+        model="m", size="s", quality="q", prompt_template="封面:${title}|${contentSummary}|${articleType}"))
+    captured = {}
+
+    async def fake_gen(prompt, model, size, quality):
+        captured["prompt"] = prompt
+        return b"X"
+
+    async def fake_compress(d):
+        return b"Y", "jpg"
+
+    monkeypatch.setattr(article, "generate_image", fake_gen)
+    monkeypatch.setattr(article, "compress_cover", fake_compress)
+    monkeypatch.setattr(article, "save_image", lambda b, e: ("/p", "/f.jpg"))
+    await article.s_cover_image(
+        {"wordpress": {"title": "標題", "excerpt": "摘要"}, "article_type": "press-release"}, None)
+    assert "標題" in captured["prompt"] and "摘要" in captured["prompt"] and "新聞稿" in captured["prompt"]
+
+
+async def test_compress_cover_shrinks_photo():
+    """壓縮 happy path:照片型 PNG → 更小的 JPEG(模組存在的核心理由)。"""
+    from PIL import Image
+
+    from app.services.compress import compress_cover
+
+    img = Image.new("RGB", (600, 600))
+    px = img.load()
+    for y in range(600):
+        for x in range(600):
+            v = (x + y) * 255 // 1198                       # 平滑對角漸層 → JPEG 比 24-bit PNG 小
+            px[x, y] = (v, v, v)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    src = buf.getvalue()
+    out, ext = await compress_cover(src)
+    assert ext == "jpg" and len(out) < len(src)
+    Image.open(io.BytesIO(out)).verify()

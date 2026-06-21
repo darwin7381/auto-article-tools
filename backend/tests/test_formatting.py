@@ -51,3 +51,55 @@ async def test_article_formatting_respects_explicit_author(_patch):
     out = await article.s_article_formatting(
         {"wordpress": {"title": "T", "content": "<p>x</p>", "author": 99}, "article_type": "press-release"}, None)
     assert out["wordpress"]["author"] == 99               # 已指定不覆蓋
+
+
+async def test_article_formatting_body_fallback_and_regular(_patch):
+    from app.workflows import article
+
+    # wp 無 content → 退用 data["html"];regular 無 author_id → 不寫 author
+    out = await article.s_article_formatting(
+        {"wordpress": {"title": "T"}, "html": "<p>來自 html 的正文</p>", "article_type": "regular"}, None)
+    assert "html 的正文" in out["wordpress"]["content"]   # 退用 data["html"](首字被 dropcap 包走)
+    assert "author" not in out["wordpress"]
+
+
+async def test_article_formatting_cover_figure_in_final(_patch):
+    from app.workflows import article
+
+    out = await article.s_article_formatting(
+        {"wordpress": {"title": "T", "content": "<p>x</p>"}, "article_type": "regular",
+         "cover_image_url": "http://c/img.png"}, None)
+    assert "featured-image" in out["final_html"] and "http://c/img.png" in out["final_html"]
+
+
+# ───────────────────────── formatting 純函式邊界 ─────────────────────────
+
+def test_dropcap_skips_leading_tag():
+    from app.services.formatting import apply_dropcap
+    out = apply_dropcap("<p><strong>動</strong>區報導</p>")
+    assert 'class="dropcap' in out and ">動</span>" in out   # 跳過 <strong>,包第一個實字
+
+
+def test_dropcap_no_paragraph_unchanged():
+    from app.services.formatting import apply_dropcap
+    assert apply_dropcap("<div>無段落</div>") == "<div>無段落</div>"
+
+
+def test_insert_header_disclaimer_no_intro_prepends():
+    from app.services.formatting import insert_header_disclaimer
+    assert insert_header_disclaimer("<p>正文</p>", "押註").startswith("押註")
+
+
+def test_build_intro_quote_empty_and_links():
+    from app.services.formatting import build_intro_quote
+    assert "（請補摘要引言）" in build_intro_quote("")        # 空摘要 fallback
+    q = build_intro_quote("摘", context=("http://u", "前情標題"))
+    assert "前情提要" in q and "http://u" in q and "前情標題" in q
+
+
+def test_append_tg_custom_articles():
+    from app.services.formatting import append_tg_and_related
+    out = append_tg_and_related("<p>x</p>", False, articles=[("http://a", "標題A")])
+    assert "標題A" in out and "http://a" in out and "blocktemponews" in out
+    spon = append_tg_and_related("<p>x</p>", True, articles=[("http://a", "標題A")])
+    assert "#ff0000" in spon                                  # 廣編紅連結
