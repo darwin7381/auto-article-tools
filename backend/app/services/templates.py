@@ -1,11 +1,9 @@
 """文稿類型範本（押註/作者）—— 內建預設複刻自舊版 src/config/article-templates.ts。
 
-優先序：DB SiteConfig（Strapi 匯入後）> 這裡的內建預設。
+押註優先序（兩層）：押註具名版本(ConfigVersion) > 這裡的內建預設。
 """
 
 from __future__ import annotations
-
-from app.services import site_config
 
 HEADER_DISCLAIMERS: dict[str, str] = {
     "sponsored": (
@@ -55,7 +53,7 @@ def resolve_disclaimers(
 ) -> tuple[str, str, str]:
     """回傳 (header_html, footer_html, 類型中文名)。supplier 會替換［撰稿方名稱］。
 
-    三層優先序(逐型)：押註具名版本 > Strapi(SiteConfig) > 內建預設。
+    兩層優先序(逐型)：押註具名版本(ConfigVersion) > 內建預設。
     header/footer kind: none / sponsored / press-release；未指定則用該文稿類型的預設。
     """
     cfg = TYPE_DEFAULTS.get(article_type, TYPE_DEFAULTS["regular"])
@@ -66,15 +64,11 @@ def resolve_disclaimers(
     def pick(slot: str, kind: str) -> str:
         if kind == "none":
             return ""
-        # 1) 具名版本
+        # 1) 押註具名版本
         ver = ver_header if slot == "header" else ver_footer
         if ver and ver.get(kind):
             return ver[kind]
-        # 2) Strapi(逐型)
-        strapi = site_config.disclaimer(f"{slot}_disclaimer", kind)
-        if strapi:
-            return strapi
-        # 3) 內建
+        # 2) 內建預設
         builtin = HEADER_DISCLAIMERS if slot == "header" else FOOTER_DISCLAIMERS
         return builtin.get(kind, "")
 

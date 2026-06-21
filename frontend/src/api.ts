@@ -64,13 +64,11 @@ export const publishJob = (
   status: string,
   overrides?: Record<string, unknown>,
 ) => jpost<{ id: number; link: string; status: string }>('/publish', { job_id, status, overrides })
-export const importStrapi = () => jpost<{ imported: Record<string, number> }>('/site-config/import-strapi', {})
 export const getBuiltinTemplates = () => jget<{
   article_types: { key: string; name: string; header: string; footer: string; author_id: number | null }[]
   header_disclaimers: Record<string, string>
   footer_disclaimers: Record<string, string>
-}>('/site-config/builtin')
-export const listSiteConfig = () => jget<{ id: string; kind: string; key: string; value: Record<string, unknown> }[]>('/site-config')
+}>('/templates/builtin')
 
 // ── 設定版本管理（prompt 組合 / 押註組合）──
 export type Version = { id: number; name: string; is_active: boolean; data: Record<string, unknown>; created_at: string }

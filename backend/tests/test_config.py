@@ -1,11 +1,11 @@
-"""設定 / 版本管理 + 押註解析 —— get_agent_config overlay、resolve_disclaimers 3-tier、site_config。"""
+"""設定 / 版本管理 + 押註解析 —— get_agent_config overlay、resolve_disclaimers(版本>內建)、agents API。"""
 
 from __future__ import annotations
 
 import pytest
 from sqlmodel import select
 
-from app.models import AgentConfig, ConfigVersion, SiteConfig, get_session, init_db
+from app.models import AgentConfig, ConfigVersion, get_session, init_db
 from app.services import versions
 from app.services.agent_config import get_agent_config
 from app.services.templates import resolve_disclaimers
@@ -15,7 +15,7 @@ from app.services.templates import resolve_disclaimers
 def db():
     init_db()
     with get_session() as s:  # 乾淨起點,隔離各測試
-        for model in (ConfigVersion, SiteConfig, AgentConfig):
+        for model in (ConfigVersion, AgentConfig):
             for r in s.exec(select(model)).all():
                 s.delete(r)
         s.commit()
@@ -25,13 +25,6 @@ def db():
 def _add_agent(**kw):
     with get_session() as s:
         s.add(AgentConfig(**kw))
-        s.commit()
-
-
-def _add_siteconfig(kind, value):
-    import json
-    with get_session() as s:
-        s.add(SiteConfig(kind=kind, value_json=json.dumps(value, ensure_ascii=False)))
         s.commit()
 
 
@@ -57,7 +50,7 @@ def test_agent_config_missing_raises(db):
         get_agent_config("nonexistent")
 
 
-# ───────────────────────── resolve_disclaimers 3-tier ─────────────────────────
+# ───────────────────────── resolve_disclaimers（版本 > 內建)─────────────────────────
 
 def test_disclaimers_builtin(db):
     header, footer, name = resolve_disclaimers("sponsored")
@@ -76,50 +69,21 @@ def test_disclaimers_none_kind_empty(db):
     assert h2 == ""
 
 
-def test_disclaimers_strapi_over_builtin(db):
-    _add_siteconfig("header_disclaimer", {"name": "sponsored", "template": "STRAPI-H", "isActive": True})
-    header, _, _ = resolve_disclaimers("sponsored")
-    assert header == "STRAPI-H"            # Strapi 蓋過內建
-
-
-def test_disclaimers_version_over_strapi(db):
-    _add_siteconfig("header_disclaimer", {"name": "sponsored", "template": "STRAPI-H", "isActive": True})
+def test_disclaimers_version_over_builtin(db):
     versions.create_version("disclaimer", "v1", {"header_disclaimers": {"sponsored": "VER-H"},
                                                  "footer_disclaimers": {}})
     header, _, _ = resolve_disclaimers("sponsored")
-    assert header == "VER-H"               # 具名版本最高優先
+    assert header == "VER-H"               # 具名版本蓋過內建
 
 
-# ───────────────────────── site_config.disclaimer ─────────────────────────
-
-def test_site_config_disclaimer_isactive_filter(db):
-    from app.services import site_config
-    _add_siteconfig("footer_disclaimer", {"name": "sponsored", "template": "OLD", "isActive": False})
-    _add_siteconfig("footer_disclaimer", {"name": "sponsored", "template": "NEW", "isActive": True})
-    assert site_config.disclaimer("footer_disclaimer", "sponsored") == "NEW"  # 跳過 isActive=False
+def test_disclaimers_footer_version_over_builtin(db):
+    versions.create_version("disclaimer", "v1",
+                            {"header_disclaimers": {}, "footer_disclaimers": {"sponsored": "V-FTR"}})
+    _, footer, _ = resolve_disclaimers("sponsored")
+    assert footer == "V-FTR"
 
 
-def test_site_config_disclaimer_missing_returns_empty(db):
-    from app.services import site_config
-    assert site_config.disclaimer("header_disclaimer", "sponsored") == ""
-
-
-def test_site_config_displayname_match_and_content_priority(db):
-    from app.services import site_config
-    # 無 name、靠 displayName 子字串比對;template 缺 → 退 content 欄位
-    _add_siteconfig("header_disclaimer", {"displayName": "廣編 sponsored 範本", "content": "BY-CONTENT", "isActive": True})
-    assert site_config.disclaimer("header_disclaimer", "sponsored") == "BY-CONTENT"
-
-
-def test_site_config_authors_and_has(db):
-    from app.services import site_config
-    assert site_config.has_site_config() is False
-    _add_siteconfig("author", {"name": "Alice", "id": 1})
-    assert site_config.has_site_config() is True
-    assert any(a.get("name") == "Alice" for a in site_config.authors())
-
-
-# ───────────────────────── versions 錯誤分支 / list / footer 對稱 ─────────────────────────
+# ───────────────────────── versions(服務 + API)─────────────────────────
 
 def test_versions_activate_delete_false_branches(db):
     assert versions.activate("agent:x", 999999) is False     # 不存在
@@ -134,24 +98,11 @@ def test_list_versions_newest_first_single_active(db):
     assert sum(1 for v in lst if v["is_active"]) == 1        # 永遠只有一個生效
 
 
-def test_disclaimers_footer_3tier(db):
-    _add_siteconfig("footer_disclaimer", {"name": "sponsored", "template": "S-FTR", "isActive": True})
-    _, footer, _ = resolve_disclaimers("sponsored")
-    assert footer == "S-FTR"                                 # Strapi footer 蓋過內建
-    versions.create_version("disclaimer", "v1",
-                            {"header_disclaimers": {}, "footer_disclaimers": {"sponsored": "V-FTR"}})
-    _, footer2, _ = resolve_disclaimers("sponsored")
-    assert footer2 == "V-FTR"                                # 版本 footer 最高優先
-
-
-# ───────────────────────── versions API 空名 400 ─────────────────────────
-
 def test_create_version_empty_name_400(db):
     from fastapi.testclient import TestClient
     from app.main import app
     with TestClient(app) as c:
-        r = c.post("/versions/agent:c", json={"name": "  ", "data": {}})
-        assert r.status_code == 400
+        assert c.post("/versions/agent:c", json={"name": "  ", "data": {}}).status_code == 400
 
 
 def test_versions_activate_delete_happy_and_404_api(db):

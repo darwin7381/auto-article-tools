@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
-  getAgent, getAgentDefault, getBuiltinTemplates, importStrapi, listAgents,
-  listSiteConfig, listVersions, type Agent,
+  getAgent, getAgentDefault, getBuiltinTemplates, listAgents,
+  listVersions, type Agent,
 } from './api'
 import { toast } from './toast'
 import { VersionBar } from './VersionBar'
@@ -15,7 +15,7 @@ export function ConfigPanel() {
     <>
       <AgentConfig />
       <DisclaimerConfig />
-      <SiteTemplates />
+      <BuiltinTemplates />
     </>
   )
 }
@@ -172,43 +172,14 @@ function DisclaimerConfig() {
   )
 }
 
-/** 站台範本來源透明化 + Strapi 匯入。 */
-function SiteTemplates() {
+/** 文稿類型 → 押註/作者 內建預設對照。 */
+function BuiltinTemplates() {
   const [builtin, setBuiltin] = useState<Awaited<ReturnType<typeof getBuiltinTemplates>> | null>(null)
-  const [dbRows, setDbRows] = useState<{ kind: string; key: string; value: Record<string, unknown> }[]>([])
-  const [strapiMsg, setStrapiMsg] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  const reload = () => {
-    getBuiltinTemplates().then(setBuiltin).catch(() => {})
-    listSiteConfig().then(setDbRows).catch(() => {})
-  }
-  useEffect(() => { reload() }, [])
-
-  async function runImport() {
-    setBusy(true); setStrapiMsg('匯入中…（需本機 Strapi 開著）')
-    try {
-      const o = await importStrapi()
-      const ok = Object.values(o.imported).some((n) => n > 0)
-      setStrapiMsg((ok ? '✓ 匯入成功：' : '⚠️ Strapi 沒回資料(多半沒開機)：') + JSON.stringify(o.imported))
-      ok ? toast.ok('Strapi 設定已匯入') : toast.err('Strapi 未匯入(檢查是否開機)')
-      reload()
-    } catch (e) { setStrapiMsg('✗ ' + String(e)); toast.err('Strapi 匯入失敗') }
-    finally { setBusy(false) }
-  }
-  const hasDb = dbRows.length > 0
+  useEffect(() => { getBuiltinTemplates().then(setBuiltin).catch(() => {}) }, [])
 
   return (
     <div className="panel">
-      <h2>文稿類型 / 作者（Strapi 域）</h2>
-      <div className={`source-banner ${hasDb ? 'db' : 'builtin'}`}>
-        {hasDb ? `DB 有 ${dbRows.length} 筆 Strapi 設定,以 DB 為準。` : 'DB 無 Strapi 設定 → 用內建預設。看下表夠不夠用再決定開不開 Strapi。'}
-        <div className="row" style={{ marginTop: 8 }}>
-          <button className="ghost" disabled={busy} onClick={runImport}>{busy ? '匯入中…' : '從 Strapi 匯入 DB'}</button>
-          <span className="muted">{strapiMsg}</span>
-        </div>
-      </div>
-      <h3 className="sub-h">文稿類型 → 押註對應（內建預設）</h3>
+      <h2>文稿類型 → 押註對應（內建預設）</h2>
       <div className="table-wrap"><table>
         <thead><tr><th>類型</th><th>開頭押註</th><th>結尾押註</th><th>作者 ID</th></tr></thead>
         <tbody>
@@ -217,6 +188,7 @@ function SiteTemplates() {
           ))}
         </tbody>
       </table></div>
+      <p className="hint">押註可在上方「免責押註」用具名版本覆蓋(版本 &gt; 內建);這裡是內建預設對照。</p>
     </div>
   )
 }
