@@ -312,6 +312,49 @@ const UNIT_TESTS: Row[] = [
   ['前端 dashboard / RWD / 拖放 / 主題 / 快取', '隔離瀏覽器(桌面 1440 + 390 手機)', '無溢出 ✅', true],
 ]
 
+// Subagent 獨立稽核(走訂閱、不燒 API;輔助佐證,不覆寫上方模組分數)。
+// 紀錄:evals/records/2026-06-21-module-capability-auditor-batch.md;角色:evals/agents/
+const AUDITS: { mod: string; owner: number; audit: number; finding: string }[] = [
+  { mod: '進稿抽取', owner: 86, audit: 84, finding: '.doc 成功路徑、RTF 非 utf8、gdoc 圖嵌入分支未測' },
+  { mod: 'AI 內容處理', owner: 82, audit: 32, finding: '3 個 LLM agent + chat()/structured() 零直接測試' },
+  { mod: '封面圖生成', owner: 82, audit: 58, finding: 'generate_image 串流/重試/stage 編排零測' },
+  { mod: '進階組稿', owner: 88, audit: 58, finding: '押註 3-tier 解析、供稿方替換、寫回未測' },
+  { mod: '任務系統', owner: 90, audit: 58, finding: 'crash recovery、rerun-from-stage、WAL、error path 未測' },
+  { mod: '設定 / 版本', owner: 84, audit: 38, finding: 'config overlay、押註解析、Strapi 匯入零測' },
+  { mod: 'WordPress 發布', owner: 82, audit: 41, finding: '零自動測試;封面掉失不回報、重複發布風險' },
+  { mod: '觀測 / 評測', owner: 80, audit: 64, finding: '結構評分有測;未運維化、整合未測' },
+  { mod: '前端 Dashboard', owner: 84, audit: 83, finding: '前端零自動化測試(僅人工瀏覽器)' },
+]
+
+function AuditsPanel() {
+  return (
+    <div className="panel">
+      <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
+      <p className="hint" style={{ marginTop: 0 }}>
+        9 個獨立 Claude subagent(<code>module-capability-auditor</code>)各自讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴 ——
+        與維護者分數的差距 ≈ <b>自動化測試債</b>。<b>此為輔助佐證,不覆寫上方模組分數。</b>
+        紀錄 <code>evals/records/2026-06-21-…-batch.md</code>;角色 <code>evals/agents/</code>。
+      </p>
+      <div className="table-wrap"><table>
+        <thead><tr><th>模組</th><th>維護者分</th><th>獨立稽核分</th><th>差距</th><th>主要待補(測試)</th></tr></thead>
+        <tbody>{AUDITS.map((a) => (
+          <tr key={a.mod}>
+            <td>{a.mod}</td>
+            <td><b style={{ color: scoreColor(a.owner) }}>{a.owner}</b></td>
+            <td><b style={{ color: scoreColor(a.audit) }}>{a.audit}</b></td>
+            <td className="muted">{a.owner - a.audit > 0 ? `−${a.owner - a.audit}` : '0'}</td>
+            <td className="muted">{a.finding}</td>
+          </tr>
+        ))}</tbody>
+      </table></div>
+      <p className="hint">
+        另有 <code>content-faithfulness</code> 評審角色(比對原文 vs 成稿,抓丟內容/幻覺):需真實 article「原文+成稿」配對才跑,尚未執行。
+        共同主題:多數模組邏輯經 code-review + 人工/整合驗證可用,但缺自動化單元測試 —— 補測順序見紀錄。
+      </p>
+    </div>
+  )
+}
+
 export function StatusPanel() {
   const [live, setLive] = useState<{ health: boolean; wf: number; jobs: number; cfg: number; done: number }>(
     { health: false, wf: 0, jobs: 0, cfg: 0, done: 0 })
@@ -363,6 +406,8 @@ export function StatusPanel() {
       </div>
 
       <ModulesPanel />
+
+      <AuditsPanel />
 
       <div className="panel">
         <h2>🧪 完整流程測試（E2E,跑整條 pipeline）</h2>
