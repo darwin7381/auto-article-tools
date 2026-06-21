@@ -31,9 +31,6 @@ class Settings(BaseSettings):
     wordpress_api_user: str = ""
     wordpress_api_password: str = ""
 
-    # Strapi（設定遷移來源；遷移完成後可不再依賴）
-    strapi_url: str = "http://localhost:1337"
-    strapi_api_token: str = ""
 
     # URL 進稿 fallback（Firecrawl，選用）
     firecrawl_api_key: str = ""

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { getHealth, listJobs, listSiteConfig, listWorkflows, type Job } from './api'
+import { getHealth, listJobs, listWorkflows, type Job } from './api'
 
 const STAGES = [
   ['extract', '進稿抽取', '檔案/URL → 純文字(pymupdf/python-docx/trafilatura)'],
@@ -202,7 +202,7 @@ const MAIN_MODULES: MainMod[] = [
       {
         key: 'format', name: '進階組稿', score: 88, status: '成熟 · 與舊版對等、六項全測',
         deps: 'formatting.py(自製，復刻舊 ArticleFormattingProcessor)',
-        how: '標題層級正規化、用摘要生成 intro_quote、首字 Dropcap、頁首/頁尾免責(3-tier:版本>Strapi>內建)、TG banner+相關閱讀、供稿方名稱替換 → 寫回 wp.content。',
+        how: '標題層級正規化、用摘要生成 intro_quote、首字 Dropcap、頁首/頁尾免責(版本>內建)、TG banner+相關閱讀、供稿方名稱替換 → 寫回 wp.content。',
         scenarios: ['廣編稿需頭尾免責聲明', '新聞稿首字放大+導言', '文末 TG 官方橫幅+相關報導', '供稿方名稱自動替換'],
         strengths: ['六項組稿全綠(test_format_article_full)', '與舊版對等', '押註 3-tier 解析', '開關可逐項關閉'],
         gaps: ['相關閱讀為預設連結,需審稿時替換'],
@@ -225,34 +225,25 @@ const MAIN_MODULES: MainMod[] = [
     ],
   },
   {
-    key: 'config', name: '⑥ 設定 / 版本管理', summary: 'Agent 設定 + Prompt/押註 具名版本(切換/回溯/刪除) + Strapi 押註來源,3-tier 解析。',
+    key: 'config', name: '⑥ 設定 / 版本管理', summary: 'Agent 設定 + Prompt/押註 具名版本(切換/回溯/刪除);押註兩層解析:具名版本 > 內建預設。',
     subs: [
       {
         key: 'agentcfg', name: 'Agent 設定', score: 85, status: '可用 · prompt/model/溫度可調',
-        deps: 'agent_config.py',
-        how: '每個 agent 的 provider/model/system+user prompt/溫度/max_tokens 讀自 DB 生效版。',
-        scenarios: ['調 prompt 措辭', '換 model / provider', '調溫度控發散'],
-        strengths: ['設定即時生效', 'API 可程式化讀寫'],
+        deps: 'agent_config.py + agents API(取代舊 R2 後台)',
+        how: '每個 agent 的 provider/model/system+user prompt/溫度/max_tokens 讀自 DB 生效版;agents API 線上編輯/重置 seed。',
+        scenarios: ['調 prompt 措辭', '換 model / provider', '調溫度控發散', '重置回 seed 預設'],
+        strengths: ['設定即時生效', 'API 可程式化讀寫', 'overlay(版本覆蓋 base)有測'],
         gaps: ['無 A/B 對照跑'],
-        tests: 'E2E 透過設定驅動跑通;版本生命週期見下',
+        tests: 'test_config:overlay + agents API list/get/update/404;reset 404',
       },
       {
         key: 'version', name: 'Prompt / 押註 版本', score: 86, status: '強 · 生命週期全測',
         deps: 'versions.py',
-        how: '具名儲存 prompt/押註 組合;建立 / 切換生效 / 回溯 / 刪除;上方顯示目前生效版本。',
-        scenarios: ['存多套 prompt 組合', '一鍵切換/回退', '刪除過時組合'],
-        strengths: ['切換/回退/刪除全綠', '避免覆蓋即失去舊版'],
+        how: '具名儲存 prompt/押註 組合;建立 / 切換生效 / 回溯 / 刪除;押註解析「版本 > 內建」兩層;上方顯示目前生效版本。',
+        scenarios: ['存多套 prompt 組合', '一鍵切換/回退', '刪除過時組合', '押註用版本覆蓋內建'],
+        strengths: ['切換/回退/刪除全綠', '避免覆蓋即失去舊版', '押註 版本>內建 有測'],
         gaps: ['版本 diff 視覺化可再加'],
-        tests: 'test_config_version_lifecycle:建立/切換/刪除/回退',
-      },
-      {
-        key: 'strapi', name: 'Strapi / 押註來源', score: 82, status: '可用 · 分型解析 + fallback',
-        deps: 'strapi.py + site_config.py + templates.py',
-        how: '從 Strapi 讀押註範本(per-type);3-tier 解析:具名版本 > Strapi > 內建;token 失效時 public read fallback。',
-        scenarios: ['從 CMS 拉押註範本', '廣編/新聞分型套不同押註'],
-        strengths: ['分型(廣編/新聞)正確', 'public read fallback(401 不致命)', '匯入 12 筆實測'],
-        gaps: ['設定真相散在 R2/Strapi/env 三處(見 memory)'],
-        tests: 'Strapi 匯入 12 筆 + resolve 分型實測(廣編=1/新聞=2)',
+        tests: 'test_config_version_lifecycle + activate/delete API/404 + 押註 版本>內建',
       },
     ],
   },
@@ -308,7 +299,6 @@ const UNIT_TESTS: Row[] = [
   ['eval 評分器(結構不變式 + 繁中比例)', 'test_eval_scorecard', '通過', true],
   ['版本管理生命週期(建立/切換/刪除/回退)', 'test_config_version_lifecycle', '通過', true],
   ['durable job 端到端 + SSE 重播 + 404', 'test_api', '通過', true],
-  ['Strapi 匯入 + 押註分型讀取', '匯入 12 筆 + resolve 實測', '廣編/新聞各正確 ✅', true],
   ['影像 gpt-image-2 streaming + Pillow 壓縮', '單獨重現(183s 斷→72s 成功)', '通過 · 省 84%', true],
   ['前端 dashboard / RWD / 拖放 / 主題 / 快取', '隔離瀏覽器(桌面 1440 + 390 手機)', '無溢出 ✅', true],
 ]
@@ -322,7 +312,7 @@ const AUDITS: { mod: string; owner: number; audit1: number; audit: number; findi
   { mod: '封面圖生成', owner: 82, audit1: 58, audit: 81, finding: '剩 retry 耗盡訊息、APITimeout/InternalServerError 分支' },
   { mod: '進階組稿', owner: 88, audit1: 58, audit: 88, finding: '剩 dropcap 特殊字元 guard、stage formatting 開關、HTML 跳脫' },
   { mod: '任務系統', owner: 90, audit1: 58, audit: 80, finding: '剩 SSE live tail/去重、真實併發限流實證' },
-  { mod: '設定 / 版本', owner: 84, audit1: 38, audit: 79, finding: '剩 site_config /effective 端點、delete-active 自動接棒(API 層)' },
+  { mod: '設定 / 版本', owner: 86, audit1: 38, audit: 79, finding: '剩 delete-active 自動接棒(API 層)、agents reset 成功路徑(需 seed)' },
   { mod: 'WordPress 發布', owner: 82, audit1: 41, audit: 80, finding: '剩 502 失敗分支、媒體 from-path 分支、真實 _auth' },
   { mod: '觀測 / 評測', owner: 80, audit1: 64, audit: 80, finding: '剩 多階段 token 加總、chat/structured 真實 usage 抽取' },
   { mod: '前端 Dashboard', owner: 84, audit1: 83, audit: 88, finding: '剩 RunPanel 完整狀態機(attach/SSE/poll 合併)整合測試' },
@@ -351,24 +341,23 @@ function AuditsPanel() {
       </table></div>
       <p className="hint">
         另有 <code>content-faithfulness</code> 評審角色(比對原文 vs 成稿,抓丟內容/幻覺):需真實 article「原文+成稿」配對才跑,尚未執行。
-        仍待補的多為 edge/整合分支與 strapi 匯入/crash-recovery 等較深路徑(見紀錄)。
+        仍待補的多為最深層整合/邊角分支(完整 7 階段鏈、SSE live、RunPanel 狀態機;見紀錄)。
       </p>
     </div>
   )
 }
 
 export function StatusPanel() {
-  const [live, setLive] = useState<{ health: boolean; wf: number; jobs: number; cfg: number; done: number }>(
-    { health: false, wf: 0, jobs: 0, cfg: 0, done: 0 })
+  const [live, setLive] = useState<{ health: boolean; wf: number; jobs: number; done: number }>(
+    { health: false, wf: 0, jobs: 0, done: 0 })
   useEffect(() => {
     (async () => {
-      const [h, w, j, c] = await Promise.all([
+      const [h, w, j] = await Promise.all([
         getHealth().then(() => true).catch(() => false),
         listWorkflows().then((x) => x.length).catch(() => 0),
         listJobs().catch(() => [] as Job[]),
-        listSiteConfig().then((x) => x.length).catch(() => 0),
       ])
-      setLive({ health: h, wf: w, jobs: j.length, cfg: c, done: j.filter((x) => x.status === 'done').length })
+      setLive({ health: h, wf: w, jobs: j.length, done: j.filter((x) => x.status === 'done').length })
     })()
   }, [])
 
@@ -379,8 +368,8 @@ export function StatusPanel() {
         <Stat label="Workflows" value={String(live.wf)} />
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
-        <Stat label="Strapi 設定" value={String(live.cfg)} />
         <Stat label="後端測試" value="132/132 ✓" ok />
+        <Stat label="前端測試" value="12/12 ✓" ok />
       </div>
 
       <div className="panel">

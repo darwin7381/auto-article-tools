@@ -14,7 +14,7 @@ from app.api import (
     health,
     jobs,
     publish,
-    site_config,
+    templates,
     uploads,
     versions,
     workflows,
@@ -49,7 +49,7 @@ app.include_router(jobs.router)
 app.include_router(uploads.router)
 app.include_router(files.router)
 app.include_router(publish.router)
-app.include_router(site_config.router)
+app.include_router(templates.router)
 app.include_router(versions.router)
 
 
