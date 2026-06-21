@@ -4,7 +4,7 @@
 標題層級正規化 → 引言區塊 → 開頭押註(插在引言後) → Dropcap 首字 → 結尾押註(前加分隔線)
 → TG Banner + 相關閱讀。每項可由參數開關。
 
-押註內容由呼叫端(resolve_disclaimers)決定(版本/Strapi/內建,已替換供稿方),這裡只負責插入位置。
+押註內容由呼叫端(resolve_disclaimers)決定(版本/內建,已替換供稿方),這裡只負責插入位置。
 """
 
 from __future__ import annotations

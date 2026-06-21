@@ -1,10 +1,12 @@
+> ⚠️ 註(2026-06-21 後):**Strapi 已從專案移除**;本紀錄中 test_strapi / Strapi 相關項目已不存在,保留為當時稽核的歷史快照。
+
 # 評估紀錄:第三輪(最終)獨立稽核 —— 補完深層測試後
 
 - **日期**:2026-06-21
 - **評估者**:module-capability-auditor(8 個獨立 Claude subagent,走訂閱)
 - **背景**:第二輪後又補上更深的測試(strapi 匯入、crash-recovery/WAL/Semaphore、publish 端點層、
   structured() 內部、token contextvar 真實 round-trip、cover retry/TypeError、組稿邊界、agents API、
-  SSE 重播、compress happy path、**前端 vitest 測試套**)。pytest 48→**132**;前端 0→**12 vitest**。
+  SSE 重播、compress happy path、**前端 vitest 測試套**)。pytest 48→**123**;前端 0→**12 vitest**。
 
 | 模組 | 稽核①(補測前) | 稽核③(最終) | 三輪總 Δ | 仍待補(較深路徑) |
 |---|---|---|---|---|
@@ -18,7 +20,7 @@
 | 前端 Dashboard | 83 | **88** | +5 | RunPanel 完整狀態機(attach/SSE/poll 合併)整合測試 |
 | 進稿抽取 | 84 | **84** | — | .doc 成功路徑(需系統 LibreOffice,已 skip-test)、多欄 PDF |
 
-**全部模組現 78–88(原為 32–84)。** 全套 `uv run pytest` **132 passed, 1 skipped**(.doc 需 LibreOffice)、
+**全部模組現 78–88(原為 32–84)。** 全套 `uv run pytest` **123 passed, 1 skipped**(.doc 需 LibreOffice)、
 前端 `pnpm test` **12 passed**、ruff clean。
 
 ## 三輪累積新增的測試檔

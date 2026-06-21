@@ -356,6 +356,7 @@
           "jobs"
         ],
         "summary": "List Jobs",
+        "description": "列表一律輕量（不含 result）。",
         "operationId": "list_jobs_jobs_get",
         "parameters": [
           {
@@ -404,6 +405,7 @@
           "jobs"
         ],
         "summary": "Get Job",
+        "description": "full=false：輕量狀態（輪詢用，含 done_stages 摘要）；full=true：完整含逐階段輸出。",
         "operationId": "get_job_jobs__job_id__get",
         "parameters": [
           {
@@ -413,6 +415,16 @@
             "schema": {
               "type": "integer",
               "title": "Job Id"
+            }
+          },
+          {
+            "name": "full",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Full"
             }
           }
         ],
@@ -649,28 +661,44 @@
         }
       }
     },
-    "/site-config": {
+    "/templates/builtin": {
       "get": {
         "tags": [
-          "site-config"
+          "templates"
         ],
-        "summary": "List Site Config",
-        "operationId": "list_site_config_site_config_get",
+        "summary": "Builtin Templates",
+        "operationId": "builtin_templates_templates_builtin_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Builtin Templates Templates Builtin Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/versions/{scope}": {
+      "get": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "List For Scope",
+        "operationId": "list_for_scope_versions__scope__get",
         "parameters": [
           {
-            "name": "kind",
-            "in": "query",
-            "required": false,
+            "name": "scope",
+            "in": "path",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Kind"
+              "type": "string",
+              "title": "Scope"
             }
           }
         ],
@@ -680,12 +708,61 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  "title": "Response List Site Config Site Config Get"
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List For Scope Versions  Scope  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Create",
+        "operationId": "create_versions__scope__post",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scope"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVersion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Versions  Scope  Post"
                 }
               }
             }
@@ -703,23 +780,105 @@
         }
       }
     },
-    "/site-config/import-strapi": {
+    "/versions/{scope}/{version_id}/activate": {
       "post": {
         "tags": [
-          "site-config"
+          "versions"
         ],
-        "summary": "Import Strapi",
-        "description": "從本機 Strapi 抓全部設定匯入 DB（需 Strapi 開著 + STRAPI_API_TOKEN）。",
-        "operationId": "import_strapi_site_config_import_strapi_post",
+        "summary": "Activate",
+        "operationId": "activate_versions__scope___version_id__activate_post",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Import Strapi Site Config Import Strapi Post"
+                  "additionalProperties": true,
+                  "title": "Response Activate Versions  Scope   Version Id  Activate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/versions/{scope}/{version_id}": {
+      "delete": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Delete",
+        "operationId": "delete_versions__scope___version_id__delete",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Versions  Scope   Version Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -977,6 +1136,25 @@
           "workflow"
         ],
         "title": "CreateJobRequest"
+      },
+      "CreateVersion": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "data"
+        ],
+        "title": "CreateVersion"
       },
       "HTTPValidationError": {
         "properties": {

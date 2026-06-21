@@ -35,7 +35,7 @@ TYPE_DEFAULTS: dict[str, dict] = {
 
 
 def _disclaimer_sets_or_none() -> tuple[dict | None, dict | None]:
-    """目前生效的押註具名版本集(無則 None,讓上層退回 Strapi/內建)。"""
+    """目前生效的押註具名版本集(無則 None,讓上層退回內建)。"""
     from app.services import versions
 
     active = versions.active_version("disclaimer")
