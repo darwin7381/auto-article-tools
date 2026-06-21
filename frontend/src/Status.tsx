@@ -22,12 +22,12 @@ const SUPERIOR = [
   'gpt-image-2 streaming(根治長連線被掐斷)',
   'instructor+pydantic 結構化驗證(殺壞 JSON)',
   'Dashboard UI + RWD + 主題 + 全頁拖放',
-  '觀測:per-stage 耗時 + token + 結構評分;品質評審走 Claude subagent(訂閱、不燒 API,紀錄入 evals/)',
+  '觀測:per-stage 耗時 + token + 結構評分;品質評審 routine 走 Claude subagent(訂閱、不燒 API)+ llm_judge 選用工具',
   '抽取位置保真:PDF 圖/表依座標插回原位(舊版圖片會被丟到頁尾)',
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 47/47(含合成夾具斷言圖片排列位置)',
+  '自動化測試 pytest 48/48(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -271,16 +271,16 @@ const MAIN_MODULES: MainMod[] = [
     ],
   },
   {
-    key: 'obs', name: '⑧ 觀測 / 評測', summary: '專案內:per-stage 耗時+token + 結構不變式回歸評分(零成本決定論)。內容品質評審改走 Claude subagent(訂閱、不燒 API),不放進專案。',
+    key: 'obs', name: '⑧ 觀測 / 評測', summary: '專案內:per-stage 耗時+token + 結構不變式回歸評分(零成本決定論)。內容品質評審 routine 走 Claude subagent(訂閱、不燒 API);llm_judge 留作選用開發工具(非生產)。',
     subs: [
       {
-        key: 'obs', name: '觀測 / 評測', score: 78, status: '結構評分+telemetry 已測 · 品質評審走 subagent · 待運維化',
-        deps: 'evals.py(結構不變式評分)+ contextvar(token)+ evals/ subagent 品質評審(訂閱)',
-        how: '① 專案內:11 條結構不變式 + 繁中比例 + per-stage 耗時/token,零成本決定論。② 內容品質(忠實/丟內容/幻覺/翻譯)由 Claude subagent 跑(走訂閱、不燒 API),角色與紀錄在 evals/ —— 不在 pipeline 留會燒 API 的判斷碼。生產端 LLM 只有 pipeline 那幾個 agent。',
-        scenarios: ['prompt/流程改動後跑結構回歸', '抓 AI 端丟內容 → 開發時用 subagent content-faithfulness 評審', '看每步耗時/tokens 找瓶頸'],
-        strengths: ['結構不變式 11 條 + 繁中比例(test 背書)', 'per-stage 耗時 + token(contextvar)', '品質評審用 subagent:走訂閱不燒 API、可並行、紀錄入 evals/', '不把會燒 API 的判斷碼塞進生產 pipeline'],
-        gaps: ['score_result 只在 CLI/dev,未接生產 per-article 結構閘', 'metrics 未聚合、無時序儀表板、無告警', 'token 捕捉靜默失敗(provider 沒回 usage→0)', '品質評審為人工觸發 subagent(非自動)'],
-        tests: 'test_eval_scorecard(結構不變式 + 繁中比例 + per-stage 彙總)',
+        key: 'obs', name: '觀測 / 評測', score: 80, status: '結構評分+telemetry 已測 · 品質評審 subagent(訂閱)+ llm_judge 選用工具 · 待運維化',
+        deps: 'evals.py(結構評分 + llm_judge 選用工具)+ contextvar(token)+ evals/ subagent(訂閱)',
+        how: '① 專案內:11 條結構不變式 + 繁中比例 + per-stage 耗時/token,零成本決定論。② 內容品質(忠實/丟內容/幻覺/翻譯):routine 走 evals/ 的 Claude subagent(訂閱、不燒 API);另保留 llm_judge 選用開發工具(CLI --judge,明確 opt-in 才跑、會用 key、非生產)。界線:生產端用 key 的只有 pipeline 那幾隻 agent。',
+        scenarios: ['prompt/流程改動後跑結構回歸', '抓 AI 端丟內容 → routine 用 subagent content-faithfulness;或 opt-in --judge', '看每步耗時/tokens 找瓶頸'],
+        strengths: ['結構不變式 11 條 + 繁中比例(test 背書)', 'per-stage 耗時 + token(contextvar)', '品質評審 routine 走 subagent(訂閱不燒 API、可並行、紀錄入 evals/)', 'llm_judge 選用工具留在專案(test_llm_judge 背書),但不融入生產 pipeline'],
+        gaps: ['score_result 只在 CLI/dev,未接生產 per-article 結構閘', 'metrics 未聚合、無時序儀表板、無告警', 'token 捕捉靜默失敗(provider 沒回 usage→0)', '品質評審非自動(人工觸發)'],
+        tests: 'test_eval_scorecard(結構)+ test_llm_judge(選用工具 mock LLM、不打網路)',
       },
     ],
   },
@@ -300,7 +300,7 @@ const MAIN_MODULES: MainMod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '47/47 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '48/48 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -335,7 +335,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="47/47 ✓" ok />
+        <Stat label="後端測試" value="48/48 ✓" ok />
       </div>
 
       <div className="panel">
@@ -379,7 +379,7 @@ export function StatusPanel() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 47/47;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 48/48;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">
