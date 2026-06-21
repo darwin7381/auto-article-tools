@@ -1,4 +1,4 @@
-> ⚠️ 註(2026-06-21 後):**Strapi 已從專案移除**;本紀錄中 test_strapi / Strapi 相關項目已不存在,保留為當時稽核的歷史快照。
+> ⚠️ 註(2026-06-21 後):**Strapi 已從新平台(backend/frontend)移除**(舊 `src/` Next.js app 仍含,屬被 strangler 取代的舊系統);本紀錄中 test_strapi / Strapi 相關項目已不存在,保留為當時稽核的歷史快照。
 
 # 評估紀錄:補完測試後第二輪獨立稽核
 
