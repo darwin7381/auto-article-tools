@@ -87,6 +87,31 @@ async def test_compress_cover():
     Image.open(io.BytesIO(out)).verify()    # 輸出仍為有效影像
 
 
+@pytest.mark.asyncio
+async def test_llm_judge(monkeypatch):
+    """LLM-judge:比對原文 vs 成稿,結構化回品質分 + 遺失內容(mock LLM,不打網路)。"""
+    from app.services import llm as llmmod
+    from app.services.evals import JudgeResult, llm_judge
+
+    seen = {}
+
+    async def fake_structured(provider, model, system, user, model_cls, **kw):
+        seen["user"] = user
+        seen["model_cls"] = model_cls
+        return JudgeResult(faithfulness=60, translation=100, readability=85,
+                           structure=90, overall=72,
+                           missing_content=["原文表格『活動亮點』未出現於成稿"],
+                           hallucinations=[], issues=[])
+
+    monkeypatch.setattr(llmmod, "structured", fake_structured)
+    res = await llm_judge("原文含表格:活動亮點 ...", "<p>成稿內文</p>",
+                          "press-release", provider="openrouter", model="x")
+    assert res.overall == 72 and res.faithfulness == 60
+    assert res.missing_content and "活動亮點" in res.missing_content[0]
+    assert "原文" in seen["user"] and "成稿" in seen["user"]  # 原文與成稿都餵進 prompt
+    assert seen["model_cls"] is JudgeResult
+
+
 def test_eval_scorecard():
     """eval 評分:結構不變式 + 繁中比例。"""
     from app.services.evals import cjk_ratio, score_result

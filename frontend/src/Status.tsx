@@ -22,12 +22,12 @@ const SUPERIOR = [
   'gpt-image-2 streaming(根治長連線被掐斷)',
   'instructor+pydantic 結構化驗證(殺壞 JSON)',
   'Dashboard UI + RWD + 主題 + 全頁拖放',
-  '觀測:per-stage 耗時 + token 用量 + eval 回歸評分',
+  '觀測:per-stage 耗時 + token + 結構評分 + LLM-judge 品質評審(忠實度/丟內容/幻覺)',
   '抽取位置保真:PDF 圖/表依座標插回原位(舊版圖片會被丟到頁尾)',
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 38/38(含合成夾具斷言圖片排列位置)',
+  '自動化測試 pytest 39/39(含合成夾具斷言圖片排列位置)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -39,7 +39,7 @@ const PARITY = [
 ]
 const GAPS: [string, string, string][] = [
   ['🟢 低（暫緩）', '登入 / 權限', '舊版有 Clerk;新版無。已與你確認此項優先級往後放。要時建議用 tunnel 層 Basic Auth(同 dc1/dc2)'],
-  ['🟢 低', 'eval 進階', '已有 golden 評分 CLU(結構不變式 + 耗時/tokens);LLM-judge 品質評分可再加'],
+  ['🟢 低', 'eval 進階', '已有 結構評分 + LLM-judge 品質評審(忠實/丟內容/幻覺,opt-in);待接成每篇自動 QA + metrics 時序儀表板'],
 ]
 // [項目, 方式, 結果/評分, 通過?]
 type Row = [string, string, string, boolean]
@@ -274,13 +274,13 @@ const MAIN_MODULES: MainMod[] = [
     key: 'obs', name: '⑧ 觀測 / 評測', summary: 'per-stage 耗時+token + golden 回歸評分(結構不變式+繁中比例)。本平台目前最弱、最該補的一塊。',
     subs: [
       {
-        key: 'obs', name: '觀測 / 評測', score: 76, status: '基礎可用 · 缺品質評分與時序儀表板',
-        deps: 'evals.py + contextvar(token 捕捉)',
-        how: '每階段 elapsed_ms + token 用量(contextvar 捕捉);golden 評分器:11 條結構不變式 + 繁中比例(去標籤/URL 校正後量測)。',
-        scenarios: ['prompt/流程改動後跑回歸不退步', '看每步耗時/tokens 找瓶頸', '成稿結構完整性檢查'],
-        strengths: ['per-stage 耗時 + token', '11 條結構不變式評分', 'cjk_ratio 去標籤/URL 校正(修誤判)'],
-        gaps: ['無 LLM-judge 品質評分', 'metrics 未持久化、無時序儀表板', '無告警'],
-        tests: 'test_eval_scorecard:結構不變式 + 繁中比例 + per-stage 耗時彙總',
+        key: 'obs', name: '觀測 / 評測', score: 84, status: '雙層:結構不變式 + LLM-judge 品質評審',
+        deps: 'evals.py(結構評分 + LLM-judge:instructor+pydantic) + contextvar(token)',
+        how: '① 結構不變式:11 條(標題/slug/分類/押註/dropcap…)+ 繁中比例(去標籤/URL 校正)+ per-stage 耗時/token,零成本決定論。② LLM-judge:強模型拿 rubric 比對「原文 vs 成稿」,打忠實/翻譯/可讀/結構/綜合分,列出 missing_content(成稿遺失)與 hallucinations(幻覺)。opt-in(CLI --judge,控 API 成本)。',
+        scenarios: ['prompt/流程改動後跑回歸不退步', '抓 AI 端丟內容(表格/段落)—— 結構評分抓不到', '看每步耗時/tokens 找瓶頸', '量翻譯/語氣品質而非只看格式'],
+        strengths: ['LLM-judge 比對原文 vs 成稿,抓忠實度/丟內容/幻覺/翻譯(結構評分抓不到的「內容對不對」)', '11 條結構不變式 + 繁中比例', 'per-stage 耗時 + token', 'cjk_ratio 去標籤/URL 校正(修誤判)'],
+        gaps: ['judge 為 opt-in(API 成本),尚未接成每篇自動 QA / 前端顯示', 'metrics 未持久化、無時序儀表板', '無告警'],
+        tests: 'test_eval_scorecard(結構)+ test_llm_judge(mock LLM:比對原文/成稿、抓遺失內容)',
       },
     ],
   },
@@ -300,7 +300,7 @@ const MAIN_MODULES: MainMod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '38/38 通過', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '39/39 通過', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -335,7 +335,7 @@ export function StatusPanel() {
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
         <Stat label="Strapi 設定" value={String(live.cfg)} />
-        <Stat label="後端測試" value="38/38 ✓" ok />
+        <Stat label="後端測試" value="39/39 ✓" ok />
       </div>
 
       <div className="panel">
@@ -379,7 +379,7 @@ export function StatusPanel() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 38/38;前端以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 39/39;前端以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">
