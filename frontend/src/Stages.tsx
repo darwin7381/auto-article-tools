@@ -1,6 +1,15 @@
+import { marked } from 'marked'
 import { useState } from 'react'
 import { apiBase } from './api'
 import { collapseSame, lineDiff } from './diff'
+
+marked.setOptions({ gfm: true, breaks: true })
+
+/** markdown → HTML（給人看的渲染；表格/標題/清單都成真元素）。 */
+function mdToHtml(md: string): string {
+  try { return marked.parse(md, { async: false }) as string }
+  catch { return md }
+}
 
 type Status = 'pending' | 'running' | 'done' | 'error'
 export type StageView = {
@@ -103,13 +112,35 @@ function OutputView({ output, prevOutput }: {
               <span className="k">摘要</span><span>{String(wp.excerpt || '')}</span>
             </div>
           )}
-          {html && <iframe className="htmlframe" srcDoc={html} title="preview" />}
-          {!html && md && <pre className="log content">{md.slice(0, 5000)}</pre>}
-          {!html && !md && (o.text as string) && <pre className="log content">{String(o.text).slice(0, 5000)}</pre>}
-          {Object.keys(rest).length > 0 && <pre className="log" style={{ fontSize: 11 }}>{JSON.stringify(rest, null, 2).slice(0, 1500)}</pre>}
+          {html
+            ? <iframe className="htmlframe" srcDoc={html} title="preview" />
+            : md
+              ? <MarkdownBox md={md} />
+              : (o.text as string)
+                ? <div className="md-render"><p style={{ whiteSpace: 'pre-wrap' }}>{String(o.text).slice(0, 8000)}</p></div>
+                : null}
+          {Object.keys(rest).length > 0 && (
+            <details className="rest-fields">
+              <summary>其他欄位（{Object.keys(rest).join('、')}）</summary>
+              <pre className="log" style={{ fontSize: 11 }}>{JSON.stringify(rest, null, 2).slice(0, 1500)}</pre>
+            </details>
+          )}
         </>
       )}
     </div>
+  )
+}
+
+/** 渲染 markdown 給人看（表格/標題/清單成真元素）；過長截斷並提示。 */
+function MarkdownBox({ md }: { md: string }) {
+  const LIMIT = 12000
+  const truncated = md.length > LIMIT
+  const html = mdToHtml(truncated ? md.slice(0, LIMIT) : md)
+  return (
+    <>
+      <div className="md-render" dangerouslySetInnerHTML={{ __html: html }} />
+      {truncated && <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>（內容過長，已截斷顯示；完整內容見「原始 JSON」）</div>}
+    </>
   )
 }
 

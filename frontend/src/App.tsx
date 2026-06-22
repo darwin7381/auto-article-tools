@@ -423,7 +423,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const totalMs = job ? jobDurMs(job) : null
 
   return (
-    <div className="grid">
+    <div className="run-layout">
       {dragOver && <div className="drop-overlay"><div>📄 放開以上傳檔案</div></div>}
       <div className="panel">
         <h2>1. 進稿</h2>
