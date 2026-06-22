@@ -1,21 +1,61 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
 
-// 所有請求都帶 timeout：tunnel/行動網路壅塞時，沒 timeout 的 fetch 會永遠懸住
-// → UI 卡死且不自癒
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** 把錯誤回應轉成「給人看」的訊息——絕不把整頁 HTML(如 frp 的 404 頁)丟給使用者。 */
+export function friendlyError(status: number, body: string): string {
+  try {
+    const j = JSON.parse(body)
+    if (j && j.detail) return typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail)
+  } catch { /* 非 JSON,往下判斷 */ }
+  if (/<\s*html|powered by|fatedier\/frp/i.test(body)) {
+    // 反代(frp/Caddy)回的頁面 = 後端當下沒接上(多半正在重啟)
+    return '後端暫時無法連線（可能正在重啟），請稍候再試'
+  }
+  return `${status} ${body.slice(0, 160)}`.trim()
+}
+
+/** frp 在後端未接上時會回 404 HTML 頁;502/503 同理 → 視為「暫時性、可重試」。 */
+export function isTransientDown(status: number, body: string): boolean {
+  if (status === 502 || status === 503) return true
+  if (status === 404 && /<\s*html|powered by|frp/i.test(body)) return true
+  return false
+}
+function isNetworkError(e: unknown): boolean {
+  if (e instanceof DOMException) return e.name === 'TimeoutError' || e.name === 'AbortError'
+  return e instanceof TypeError // fetch 連線失敗
+}
+
+/** 帶 timeout + 暫時性失敗自動重試的 fetch(回 Response;錯誤已轉人話)。
+ *  重試只在「後端暫時不可達」(frp 404/502/503 / 連線失敗)時發生 —— 此時後端沒收到請求,
+ *  即使是 POST 也不會產生重複副作用,安全。真正的 4xx/5xx 業務錯誤不重試。 */
+async function req(path: string, init: RequestInit, { timeoutMs = 20_000, retries = 0 } = {}): Promise<Response> {
+  let lastMsg = '請求失敗'
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const r = await fetch(`${API_BASE}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) })
+      if (r.ok) return r
+      const body = await r.text()
+      if (isTransientDown(r.status, body) && i < retries) {
+        lastMsg = friendlyError(r.status, body); await sleep(700 * (i + 1)); continue
+      }
+      throw new Error(friendlyError(r.status, body))
+    } catch (e) {
+      if (isNetworkError(e) && i < retries) { lastMsg = '連線逾時或中斷,重試中…'; await sleep(700 * (i + 1)); continue }
+      if (e instanceof Error && !isNetworkError(e)) throw e // 已是人話訊息
+      throw new Error(isNetworkError(e) ? '連線逾時或中斷' : lastMsg)
+    }
+  }
+  throw new Error(lastMsg)
+}
+
 async function jget<T>(path: string, timeoutMs = 20_000): Promise<T> {
-  const r = await fetch(`${API_BASE}${path}`, { signal: AbortSignal.timeout(timeoutMs) })
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
-  return r.json()
+  return (await req(path, {}, { timeoutMs, retries: 2 })).json()
 }
 async function jpost<T>(path: string, body: unknown, timeoutMs = 30_000): Promise<T> {
-  const r = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(timeoutMs),
-  })
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
-  return r.json()
+  return (await req(path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }, { timeoutMs, retries: 2 })).json()
 }
 
 export type Workflow = { name: string; description: string; stages: string[] }
@@ -84,9 +124,8 @@ export const deleteVersion = (scope: string, id: number) =>
 export async function uploadFile(file: File): Promise<{ file: string; original_name: string; size: number }> {
   const fd = new FormData()
   fd.append('file', file)
-  const r = await fetch(`${API_BASE}/uploads`, { method: 'POST', body: fd })
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
-  return r.json()
+  // 60s timeout + 暫時性失敗重試 3 次(後端重啟空窗 ~3-5s,frp 會回 404 → 退避重試自動撐過)
+  return (await req('/uploads', { method: 'POST', body: fd }, { timeoutMs: 60_000, retries: 3 })).json()
 }
 
 export type StreamHandler = (event: string, data: unknown) => void
