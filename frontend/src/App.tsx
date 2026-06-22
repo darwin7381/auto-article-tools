@@ -425,78 +425,86 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   return (
     <div className="run-layout">
       {dragOver && <div className="drop-overlay"><div>📄 放開以上傳檔案</div></div>}
-      <div className="panel">
-        <h2>1. 進稿</h2>
-        <div className="seg">
-          <button className={imode === 'file' ? 'on' : ''} onClick={() => setImode('file')}>上傳文件</button>
-          <button className={imode === 'url' ? 'on' : ''} onClick={() => setImode('url')}>輸入連結</button>
-        </div>
-        <div style={{ marginTop: 12 }}>
-          {imode === 'file'
-            ? <FileDrop uploaded={uploaded} uploading={uploading} onFile={handleFile} onReset={() => setUploaded(null)} />
-            : <UrlInput url={url} onUrl={setUrl} />}
-        </div>
+      <div className="panel run-input">
+        <div className="input-grid">
+          <section className="input-col">
+            <h2>1. 進稿</h2>
+            <div className="seg">
+              <button className={imode === 'file' ? 'on' : ''} onClick={() => setImode('file')}>上傳文件</button>
+              <button className={imode === 'url' ? 'on' : ''} onClick={() => setImode('url')}>輸入連結</button>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              {imode === 'file'
+                ? <FileDrop uploaded={uploaded} uploading={uploading} onFile={handleFile} onReset={() => setUploaded(null)} />
+                : <UrlInput url={url} onUrl={setUrl} />}
+            </div>
 
-        <h2 style={{ marginTop: 22 }}>2. 文稿類型</h2>
-        <div className="seg">
-          {TYPE_OPTS.map((o) => (
-            <button key={o.key} className={atype === o.key ? 'on' : ''} onClick={() => pickType(o.key)}>{o.label}</button>
-          ))}
-        </div>
-        <div className="two-col" style={{ marginTop: 8 }}>
-          <div>
-            <label>正文開頭押註</label>
-            <select value={headerD} onChange={(e) => setHeaderD(e.target.value)}>
-              {DISCLAIMER_OPTS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label>正文末尾押註</label>
-            <select value={footerD} onChange={(e) => setFooterD(e.target.value)}>
-              {DISCLAIMER_OPTS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
-            </select>
-          </div>
-        </div>
-        <label>供稿方</label>
-        <input type="text" value={supplier} placeholder="輸入供稿方名稱（選填）" onChange={(e) => setSupplier(e.target.value)} />
-        <p className="hint">用於自動替換押註中的［撰稿方名稱］</p>
+            <h2 style={{ marginTop: 22 }}>2. 文稿類型</h2>
+            <div className="seg">
+              {TYPE_OPTS.map((o) => (
+                <button key={o.key} className={atype === o.key ? 'on' : ''} onClick={() => pickType(o.key)}>{o.label}</button>
+              ))}
+            </div>
+            <div className="two-col" style={{ marginTop: 8 }}>
+              <div>
+                <label>正文開頭押註</label>
+                <select value={headerD} onChange={(e) => setHeaderD(e.target.value)}>
+                  {DISCLAIMER_OPTS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label>正文末尾押註</label>
+                <select value={footerD} onChange={(e) => setFooterD(e.target.value)}>
+                  {DISCLAIMER_OPTS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <label>供稿方</label>
+            <input type="text" value={supplier} placeholder="輸入供稿方名稱（選填）" onChange={(e) => setSupplier(e.target.value)} />
+            <p className="hint">用於自動替換押註中的［撰稿方名稱］</p>
+          </section>
 
-        <h2 style={{ marginTop: 22 }}>3. 進階組稿</h2>
-        <div className="fmt-grid">
-          {([
-            ['headings', '標題層級正規化', 'h2→h3 符合上稿層級'],
-            ['intro_quote', '引言區塊', '用摘要生成 intro_quote'],
-            ['dropcap', '首字放大 Dropcap', '正文首字放大'],
-            ['related', 'TG Banner + 相關閱讀', '文末官方橫幅與相關報導'],
-          ] as const).map(([k, label, desc]) => (
-            <button key={k} type="button" className={`fmt-toggle ${fmt[k] ? 'on' : ''}`}
-              onClick={() => setFmt({ ...fmt, [k]: !fmt[k] })}>
-              <span className="fmt-check">{fmt[k] ? '✓' : ''}</span>
-              <span className="fmt-txt"><b>{label}</b><i>{desc}</i></span>
-            </button>
-          ))}
-        </div>
-        <p className="hint">套用 BlockTempo 上稿規範到「上稿內文」;相關閱讀為預設連結,可在審稿時於編輯器替換。</p>
+          <section className="input-col">
+            <details className="adv" open>
+              <summary><span className="adv-title">3. 進階組稿</span><span className="adv-sum muted">{Object.values(fmt).filter(Boolean).length}/4 開啟</span></summary>
+              <div className="fmt-grid" style={{ marginTop: 10 }}>
+                {([
+                  ['headings', '標題層級正規化', 'h2→h3 符合上稿層級'],
+                  ['intro_quote', '引言區塊', '用摘要生成 intro_quote'],
+                  ['dropcap', '首字放大 Dropcap', '正文首字放大'],
+                  ['related', 'TG Banner + 相關閱讀', '文末官方橫幅與相關報導'],
+                ] as const).map(([k, label, desc]) => (
+                  <button key={k} type="button" className={`fmt-toggle ${fmt[k] ? 'on' : ''}`}
+                    onClick={() => setFmt({ ...fmt, [k]: !fmt[k] })}>
+                    <span className="fmt-check">{fmt[k] ? '✓' : ''}</span>
+                    <span className="fmt-txt"><b>{label}</b><i>{desc}</i></span>
+                  </button>
+                ))}
+              </div>
+              <p className="hint">套用 BlockTempo 上稿規範到「上稿內文」;相關閱讀為預設連結,可在審稿時於編輯器替換。</p>
+            </details>
 
-        <h2 style={{ marginTop: 22 }}>4. 處理模式</h2>
-        <div className="two-col">
-          <div>
-            <label>處理模式</label>
-            <select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
-              <option value="manual">手動模式（逐步審稿）</option>
-              <option value="auto">自動模式（跑完直接發）</option>
-            </select>
-          </div>
-          <div>
-            <label>預設發佈狀態</label>
-            <select value={pubStatus} onChange={(e) => setPubStatus(e.target.value)}>
-              <option value="draft">草稿</option>
-              <option value="pending">待審核</option>
-              <option value="publish">立即發佈</option>
-              <option value="private">私人</option>
-              <option value="future">定時發佈</option>
-            </select>
-          </div>
+            <h2 style={{ marginTop: 18 }}>4. 處理模式</h2>
+            <div className="two-col">
+              <div>
+                <label>處理模式</label>
+                <select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
+                  <option value="manual">手動模式（逐步審稿）</option>
+                  <option value="auto">自動模式（跑完直接發）</option>
+                </select>
+              </div>
+              <div>
+                <label>預設發佈狀態</label>
+                <select value={pubStatus} onChange={(e) => setPubStatus(e.target.value)}>
+                  <option value="draft">草稿</option>
+                  <option value="pending">待審核</option>
+                  <option value="publish">立即發佈</option>
+                  <option value="private">私人</option>
+                  <option value="future">定時發佈</option>
+                </select>
+              </div>
+            </div>
+          </section>
         </div>
 
         <button className="primary" disabled={running || uploading} onClick={() => { const i = gatherInput(); if (i) execute(i) }}>
