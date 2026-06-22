@@ -17,6 +17,7 @@ type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
 
 function rec(o: unknown): Record<string, unknown> { return (o ?? {}) as Record<string, unknown> }
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
 const PIPELINE = 'article'
 
@@ -203,7 +204,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
       setUploaded(u)
       toast.ok(`已上傳：${u.original_name}`)
     } catch (e) {
-      toast.err('上傳失敗：' + String(e))
+      toast.err('上傳失敗：' + errMsg(e))
     } finally { setUploading(false) }
   }
   const dragOver = useGlobalDrop(handleFile)
@@ -374,7 +375,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
             try {
               const out = await publishJob(full.id, pubStatus)
               toast.ok(`自動發布成功（${out.status}）`)
-            } catch (e) { toast.err('自動發布失敗：' + String(e)) }
+            } catch (e) { toast.err('自動發布失敗：' + errMsg(e)) }
           }
           return
         }
@@ -411,7 +412,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
       refreshRecent()
       await attach(id, keepPrefix, true)
     } catch (e) {
-      toast.err('啟動失敗：' + String(e))
+      toast.err('啟動失敗：' + errMsg(e))
       setRunning(false)
       setViews([])
     } finally { submitLock.current = false }
