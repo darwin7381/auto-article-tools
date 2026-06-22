@@ -15,33 +15,39 @@ export function friendlyError(status: number, body: string): string {
   return `${status} ${body.slice(0, 160)}`.trim()
 }
 
-/** frp 在後端未接上時會回 404 HTML 頁;502/503 同理 → 視為「暫時性、可重試」。 */
+/** 後端「確定沒收到請求」——frp 反代在後端未接上時回的 404 HTML 頁。
+ *  這是唯一能保證「請求未被處理」的訊號 → 連 POST 重試都安全(不會重複副作用)。 */
+export function isBackendUnreached(status: number, body: string): boolean {
+  return status === 404 && /<\s*html|powered by|frp/i.test(body)
+}
+/** 暫時性失敗(可重試)——但 502/503/逾時是「曖昧」的:後端可能已處理只是回應遺失。
+ *  因此這類只給「冪等請求(GET)」重試;非冪等(POST)只認 isBackendUnreached。 */
 export function isTransientDown(status: number, body: string): boolean {
-  if (status === 502 || status === 503) return true
-  if (status === 404 && /<\s*html|powered by|frp/i.test(body)) return true
-  return false
+  return status === 502 || status === 503 || isBackendUnreached(status, body)
 }
 function isNetworkError(e: unknown): boolean {
   if (e instanceof DOMException) return e.name === 'TimeoutError' || e.name === 'AbortError'
   return e instanceof TypeError // fetch 連線失敗
 }
 
-/** 帶 timeout + 暫時性失敗自動重試的 fetch(回 Response;錯誤已轉人話)。
- *  重試只在「後端暫時不可達」(frp 404/502/503 / 連線失敗)時發生 —— 此時後端沒收到請求,
- *  即使是 POST 也不會產生重複副作用,安全。真正的 4xx/5xx 業務錯誤不重試。 */
-async function req(path: string, init: RequestInit, { timeoutMs = 20_000, retries = 0 } = {}): Promise<Response> {
+/** 帶 timeout + 自動重試的 fetch(回 Response;錯誤已轉人話)。
+ *  idempotent=true(GET):暫時性失敗(frp404/502/503/連線中斷)都可重試。
+ *  idempotent=false(POST):**只在「後端確定沒收到」(frp 未接上的 404)時重試** ——
+ *    502/503/逾時/連線中斷都「曖昧」(後端可能已處理),重試恐造成重複建 job,故不重試。 */
+async function req(path: string, init: RequestInit,
+                   { timeoutMs = 20_000, retries = 0, idempotent = false } = {}): Promise<Response> {
   let lastMsg = '請求失敗'
   for (let i = 0; i <= retries; i++) {
     try {
       const r = await fetch(`${API_BASE}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) })
       if (r.ok) return r
       const body = await r.text()
-      if (isTransientDown(r.status, body) && i < retries) {
-        lastMsg = friendlyError(r.status, body); await sleep(700 * (i + 1)); continue
-      }
+      const canRetry = idempotent ? isTransientDown(r.status, body) : isBackendUnreached(r.status, body)
+      if (canRetry && i < retries) { lastMsg = friendlyError(r.status, body); await sleep(700 * (i + 1)); continue }
       throw new Error(friendlyError(r.status, body))
     } catch (e) {
-      if (isNetworkError(e) && i < retries) { lastMsg = '連線逾時或中斷,重試中…'; await sleep(700 * (i + 1)); continue }
+      // 連線中斷/逾時只給冪等請求重試;POST 曖昧 → 不重試(可能已處理)
+      if (idempotent && isNetworkError(e) && i < retries) { lastMsg = '連線逾時或中斷,重試中…'; await sleep(700 * (i + 1)); continue }
       if (e instanceof Error && !isNetworkError(e)) throw e // 已是人話訊息
       throw new Error(isNetworkError(e) ? '連線逾時或中斷' : lastMsg)
     }
@@ -50,12 +56,13 @@ async function req(path: string, init: RequestInit, { timeoutMs = 20_000, retrie
 }
 
 async function jget<T>(path: string, timeoutMs = 20_000): Promise<T> {
-  return (await req(path, {}, { timeoutMs, retries: 2 })).json()
+  return (await req(path, {}, { timeoutMs, retries: 2, idempotent: true })).json()
 }
 async function jpost<T>(path: string, body: unknown, timeoutMs = 30_000): Promise<T> {
+  // 非冪等:只在「後端未接到請求」時重試,避免重複建 job 等重複副作用
   return (await req(path, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  }, { timeoutMs, retries: 2 })).json()
+  }, { timeoutMs, retries: 2, idempotent: false })).json()
 }
 
 export type Workflow = { name: string; description: string; stages: string[] }
@@ -124,8 +131,9 @@ export const deleteVersion = (scope: string, id: number) =>
 export async function uploadFile(file: File): Promise<{ file: string; original_name: string; size: number }> {
   const fd = new FormData()
   fd.append('file', file)
-  // 60s timeout + 暫時性失敗重試 3 次(後端重啟空窗 ~3-5s,frp 會回 404 → 退避重試自動撐過)
-  return (await req('/uploads', { method: 'POST', body: fd }, { timeoutMs: 60_000, retries: 3 })).json()
+  // 60s timeout + 重試 3 次,但只在「後端未接到請求」(frp 重啟空窗的 404)時重試 ——
+  // 那時檔案根本沒送達後端,不會產生重複暫存檔;曖昧失敗(逾時/502)不重試。
+  return (await req('/uploads', { method: 'POST', body: fd }, { timeoutMs: 60_000, retries: 3, idempotent: false })).json()
 }
 
 export type StreamHandler = (event: string, data: unknown) => void
