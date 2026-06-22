@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { useState } from 'react'
 import { apiBase } from './api'
@@ -5,10 +6,12 @@ import { collapseSame, lineDiff } from './diff'
 
 marked.setOptions({ gfm: true, breaks: true })
 
-/** markdown → HTML（給人看的渲染；表格/標題/清單都成真元素）。 */
-function mdToHtml(md: string): string {
-  try { return marked.parse(md, { async: false }) as string }
-  catch { return md }
+/** markdown → 已消毒 HTML（內容來自不可信來源:抽取文件/網頁/AI 輸出 → 必須 sanitize 防 XSS）。 */
+export function mdToSafeHtml(md: string): string {
+  try {
+    const raw = marked.parse(md, { async: false }) as string
+    return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
+  } catch { return DOMPurify.sanitize(md) }
 }
 
 type Status = 'pending' | 'running' | 'done' | 'error'
@@ -113,7 +116,7 @@ function OutputView({ output, prevOutput }: {
             </div>
           )}
           {html
-            ? <iframe className="htmlframe" srcDoc={html} title="preview" />
+            ? <iframe className="htmlframe" srcDoc={html} title="preview" sandbox="" />
             : md
               ? <MarkdownBox md={md} />
               : (o.text as string)
@@ -135,7 +138,7 @@ function OutputView({ output, prevOutput }: {
 function MarkdownBox({ md }: { md: string }) {
   const LIMIT = 12000
   const truncated = md.length > LIMIT
-  const html = mdToHtml(truncated ? md.slice(0, LIMIT) : md)
+  const html = mdToSafeHtml(truncated ? md.slice(0, LIMIT) : md)
   return (
     <>
       <div className="md-render" dangerouslySetInnerHTML={{ __html: html }} />
