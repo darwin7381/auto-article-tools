@@ -150,15 +150,17 @@ function MarkdownBox({ md }: { md: string }) {
 const ICON: Record<Status, string> = { pending: '○', running: '◐', done: '✓', error: '✕' }
 const STATUS_TEXT: Record<string, string> = { pending: '等待中', running: '處理中', done: '已完成', error: '錯誤' }
 
-function StageCard({ index, stage, prevOutput, originalInput, onRerun }: {
+function StageCard({ index, stage, prevOutput, originalInput, onRerun, forceOpen = false }: {
   index: number
   stage: StageView
   prevOutput: Record<string, unknown> | null
   originalInput: Record<string, unknown>
   onRerun: ((stageId: string, input: Record<string, unknown>) => void) | null
+  forceOpen?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
+  const showOutput = forceOpen || open
   const inputState = index === 0 ? originalInput : (prevOutput ?? {})
   const [draft, setDraft] = useState('')
 
@@ -190,7 +192,7 @@ function StageCard({ index, stage, prevOutput, originalInput, onRerun }: {
           <span className="meta-badge">{curChars} 字{delta != null && delta !== 0 ? ` (${delta > 0 ? '+' : ''}${delta})` : ''}</span>
         )}
         <span className="spacer" />
-        {stage.status === 'done' && stage.output && (
+        {!forceOpen && stage.status === 'done' && stage.output && (
           <button className="link" onClick={() => setOpen((v) => !v)}>{open ? '收合' : '查看'}</button>
         )}
         {onRerun && (stage.status === 'done' || stage.status === 'error') && (
@@ -198,7 +200,10 @@ function StageCard({ index, stage, prevOutput, originalInput, onRerun }: {
         )}
       </div>
       {stage.status === 'running' && <div className="stage-msg">{STAGE_MESSAGES[stage.id] ?? '處理中...'}</div>}
-      {open && stage.output && <OutputView output={stage.output} prevOutput={prevOutput} />}
+      {showOutput && stage.output && <OutputView output={stage.output} prevOutput={prevOutput} />}
+      {forceOpen && stage.status !== 'running' && !stage.output && (
+        <div className="stage-msg muted">此階段尚無輸出{stage.status === 'pending' ? '（等待中）' : ''}。</div>
+      )}
       {editing && (
         <div className="rerun">
           <label>這步的輸入（可編輯後重跑，下游階段會接著重跑）</label>
@@ -213,7 +218,7 @@ function StageCard({ index, stage, prevOutput, originalInput, onRerun }: {
   )
 }
 
-export function StageList({ stages, originalInput, onRerun, grouped = true, meta, totalMs }: {
+export function StageList({ stages, originalInput, onRerun, meta, totalMs }: {
   stages: StageView[]
   originalInput: Record<string, unknown>
   onRerun: ((stageId: string, input: Record<string, unknown>) => void) | null
@@ -226,16 +231,17 @@ export function StageList({ stages, originalInput, onRerun, grouped = true, meta
   const pct = stages.length ? Math.round((doneCount / stages.length) * 100) : 0
   const overallText = hasError ? '錯誤' : pct === 100 ? '已完成' : doneCount > 0 || stages.some((s) => s.status === 'running') ? '處理中' : '等待開始'
 
-  const card = (s: StageView) => {
-    const i = stages.findIndex((x) => x.id === s.id)
-    return (
-      <StageCard key={s.id} index={i} stage={s}
-        prevOutput={i > 0 ? stages[i - 1].output ?? null : null}
-        originalInput={originalInput} onRerun={onRerun} />
-    )
-  }
-  const groupedIds = new Set(GROUPS.flatMap((g) => g.ids))
-  const ungrouped = stages.filter((s) => !groupedIds.has(s.id))
+  // 焦點階段：進行中 > 出錯 > 最後一個完成 > 第一個。使用者點選則固定（pin）。
+  const running = stages.find((s) => s.status === 'running')
+  const errored = stages.find((s) => s.status === 'error')
+  const lastDone = [...stages].reverse().find((s) => s.status === 'done')
+  const focusId = (running ?? errored ?? lastDone ?? stages[0])?.id
+  const [sel, setSel] = useState<string | null>(null)
+  const activeId = sel && stages.some((s) => s.id === sel) ? sel : focusId
+  const activeIdx = stages.findIndex((s) => s.id === activeId)
+  const active = activeIdx >= 0 ? stages[activeIdx] : null
+  // 第二群組起點（後期處理）→ 在 stepper 上畫一條分隔
+  const groupStart = GROUPS[1]?.ids[0]
 
   return (
     <div className="stage-list">
@@ -250,21 +256,29 @@ export function StageList({ stages, originalInput, onRerun, grouped = true, meta
         <div className="bar"><div className={`fill ${hasError ? 'bad' : ''}`} style={{ width: `${pct}%` }} /></div>
         {meta && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{meta}</div>}
       </div>
-      {grouped ? (
-        <>
-          {GROUPS.map((g) => {
-            const items = stages.filter((s) => g.ids.includes(s.id))
-            if (items.length === 0) return null
-            return (
-              <div key={g.title} className="stage-group">
-                <div className="group-title">{g.title}</div>
-                {items.map(card)}
-              </div>
-            )
-          })}
-          {ungrouped.length > 0 && <div className="stage-group">{ungrouped.map(card)}</div>}
-        </>
-      ) : stages.map(card)}
+
+      {/* 橫向 stepper：7 階段一眼掌握、狀態著色,點選看詳情(不必往下捲) */}
+      <div className="stepper" role="tablist">
+        {stages.map((s, i) => (
+          <div key={s.id} className="step-wrap">
+            {s.id === groupStart && <span className="step-div" aria-hidden />}
+            <button role="tab" aria-selected={s.id === activeId}
+              className={`step ${s.status} ${s.id === activeId ? 'sel' : ''}`}
+              onClick={() => setSel(s.id)}>
+              <span className="step-ic">{ICON[s.status]}</span>
+              <span className="step-name">{i + 1}. {STAGE_LABELS[s.id] ?? s.id}</span>
+              {s.elapsedMs != null && <span className="step-meta">{fmtMs(s.elapsedMs)}</span>}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* 焦點階段詳情 */}
+      {active && (
+        <StageCard key={active.id} index={activeIdx} stage={active} forceOpen
+          prevOutput={activeIdx > 0 ? stages[activeIdx - 1].output ?? null : null}
+          originalInput={originalInput} onRerun={onRerun} />
+      )}
     </div>
   )
 }

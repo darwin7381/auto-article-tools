@@ -180,6 +180,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const [supplier, setSupplier] = useState('')
   const [fmt, setFmt] = pref('formatting', { headings: true, intro_quote: true, dropcap: true, related: true })
   const [running, setRunning] = useState(false)
+  const [setupOpen, setSetupOpen] = useState(true)  // 有 job 在跑/載入後自動收起設定區,把畫面讓給進度與結果
   const [views, setViews] = useState<StageView[]>([])
   const [job, setJob] = useState<Job | null>(null)
   const [recent, setRecent] = useState<Job[]>([])
@@ -315,6 +316,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
     setWatchingId(id)
     setJob(null)
     setRunning(true)
+    setSetupOpen(false)  // 載入/接回 job → 收起設定區,聚焦進度與結果
     // ⚡ 快取命中（已完成 job 不可變）→ 零網路、秒開
     const cached = jobCache.current.get(id)
     if (cached) {
@@ -392,6 +394,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
     const keepPrefix = fromStage ? views.slice(0, startIdx) : []
     // ⚡ 點下去「立刻」有反應：鎖按鈕 + 渲染骨架，不等任何網路往返
     setRunning(true)
+    setSetupOpen(false)  // 開始處理 → 收起設定區
     setJob(null)
     setLastInput(inputObj)
     setViews(() => {
@@ -422,10 +425,32 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   })()
   const totalMs = job ? jobDurMs(job) : null
 
+  // 摘要列優先反映「目前掛載的 job」(lastInput);無 job 時退回表單目前選擇
+  const li = rec(lastInput)
+  const liType = (li.article_type as string) || atype
+  const typeLabel = TYPE_OPTS.find((o) => o.key === liType)?.label ?? liType
+  const liSrc = li.url
+    ? { icon: '🔗', text: String(li.url).replace(/^https?:\/\//, '').slice(0, 48) }
+    : li.file
+      ? { icon: '📄', text: String(li.file).split('/').pop() ?? '檔案' }
+      : imode === 'file'
+        ? { icon: '📄', text: uploaded?.original_name ?? '未選檔案' }
+        : { icon: '🔗', text: url ? url.replace(/^https?:\/\//, '').slice(0, 48) : '未填連結' }
+  const modeLabel = mode === 'auto' ? '自動模式' : '手動模式'
+
   return (
     <div className="run-layout">
       {dragOver && <div className="drop-overlay"><div>📄 放開以上傳檔案</div></div>}
-      <div className="panel run-input">
+      {!setupOpen && (
+        <div className="setup-bar">
+          <span className="sb-chip type">{typeLabel}</span>
+          <span className="sb-chip">{liSrc.icon} {liSrc.text}</span>
+          <span className="sb-chip">{modeLabel}</span>
+          <span className="spacer" />
+          <button className="ghost" onClick={() => setSetupOpen(true)}>編輯設定 / 新任務</button>
+        </div>
+      )}
+      <div className="panel run-input" style={{ display: setupOpen ? 'block' : 'none' }}>
         <div className="input-grid">
           <section className="input-col">
             <h2>1. 進稿</h2>

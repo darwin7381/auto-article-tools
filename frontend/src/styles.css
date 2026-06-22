@@ -497,7 +497,34 @@ button.link.err { color: var(--err); }
 .tiptap table { border-collapse: collapse; margin: 10px 0; }
 .tiptap td, .tiptap th { border: 1px solid var(--border); padding: 5px 9px; min-width: 48px; }
 
-.stage-list { display: flex; flex-direction: column; gap: 8px; }
+.stage-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* 設定收合後的摘要列 */
+.setup-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--border-soft); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); }
+.sb-chip { font-size: 12.5px; color: var(--text); background: var(--panel-2); border: 1px solid var(--border-soft);
+  border-radius: 20px; padding: 4px 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+.sb-chip.type { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); font-weight: 600; }
+
+/* 橫向 stepper：所有階段一眼掌握 */
+.stepper { display: flex; gap: 6px; flex-wrap: wrap; align-items: stretch; }
+.step-wrap { display: flex; align-items: stretch; gap: 6px; }
+.step-div { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
+.step { display: flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 9px;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); cursor: pointer;
+  font-size: 12.5px; transition: border-color .15s, background .15s, color .15s; white-space: nowrap; }
+.step:hover { border-color: var(--accent-2); }
+.step.sel { background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); border-color: var(--accent); color: var(--text); }
+.step .step-ic { width: 15px; text-align: center; }
+.step.done .step-ic { color: var(--ok); }
+.step.running .step-ic { color: var(--accent); animation: spin 1s linear infinite; display: inline-block; }
+.step.error .step-ic { color: var(--err); }
+.step.done { color: var(--text); }
+.step .step-name { font-weight: 500; }
+.step .step-meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* 焦點詳情卡在 stepper 下方,稍微突出 */
+.stage-list > .stage-card { border-color: var(--border); }
+.stage-list > .stage-card.running { border-color: var(--accent); }
 .stage-card { border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); overflow: hidden; }
 .stage-card.running { border-color: var(--accent); }
 .stage-card.done { border-color: #1f3a30; }
