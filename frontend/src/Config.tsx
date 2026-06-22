@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify'
 import { useEffect, useState } from 'react'
 import {
   getAgent, getAgentDefault, getBuiltinTemplates, listAgents,
@@ -158,7 +159,7 @@ function DisclaimerConfig() {
           <div key={k} className="cmp-row">
             <div className="cmp-col def">
               <div className="cmp-label">預設 {label}</div>
-              <div className="ro" dangerouslySetInnerHTML={{ __html: builtin[k] || '(無)' }} />
+              <div className="ro" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(builtin[k] || '(無)') }} />
             </div>
             <div className="cmp-col cur">
               <div className="cmp-label">現用 {label} {diff && <span className="tag-diff">≠ 預設</span>}</div>
