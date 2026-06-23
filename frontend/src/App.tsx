@@ -182,6 +182,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const [fmt, setFmt] = pref('formatting', { headings: true, intro_quote: true, dropcap: true, related: true })
   const [running, setRunning] = useState(false)
   const [setupOpen, setSetupOpen] = useState(true)  // 有 job 在跑/載入後自動收起設定區,把畫面讓給進度與結果
+  const [submitted, setSubmitted] = useState(false)  // 目前掛載的 job 是否為「本次 session 剛送出」(才知道 mode/發佈狀態);載入歷史 job 則未知
   const [views, setViews] = useState<StageView[]>([])
   const [job, setJob] = useState<Job | null>(null)
   const [recent, setRecent] = useState<Job[]>([])
@@ -318,6 +319,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
     setJob(null)
     setRunning(true)
     setSetupOpen(false)  // 載入/接回 job → 收起設定區,聚焦進度與結果
+    setSubmitted(false)  // 載入歷史 job:mode/發佈狀態非 job 屬性 → 未知,摘要不顯示
     // ⚡ 快取命中（已完成 job 不可變）→ 零網路、秒開
     const cached = jobCache.current.get(id)
     if (cached) {
@@ -396,6 +398,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
     // ⚡ 點下去「立刻」有反應：鎖按鈕 + 渲染骨架，不等任何網路往返
     setRunning(true)
     setSetupOpen(false)  // 開始處理 → 收起設定區
+    setSubmitted(true)   // 本次送出:mode/發佈狀態為使用者剛選,摘要可顯示
     setJob(null)
     setLastInput(inputObj)
     setViews(() => {
@@ -426,12 +429,14 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   })()
   const totalMs = job ? jobDurMs(job) : null
 
-  // 摘要嚴格反映「目前掛載的 job」(lastInput) —— 有 job 時只取 job 的輸入,絕不混入表單
-  // 目前狀態(否則 job 沒填的欄位會誤顯示表單殘留值,例如供稿方)。無 job 才退回表單。
+  // 摘要只反映「目前掛載 job」實際記錄的輸入(lastInput);job 沒記的欄位顯示「未紀錄」,
+  // 絕不混入表單狀態、也不捏造預設值(否則歷史 job 會被標上它從未用過的設定)。
   const li = rec(lastInput)
-  const hasJob = Boolean(li.file || li.url)
-  const liType = hasJob ? String(li.article_type || atype) : atype
-  const typeLabel = TYPE_OPTS.find((o) => o.key === liType)?.label ?? liType
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(li, k) && li[k] != null
+  const UNKNOWN = '未紀錄'
+  const dLabel = (k: string) => DISCLAIMER_OPTS.find((d) => d.key === k)?.label ?? k
+  const typeLabel = has('article_type')
+    ? (TYPE_OPTS.find((o) => o.key === li.article_type)?.label ?? String(li.article_type)) : UNKNOWN
   const liSrc = li.url
     ? { icon: '🔗', text: String(li.url).replace(/^https?:\/\//, '').slice(0, 60) }
     : li.file
@@ -439,16 +444,19 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
       : imode === 'file'
         ? { icon: '📄', text: uploaded?.original_name ?? '未選檔案' }
         : { icon: '🔗', text: url ? url.replace(/^https?:\/\//, '').slice(0, 60) : '未填連結' }
-  const modeLabel = mode === 'auto' ? '自動模式（跑完直接發）' : '手動模式（逐步審稿）'
-  const dLabel = (k: string) => DISCLAIMER_OPTS.find((d) => d.key === k)?.label ?? k
-  const sHeader = hasJob ? String(li.header_disclaimer || 'none') : headerD
-  const sFooter = hasJob ? String(li.footer_disclaimer || 'none') : footerD
-  const sFmt: Record<string, boolean> = hasJob ? ((li.formatting as Record<string, boolean>) || {}) : fmt
-  const sSupplier = hasJob ? String(li.supplier || '') : supplier
-  const pubLabel = ({ draft: '草稿', pending: '待審核', publish: '立即發佈', private: '私人', future: '定時發佈' } as Record<string, string>)[pubStatus] ?? pubStatus
+  const disclaimerTxt = has('header_disclaimer') || has('footer_disclaimer')
+    ? `${dLabel(String(li.header_disclaimer ?? 'none'))} / ${dLabel(String(li.footer_disclaimer ?? 'none'))}` : UNKNOWN
+  const fmtKnown = has('formatting') && typeof li.formatting === 'object'
+  const sFmt = (fmtKnown ? li.formatting : {}) as Record<string, boolean>
   const fmtOn = ([
     ['headings', '標題正規化'], ['intro_quote', '引言'], ['dropcap', 'Dropcap'], ['related', 'TG+相關閱讀'],
   ] as const).filter(([k]) => sFmt[k]).map(([, l]) => l)
+  const fmtTxt = fmtKnown ? `${fmtOn.length ? fmtOn.join('、') : '全關'}（${fmtOn.length}/4）` : UNKNOWN
+  const supplierKnown = has('supplier')
+  const sSupplier = supplierKnown ? String(li.supplier || '') : ''
+  // 處理模式 / 發佈狀態不是 job 的持久化屬性 → 只有「本次 session 剛送出」才知道,載入歷史 job 不顯示
+  const modeLabel = mode === 'auto' ? '自動模式（跑完直接發）' : '手動模式（逐步審稿）'
+  const pubLabel = ({ draft: '草稿', pending: '待審核', publish: '立即發佈', private: '私人', future: '定時發佈' } as Record<string, string>)[pubStatus] ?? pubStatus
 
   return (
     <div className="run-layout">
@@ -462,10 +470,10 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
             <button className="ghost" onClick={() => setSetupOpen(true)}>編輯設定 / 新任務</button>
           </div>
           <div className="ss-grid">
-            <div className="ss-item"><span className="ss-k">處理模式</span><span>{modeLabel} · {pubLabel}</span></div>
-            <div className="ss-item"><span className="ss-k">開頭 / 末尾押註</span><span>{dLabel(sHeader)} / {dLabel(sFooter)}</span></div>
-            <div className="ss-item"><span className="ss-k">進階組稿</span><span>{fmtOn.length ? fmtOn.join('、') : '全關'}（{fmtOn.length}/4）</span></div>
-            <div className="ss-item"><span className="ss-k">供稿方</span><span className={sSupplier ? '' : 'muted'}>{sSupplier || '—'}</span></div>
+            {submitted && <div className="ss-item"><span className="ss-k">處理模式</span><span>{modeLabel} · {pubLabel}</span></div>}
+            <div className="ss-item"><span className="ss-k">開頭 / 末尾押註</span><span className={disclaimerTxt === UNKNOWN ? 'muted' : ''}>{disclaimerTxt}</span></div>
+            <div className="ss-item"><span className="ss-k">進階組稿</span><span className={fmtKnown ? '' : 'muted'}>{fmtTxt}</span></div>
+            <div className="ss-item"><span className="ss-k">供稿方</span><span className={sSupplier ? '' : 'muted'}>{supplierKnown ? (sSupplier || '—') : UNKNOWN}</span></div>
           </div>
         </div>
       )}
