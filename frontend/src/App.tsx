@@ -426,9 +426,11 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   })()
   const totalMs = job ? jobDurMs(job) : null
 
-  // 摘要優先反映「目前掛載的 job」(lastInput);無 job 時退回表單目前選擇
+  // 摘要嚴格反映「目前掛載的 job」(lastInput) —— 有 job 時只取 job 的輸入,絕不混入表單
+  // 目前狀態(否則 job 沒填的欄位會誤顯示表單殘留值,例如供稿方)。無 job 才退回表單。
   const li = rec(lastInput)
-  const liType = (li.article_type as string) || atype
+  const hasJob = Boolean(li.file || li.url)
+  const liType = hasJob ? String(li.article_type || atype) : atype
   const typeLabel = TYPE_OPTS.find((o) => o.key === liType)?.label ?? liType
   const liSrc = li.url
     ? { icon: '🔗', text: String(li.url).replace(/^https?:\/\//, '').slice(0, 60) }
@@ -439,10 +441,10 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
         : { icon: '🔗', text: url ? url.replace(/^https?:\/\//, '').slice(0, 60) : '未填連結' }
   const modeLabel = mode === 'auto' ? '自動模式（跑完直接發）' : '手動模式（逐步審稿）'
   const dLabel = (k: string) => DISCLAIMER_OPTS.find((d) => d.key === k)?.label ?? k
-  const sHeader = (li.header_disclaimer as string) ?? headerD
-  const sFooter = (li.footer_disclaimer as string) ?? footerD
-  const sFmt = (li.formatting as Record<string, boolean>) || fmt
-  const sSupplier = (li.supplier as string) || supplier
+  const sHeader = hasJob ? String(li.header_disclaimer || 'none') : headerD
+  const sFooter = hasJob ? String(li.footer_disclaimer || 'none') : footerD
+  const sFmt: Record<string, boolean> = hasJob ? ((li.formatting as Record<string, boolean>) || {}) : fmt
+  const sSupplier = hasJob ? String(li.supplier || '') : supplier
   const pubLabel = ({ draft: '草稿', pending: '待審核', publish: '立即發佈', private: '私人', future: '定時發佈' } as Record<string, string>)[pubStatus] ?? pubStatus
   const fmtOn = ([
     ['headings', '標題正規化'], ['intro_quote', '引言'], ['dropcap', 'Dropcap'], ['related', 'TG+相關閱讀'],
