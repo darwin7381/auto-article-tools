@@ -426,29 +426,45 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   })()
   const totalMs = job ? jobDurMs(job) : null
 
-  // 摘要列優先反映「目前掛載的 job」(lastInput);無 job 時退回表單目前選擇
+  // 摘要優先反映「目前掛載的 job」(lastInput);無 job 時退回表單目前選擇
   const li = rec(lastInput)
   const liType = (li.article_type as string) || atype
   const typeLabel = TYPE_OPTS.find((o) => o.key === liType)?.label ?? liType
   const liSrc = li.url
-    ? { icon: '🔗', text: String(li.url).replace(/^https?:\/\//, '').slice(0, 48) }
+    ? { icon: '🔗', text: String(li.url).replace(/^https?:\/\//, '').slice(0, 60) }
     : li.file
       ? { icon: '📄', text: String(li.file).split('/').pop() ?? '檔案' }
       : imode === 'file'
         ? { icon: '📄', text: uploaded?.original_name ?? '未選檔案' }
-        : { icon: '🔗', text: url ? url.replace(/^https?:\/\//, '').slice(0, 48) : '未填連結' }
-  const modeLabel = mode === 'auto' ? '自動模式' : '手動模式'
+        : { icon: '🔗', text: url ? url.replace(/^https?:\/\//, '').slice(0, 60) : '未填連結' }
+  const modeLabel = mode === 'auto' ? '自動模式（跑完直接發）' : '手動模式（逐步審稿）'
+  const dLabel = (k: string) => DISCLAIMER_OPTS.find((d) => d.key === k)?.label ?? k
+  const sHeader = (li.header_disclaimer as string) ?? headerD
+  const sFooter = (li.footer_disclaimer as string) ?? footerD
+  const sFmt = (li.formatting as Record<string, boolean>) || fmt
+  const sSupplier = (li.supplier as string) || supplier
+  const pubLabel = ({ draft: '草稿', pending: '待審核', publish: '立即發佈', private: '私人', future: '定時發佈' } as Record<string, string>)[pubStatus] ?? pubStatus
+  const fmtOn = ([
+    ['headings', '標題正規化'], ['intro_quote', '引言'], ['dropcap', 'Dropcap'], ['related', 'TG+相關閱讀'],
+  ] as const).filter(([k]) => sFmt[k]).map(([, l]) => l)
 
   return (
     <div className="run-layout">
       {dragOver && <div className="drop-overlay"><div>📄 放開以上傳檔案</div></div>}
       {!setupOpen && (
-        <div className="setup-bar">
-          <span className="sb-chip type">{typeLabel}</span>
-          <span className="sb-chip">{liSrc.icon} {liSrc.text}</span>
-          <span className="sb-chip">{modeLabel}</span>
-          <span className="spacer" />
-          <button className="ghost" onClick={() => setSetupOpen(true)}>編輯設定 / 新任務</button>
+        <div className="panel setup-summary">
+          <div className="ss-head">
+            <span className="ss-chip type">{typeLabel}</span>
+            <span className="ss-src">{liSrc.icon} {liSrc.text}</span>
+            <span className="spacer" />
+            <button className="ghost" onClick={() => setSetupOpen(true)}>編輯設定 / 新任務</button>
+          </div>
+          <div className="ss-grid">
+            <div className="ss-item"><span className="ss-k">處理模式</span><span>{modeLabel} · {pubLabel}</span></div>
+            <div className="ss-item"><span className="ss-k">開頭 / 末尾押註</span><span>{dLabel(sHeader)} / {dLabel(sFooter)}</span></div>
+            <div className="ss-item"><span className="ss-k">進階組稿</span><span>{fmtOn.length ? fmtOn.join('、') : '全關'}（{fmtOn.length}/4）</span></div>
+            <div className="ss-item"><span className="ss-k">供稿方</span><span className={sSupplier ? '' : 'muted'}>{sSupplier || '—'}</span></div>
+          </div>
         </div>
       )}
       <div className="panel run-input" style={{ display: setupOpen ? 'block' : 'none' }}>
