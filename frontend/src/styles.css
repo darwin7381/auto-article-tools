@@ -321,6 +321,26 @@ tr.click:hover td { background: var(--panel-2); }
 .ri-title { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
 .ri-sub { font-size: 10.5px; color: var(--muted); }
 
+/* 最近任務:可收合 + 橫向捲動的圓角 pill 列(刻意與下方方形 stepper 區隔,避免混淆) */
+.recent { margin: 8px 0 14px; padding: 8px 0; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+.recent-head { display: flex; align-items: center; gap: 7px; background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 12.5px; font-weight: 600; padding: 2px 0; }
+.recent-head:hover { color: var(--text); }
+.recent-caret { font-size: 10px; width: 10px; }
+.recent-n { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 0 7px; font-size: 11px; color: var(--muted); }
+.recent-track { display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto; padding: 9px 2px 3px; -webkit-overflow-scrolling: touch; }
+.job-pill { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--text); cursor: pointer; font-size: 12px; white-space: nowrap; transition: border-color .14s; }
+.job-pill:hover { border-color: var(--accent-2); }
+.job-pill.cur { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+.job-pill .pdot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--muted); }
+.job-pill .pdot.done { background: var(--ok); }
+.job-pill .pdot.running, .job-pill .pdot.pending { background: var(--accent); animation: pulse 1.2s ease infinite; }
+.job-pill .pdot.error { background: var(--err); }
+.job-pill .jp-id { font-weight: 600; }
+.job-pill .jp-src { color: var(--muted); max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
+.job-pill .jp-time { color: var(--muted); font-size: 11px; }
+
 /* 骨架屏（任務載入中） */
 .skeleton-list { margin-top: 10px; }
 .skel { height: 38px; border-radius: 8px; background: linear-gradient(90deg, var(--panel-2) 25%, var(--border) 50%, var(--panel-2) 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; margin-bottom: 8px; }
@@ -510,6 +530,7 @@ button.link.err { color: var(--err); }
 @media (max-width: 640px) { .ss-grid { grid-template-columns: 1fr; } }
 .ss-item { display: flex; gap: 10px; font-size: 13px; line-height: 1.5; }
 .ss-item .ss-k { color: var(--muted); flex: none; min-width: 92px; }
+.run-input-head { display: flex; align-items: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); }
 
 /* 橫向 stepper：所有階段一眼掌握 */
 .stepper { display: flex; gap: 6px; flex-wrap: wrap; align-items: stretch; }
@@ -527,6 +548,7 @@ button.link.err { color: var(--err); }
 .step.done { color: var(--text); }
 .step .step-name { font-weight: 500; }
 .step .step-meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.step .step-meta.run { color: var(--accent); font-weight: 600; }
 /* 焦點詳情卡在 stepper 下方,稍微突出 */
 .stage-list > .stage-card { border-color: var(--border); }
 .stage-list > .stage-card.running { border-color: var(--accent); }

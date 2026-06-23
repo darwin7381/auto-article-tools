@@ -1,8 +1,34 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiBase } from './api'
 import { collapseSame, lineDiff } from './diff'
+
+// 各階段的典型耗時(ms)——用於「時間加權」的進度估算(AI 階段才是大宗,純比階段數會嚴重失真)。
+const STAGE_EXPECTED_MS: Record<string, number> = {
+  extract: 2000, content_ai: 55000, pr_writer: 55000, format_conversion: 800,
+  copy_editing: 60000, cover_image: 30000, article_formatting: 800,
+}
+const expectedMs = (id: string) => STAGE_EXPECTED_MS[id] ?? 5000
+
+/** 時間加權整體 %：完成階段用實際耗時、進行中用「已跑/預估(封頂95%)」、未開始用預估。
+ *  比「完成階段數/總數」貼近真實(AI 階段才是大宗),且進行中會隨時間平滑前進。 */
+export function weightedProgress(
+  stages: { id: string; status: Status; elapsedMs?: number }[],
+  runElapsed = 0,
+): number {
+  if (!stages.length) return 0
+  const done = stages.filter((s) => s.status === 'done').length
+  if (stages.some((s) => s.status === 'error')) return Math.round((done / stages.length) * 100)
+  if (done === stages.length) return 100
+  const totalEst = stages.reduce((a, s) => a + (s.status === 'done' ? (s.elapsedMs ?? expectedMs(s.id)) : expectedMs(s.id)), 0)
+  const doneEst = stages.reduce((a, s) => {
+    if (s.status === 'done') return a + (s.elapsedMs ?? expectedMs(s.id))
+    if (s.status === 'running') return a + Math.min(expectedMs(s.id) * 0.95, runElapsed)
+    return a
+  }, 0)
+  return totalEst ? Math.min(99, Math.round((doneEst / totalEst) * 100)) : 0
+}
 
 marked.setOptions({ gfm: true, breaks: true })
 
@@ -150,13 +176,14 @@ function MarkdownBox({ md }: { md: string }) {
 const ICON: Record<Status, string> = { pending: '○', running: '◐', done: '✓', error: '✕' }
 const STATUS_TEXT: Record<string, string> = { pending: '等待中', running: '處理中', done: '已完成', error: '錯誤' }
 
-function StageCard({ index, stage, prevOutput, originalInput, onRerun, forceOpen = false }: {
+function StageCard({ index, stage, prevOutput, originalInput, onRerun, forceOpen = false, runningPct }: {
   index: number
   stage: StageView
   prevOutput: Record<string, unknown> | null
   originalInput: Record<string, unknown>
   onRerun: ((stageId: string, input: Record<string, unknown>) => void) | null
   forceOpen?: boolean
+  runningPct?: number
 }) {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -199,7 +226,9 @@ function StageCard({ index, stage, prevOutput, originalInput, onRerun, forceOpen
           <button className="link" onClick={startEdit}>↻ 從這步重跑</button>
         )}
       </div>
-      {stage.status === 'running' && <div className="stage-msg">{STAGE_MESSAGES[stage.id] ?? '處理中...'}</div>}
+      {stage.status === 'running' && (
+        <div className="stage-msg">{STAGE_MESSAGES[stage.id] ?? '處理中...'}{runningPct != null ? ` 約 ${runningPct}%` : ''}</div>
+      )}
       {showOutput && stage.output && <OutputView output={stage.output} prevOutput={prevOutput} />}
       {forceOpen && stage.status !== 'running' && !stage.output && (
         <div className="stage-msg muted">此階段尚無輸出{stage.status === 'pending' ? '（等待中）' : ''}。</div>
@@ -228,11 +257,27 @@ export function StageList({ stages, originalInput, onRerun, meta, totalMs }: {
 }) {
   const doneCount = stages.filter((s) => s.status === 'done').length
   const hasError = stages.some((s) => s.status === 'error')
-  const pct = stages.length ? Math.round((doneCount / stages.length) * 100) : 0
-  const overallText = hasError ? '錯誤' : pct === 100 ? '已完成' : doneCount > 0 || stages.some((s) => s.status === 'running') ? '處理中' : '等待開始'
+  const allDone = stages.length > 0 && doneCount === stages.length
+  const running = stages.find((s) => s.status === 'running')
+
+  // 進行中階段的即時計時:每 0.5s tick 一次,估算該階段已跑多久
+  const [, setNow] = useState(0)
+  const startRef = useRef<{ id: string; t: number } | null>(null)
+  useEffect(() => {
+    if (!running) { startRef.current = null; return }
+    if (startRef.current?.id !== running.id) startRef.current = { id: running.id, t: Date.now() }
+    const iv = setInterval(() => setNow((n) => n + 1), 500)
+    return () => clearInterval(iv)
+  }, [running?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const runElapsed = running && startRef.current ? Date.now() - startRef.current.t : 0
+  // 進行中階段自身的估算 %（封頂 95%,避免未完成卻顯示 100%）
+  const runningPct = running ? Math.min(95, Math.round((runElapsed / expectedMs(running.id)) * 100)) : 0
+
+  // 時間加權的整體 %（純函式,已單元測試）：平滑且貼近真實
+  const pct = weightedProgress(stages, runElapsed)
+  const overallText = hasError ? '錯誤' : allDone ? '已完成' : (doneCount > 0 || running) ? '處理中' : '等待開始'
 
   // 焦點階段：進行中 > 出錯 > 最後一個完成 > 第一個。使用者點選則固定（pin）。
-  const running = stages.find((s) => s.status === 'running')
   const errored = stages.find((s) => s.status === 'error')
   const lastDone = [...stages].reverse().find((s) => s.status === 'done')
   const focusId = (running ?? errored ?? lastDone ?? stages[0])?.id
@@ -267,7 +312,9 @@ export function StageList({ stages, originalInput, onRerun, meta, totalMs }: {
               onClick={() => setSel(s.id)}>
               <span className="step-ic">{ICON[s.status]}</span>
               <span className="step-name">{i + 1}. {STAGE_LABELS[s.id] ?? s.id}</span>
-              {s.elapsedMs != null && <span className="step-meta">{fmtMs(s.elapsedMs)}</span>}
+              {s.status === 'running'
+                ? <span className="step-meta run">{runningPct}%</span>
+                : s.elapsedMs != null && <span className="step-meta">{fmtMs(s.elapsedMs)}</span>}
             </button>
           </div>
         ))}
@@ -276,6 +323,7 @@ export function StageList({ stages, originalInput, onRerun, meta, totalMs }: {
       {/* 焦點階段詳情 */}
       {active && (
         <StageCard key={active.id} index={activeIdx} stage={active} forceOpen
+          runningPct={active.status === 'running' ? runningPct : undefined}
           prevOutput={activeIdx > 0 ? stages[activeIdx - 1].output ?? null : null}
           originalInput={originalInput} onRerun={onRerun} />
       )}

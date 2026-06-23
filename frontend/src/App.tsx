@@ -183,6 +183,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const [running, setRunning] = useState(false)
   const [setupOpen, setSetupOpen] = useState(true)  // 有 job 在跑/載入後自動收起設定區,把畫面讓給進度與結果
   const [submitted, setSubmitted] = useState(false)  // 目前掛載的 job 是否為「本次 session 剛送出」(才知道 mode/發佈狀態);載入歷史 job 則未知
+  const [recentOpen, setRecentOpen] = useState(true)  // 最近任務列可收合
   const [views, setViews] = useState<StageView[]>([])
   const [job, setJob] = useState<Job | null>(null)
   const [recent, setRecent] = useState<Job[]>([])
@@ -478,6 +479,13 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
         </div>
       )}
       <div className="panel run-input" style={{ display: setupOpen ? 'block' : 'none' }}>
+        {views.length > 0 && (
+          <div className="run-input-head">
+            <span className="muted" style={{ fontSize: 12.5 }}>編輯處理設定</span>
+            <span className="spacer" />
+            <button className="ghost" onClick={() => setSetupOpen(false)}>收合 ▲</button>
+          </div>
+        )}
         <div className="input-grid">
           <section className="input-col">
             <h2>1. 進稿</h2>
@@ -573,19 +581,24 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
           <span className="spacer" />
         </div>
         {recent.length > 0 && (
-          <div className="runs-strip">
-            {recent.map((j) => {
-              const st = j.status === 'running' || j.status === 'pending' ? '處理中' : j.status === 'done' ? '完成' : '失敗'
-              return (
-                <button key={j.id} className={`run-item ${j.id === watchingId ? 'cur' : ''}`} onClick={() => attach(j.id)}>
-                  <span className={`dot2 ${j.status}`} />
-                  <span className="ri-main">
-                    <span className="ri-title">#{j.id}{j.start_stage ? ' ↻' : ''} {jobSource(j).slice(0, 18)}</span>
-                    <span className="ri-sub">{st} · {relTime(j.created_at)}</span>
-                  </span>
-                </button>
-              )
-            })}
+          <div className="recent">
+            <button className="recent-head" onClick={() => setRecentOpen((o) => !o)}>
+              <span className="recent-caret">{recentOpen ? '▾' : '▸'}</span>最近任務
+              <span className="recent-n">{recent.length}</span>
+              {!recentOpen && watchingId != null && <span className="muted" style={{ fontWeight: 400 }}>· 目前 #{watchingId}</span>}
+            </button>
+            {recentOpen && (
+              <div className="recent-track">
+                {recent.map((j) => (
+                  <button key={j.id} className={`job-pill ${j.status} ${j.id === watchingId ? 'cur' : ''}`} onClick={() => attach(j.id)}>
+                    <span className={`pdot ${j.status}`} />
+                    <span className="jp-id">#{j.id}{j.start_stage ? '↻' : ''}</span>
+                    <span className="jp-src">{jobSource(j).slice(0, 16)}</span>
+                    <span className="jp-time">{relTime(j.created_at)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {loadingJob != null && views.length === 0 && (
