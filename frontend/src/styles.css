@@ -499,12 +499,17 @@ button.link.err { color: var(--err); }
 
 .stage-list { display: flex; flex-direction: column; gap: 12px; }
 
-/* 設定收合後的摘要列 */
-.setup-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  background: var(--panel); border: 1px solid var(--border-soft); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); }
-.sb-chip { font-size: 12.5px; color: var(--text); background: var(--panel-2); border: 1px solid var(--border-soft);
-  border-radius: 20px; padding: 4px 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
-.sb-chip.type { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); font-weight: 600; }
+/* 設定收合後的摘要卡：不是一條細線,而是仍可一眼確認所有設定的精簡面板 */
+.setup-summary { padding: 14px 18px; }
+.ss-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ss-chip.type { font-size: 13px; font-weight: 600; color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: 20px; padding: 4px 12px; }
+.ss-src { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 52ch; }
+.ss-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 28px; margin-top: 12px;
+  padding-top: 12px; border-top: 1px solid var(--border-soft); }
+@media (max-width: 640px) { .ss-grid { grid-template-columns: 1fr; } }
+.ss-item { display: flex; gap: 10px; font-size: 13px; line-height: 1.5; }
+.ss-item .ss-k { color: var(--muted); flex: none; min-width: 92px; }
 
 /* 橫向 stepper：所有階段一眼掌握 */
 .stepper { display: flex; gap: 6px; flex-wrap: wrap; align-items: stretch; }
