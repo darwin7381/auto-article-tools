@@ -9,6 +9,8 @@ extract → content_ai → pr_writer → format_conversion → copy_editing → 
 
 from __future__ import annotations
 
+import re
+
 from pydantic import BaseModel, Field
 
 from app.core.registry import Workflow, register
@@ -25,6 +27,29 @@ def _fill(template: str, content: str, key: str) -> str:
     """把 ${key} 換成內容；模板沒有該 placeholder 就附在後面。"""
     ph = "${" + key + "}"
     return template.replace(ph, content) if ph in template else f"{template}\n\n{content}"
+
+
+_TABLE_SEP = re.compile(r"\|\s*:?-{2,}")          # markdown 表格分隔列(每表一條)
+_IMG = re.compile(r"!\[[^\]]*\]\((https?://[^)\s]+)\)")
+
+
+def _fidelity_guard(before: str, after: str) -> tuple[str, list[str]]:
+    """偵測 AI 改寫後遺失的表格/圖片(已證實的 AI 端漏失,非抽取問題)。
+
+    回傳 (修正後文字, warnings)。圖片以 URL 不可變、可安全重新補回(附在文末);
+    表格位置會變,不自動補(避免重複/錯位),只發警示讓人工審稿時補。
+    """
+    warnings: list[str] = []
+    bt, at = len(_TABLE_SEP.findall(before)), len(_TABLE_SEP.findall(after))
+    if at < bt:
+        warnings.append(f"表格 {bt}→{at}：AI 改寫時遺失 {bt - at} 個表格,請於審稿時補回")
+    before_imgs = _IMG.findall(before)
+    after_set = set(_IMG.findall(after))
+    missing = [u for u in dict.fromkeys(before_imgs) if u not in after_set]
+    if missing:
+        warnings.append(f"圖片遺失 {len(missing)} 張,已自動補回文末")
+        after = after.rstrip() + "\n\n" + "\n\n".join(f"![]({u})" for u in missing)
+    return after, warnings
 
 
 # ---- copy_editing 的結構化輸出模型（WordPress 發布參數）----
@@ -57,7 +82,9 @@ async def s_content_ai(data: dict, ctx: RunContext) -> dict:
     up = _fill(cfg.user_prompt, data["markdown"], "markdownContent")
     out = await chat(cfg.provider, cfg.model, cfg.system_prompt, up,
                      cfg.temperature if cfg.temperature is not None else 0.3, cfg.max_tokens)
-    return {**data, "model": f"{cfg.provider}/{cfg.model}", "markdown": out}
+    out, warns = _fidelity_guard(data["markdown"], out)  # 偵測/補回 AI 漏掉的表格/圖片
+    return {**data, "model": f"{cfg.provider}/{cfg.model}", "markdown": out,
+            **({"warnings": warns} if warns else {})}
 
 
 async def s_pr_writer(data: dict, ctx: RunContext) -> dict:
@@ -65,7 +92,9 @@ async def s_pr_writer(data: dict, ctx: RunContext) -> dict:
     up = _fill(cfg.user_prompt, data["markdown"], "markdownContent")
     out = await chat(cfg.provider, cfg.model, cfg.system_prompt, up,
                      cfg.temperature if cfg.temperature is not None else 0.4, cfg.max_tokens)
-    return {**data, "model": f"{cfg.provider}/{cfg.model}", "markdown": out}
+    out, warns = _fidelity_guard(data["markdown"], out)
+    return {**data, "model": f"{cfg.provider}/{cfg.model}", "markdown": out,
+            **({"warnings": warns} if warns else {})}
 
 
 async def s_format_conversion(data: dict, ctx: RunContext) -> dict:

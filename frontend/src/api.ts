@@ -1,4 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
+// 預設:dev(vite dev server)打 localhost:8000;production build 走「同源相對路徑」——
+// 因為後端同時供 SPA 與 API(同一 origin),相對路徑經 tunnel 直達後端,
+// 不會撞 https→http mixed-content,也不依賴未進版控的 .env。VITE_API_BASE 可顯式覆寫。
+const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http://localhost:8000' : '')
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 

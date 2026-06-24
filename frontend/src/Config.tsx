@@ -11,6 +11,20 @@ function str(o: Record<string, unknown>, k: string): string {
   return o[k] == null ? '' : String(o[k])
 }
 
+// 版本要保存的全部可編輯欄位(之前只存一半 → 導致 max_tokens/size/quality… 被吃掉)
+const AGENT_FIELDS = ['provider', 'model', 'temperature', 'max_tokens', 'top_p',
+  'system_prompt', 'user_prompt', 'size', 'quality', 'prompt_template'] as const
+const NUM_FIELDS = new Set(['temperature', 'max_tokens', 'top_p'])
+function buildAgentData(o: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const k of AGENT_FIELDS) {
+    const v = o[k]
+    if (v === undefined || v === null || v === '') continue
+    out[k] = NUM_FIELDS.has(k) ? Number(v) : v
+  }
+  return out
+}
+
 export function ConfigPanel() {
   return (
     <>
@@ -27,6 +41,7 @@ function AgentConfig() {
   const [name, setName] = useState('')
   const [base, setBase] = useState<Record<string, unknown>>({}) // seed live (fallback)
   const [cur, setCur] = useState<Record<string, unknown> | null>(null) // 編輯區
+  const [loaded, setLoaded] = useState<Record<string, unknown> | null>(null) // 載入時的快照(判斷是否未儲存)
   const [def, setDef] = useState<Record<string, unknown> | null>(null) // seed 預設
 
   const load = () => listAgents().then((a) => { setAgents(a); if (!name && a[0]) open(a[0].name) }).catch(() => {})
@@ -39,7 +54,8 @@ function AgentConfig() {
     ])
     setBase(b); setDef(d)
     const active = vs?.versions.find((v) => v.is_active)
-    setCur(active ? { ...b, ...active.data } : b) // 有生效版本 → 編輯區顯示生效版本內容
+    const initial = active ? { ...b, ...active.data } : b // 有生效版本 → 編輯區顯示生效版本內容
+    setCur(initial); setLoaded(initial)
   }
   function set(k: string, v: unknown) { setCur((c) => ({ ...(c ?? {}), [k]: v })) }
   function loadDefault() { if (def) { setCur((c) => ({ ...(c ?? {}), ...def })); toast.info('已把預設帶到右側,記得「儲存為新版本」才生效') } }
@@ -47,10 +63,12 @@ function AgentConfig() {
   const c = (cur ?? {}) as Record<string, unknown>
   const d = (def ?? {}) as Record<string, unknown>
   const diff = (k: string) => def != null && str(c, k) !== str(d, k)
+  const isImage = name === 'imageGeneration' || c.prompt_template != null || c.size != null
+  const dirty = cur != null && loaded != null && JSON.stringify(buildAgentData(c)) !== JSON.stringify(buildAgentData(loaded))
 
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
-      <h2>AI Agent 設定 — 預設 vs 現用 + 版本管理</h2>
+      <h2>AI Agent 設定 — 預設 vs 現用 + 版本管理{dirty && <span className="tag-dirty">● 未儲存變更</span>}</h2>
       <div className="agent-chips">
         {agents.map((a) => (
           <button key={a.name} className={`chip-btn ${a.name === name ? 'on' : ''}`} onClick={() => open(a.name)}>{a.name}</button>
@@ -60,11 +78,8 @@ function AgentConfig() {
       {!cur ? <p className="muted">載入中…</p> : (
         <>
           <VersionBar scope={`agent:${name}`} fallbackLabel="seed 預設"
-            getData={() => ({
-              provider: c.provider, model: c.model, temperature: c.temperature,
-              system_prompt: c.system_prompt, user_prompt: c.user_prompt,
-            })}
-            onLoad={(data) => setCur({ ...base, ...data })} />
+            getData={() => buildAgentData(c)}
+            onLoad={(data) => { const v = { ...base, ...data }; setCur(v); setLoaded(v) }} />
 
           <div className="cmp-row">
             <div className="cmp-col def">
@@ -79,10 +94,45 @@ function AgentConfig() {
               </div>
             </div>
           </div>
-          <CmpField label="system prompt" dval={str(d, 'system_prompt')} cval={str(c, 'system_prompt')}
-            diff={diff('system_prompt')} onChange={(v) => set('system_prompt', v)} minH={200} />
-          <CmpField label="user prompt" dval={str(d, 'user_prompt')} cval={str(c, 'user_prompt')}
-            diff={diff('user_prompt')} onChange={(v) => set('user_prompt', v)} minH={90} />
+
+          {isImage ? (
+            <>
+              <CmpField label="prompt template（封面圖提示;可用 ${title} ${contentSummary} ${articleType}）"
+                dval={str(d, 'prompt_template')} cval={str(c, 'prompt_template')}
+                diff={diff('prompt_template')} onChange={(v) => set('prompt_template', v)} minH={120} />
+              <div className="two-col" style={{ marginTop: 8 }}>
+                <div>
+                  <label>尺寸 size {diff('size') && <span className="tag-diff">≠</span>}</label>
+                  <input type="text" value={str(c, 'size')} placeholder="1536x1024" onChange={(e) => set('size', e.target.value)} />
+                </div>
+                <div>
+                  <label>品質 quality {diff('quality') && <span className="tag-diff">≠</span>}</label>
+                  <select value={str(c, 'quality') || 'medium'} onChange={(e) => set('quality', e.target.value)}>
+                    <option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+                  </select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <CmpField label="system prompt" dval={str(d, 'system_prompt')} cval={str(c, 'system_prompt')}
+                diff={diff('system_prompt')} onChange={(v) => set('system_prompt', v)} minH={200} />
+              <CmpField label="user prompt" dval={str(d, 'user_prompt')} cval={str(c, 'user_prompt')}
+                diff={diff('user_prompt')} onChange={(v) => set('user_prompt', v)} minH={90} />
+              <div className="two-col" style={{ marginTop: 8 }}>
+                <div>
+                  <label>溫度 temperature {diff('temperature') && <span className="tag-diff">≠</span>}</label>
+                  <input type="number" step="0.1" min="0" max="2" value={str(c, 'temperature')}
+                    placeholder={str(d, 'temperature') || '0.3'} onChange={(e) => set('temperature', e.target.value)} />
+                </div>
+                <div>
+                  <label>max_tokens {diff('max_tokens') && <span className="tag-diff">≠</span>}</label>
+                  <input type="number" value={str(c, 'max_tokens')}
+                    placeholder={str(d, 'max_tokens') || '(預設)'} onChange={(e) => set('max_tokens', e.target.value)} />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="row" style={{ marginTop: 12 }}>
             <button className="ghost" onClick={loadDefault}>把預設帶到右側</button>
@@ -164,6 +214,8 @@ function DisclaimerConfig() {
             <div className="cmp-col cur">
               <div className="cmp-label">現用 {label} {diff && <span className="tag-diff">≠ 預設</span>}</div>
               <textarea value={cur[k] || ''} onChange={(e) => setCur((p) => ({ ...p, [k]: e.target.value }))} style={{ minHeight: 90 }} />
+              <div className="cmp-label" style={{ marginTop: 6 }}>預覽</div>
+              <div className="ro" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cur[k] || '(空)') }} />
             </div>
           </div>
         )

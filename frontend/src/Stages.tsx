@@ -229,6 +229,11 @@ function StageCard({ index, stage, prevOutput, originalInput, onRerun, forceOpen
       {stage.status === 'running' && (
         <div className="stage-msg">{STAGE_MESSAGES[stage.id] ?? '處理中...'}{runningPct != null ? ` 約 ${runningPct}%` : ''}</div>
       )}
+      {Array.isArray(o.warnings) && (o.warnings as string[]).length > 0 && (
+        <div className="stage-warn">
+          {(o.warnings as string[]).map((w, i) => <div key={i}>⚠️ {w}</div>)}
+        </div>
+      )}
       {showOutput && stage.output && <OutputView output={stage.output} prevOutput={prevOutput} />}
       {forceOpen && stage.status !== 'running' && !stage.output && (
         <div className="stage-msg muted">此階段尚無輸出{stage.status === 'pending' ? '（等待中）' : ''}。</div>
@@ -312,6 +317,7 @@ export function StageList({ stages, originalInput, onRerun, meta, totalMs }: {
               onClick={() => setSel(s.id)}>
               <span className="step-ic">{ICON[s.status]}</span>
               <span className="step-name">{i + 1}. {STAGE_LABELS[s.id] ?? s.id}</span>
+              {Array.isArray(s.output?.warnings) && (s.output!.warnings as unknown[]).length > 0 && <span className="step-warn" title="此階段有警示">⚠️</span>}
               {s.status === 'running'
                 ? <span className="step-meta run">{runningPct}%</span>
                 : s.elapsedMs != null && <span className="step-meta">{fmtMs(s.elapsedMs)}</span>}
