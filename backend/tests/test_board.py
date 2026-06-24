@@ -95,6 +95,46 @@ def test_run_requires_source_and_links_job():
         assert run["column_id"] == cols["processing"]
 
 
+def test_migrate_legacy_board_to_delivery():
+    """舊版看板(含已移除的 kind 'review')→ migrate_board() 升級成 Delivery,不崩潰、保留卡片。"""
+    from sqlalchemy import text
+
+    from app.models import Task, engine, get_session, init_db
+    from app.services import board as svc
+
+    init_db()
+    # 用 raw SQL 造「舊設計」看板的 board + 欄位(ORM 會拒絕已移除的 'review' kind)
+    with engine.begin() as conn:
+        bid = conn.execute(text("INSERT INTO board (name, created_at) VALUES ('BD 內容部', :t)"),
+                           {"t": "2026-06-01 00:00:00"}).lastrowid
+        legacy = [("提案", "backlog"), ("待處理", "ready"), ("待審稿", "review"), ("已發佈", "done")]
+        first_col = None
+        for i, (name, kind) in enumerate(legacy):
+            cid = conn.execute(text('INSERT INTO "column" (board_id, name, kind, position, created_at) '
+                                    'VALUES (:b,:n,:k,:p,:t)'),
+                               {"b": bid, "n": name, "k": kind, "p": float(i), "t": "2026-06-01 00:00:00"}).lastrowid
+            if i == 2:
+                first_col = cid  # 把卡放在 'review' 那欄(會被移除的 kind)
+    # 卡片用 ORM 建(補齊所有 NOT NULL 欄位的預設值)
+    with get_session() as s:
+        s.add(Task(board_id=bid, column_id=first_col, position=1.0, title="舊卡"))
+        s.commit()
+
+    svc.migrate_board()  # 應升級而非崩潰
+
+    snap = svc.board_snapshot(bid)  # 若仍有非法 kind,這裡會 LookupError
+    assert snap["name"] == "Delivery 業務稿處理"
+    kinds = [c["kind"] for c in snap["columns"]]
+    assert kinds == ["backlog", "ready", "processing", "client_review", "publish", "distribution", "done", "archive"]
+    # 卡片保留,移到「需求進線」(backlog)
+    assert len(snap["tasks"]) == 1
+    backlog_id = next(c["id"] for c in snap["columns"] if c["kind"] == "backlog")
+    assert snap["tasks"][0]["column_id"] == backlog_id
+    # 冪等:再跑一次不應再動(已全為合法 kind)
+    svc.migrate_board()
+    assert [c["kind"] for c in svc.board_snapshot(bid)["columns"]] == kinds
+
+
 def test_sync_moves_to_publish_and_notifies_editor():
     from app.models import Job, JobStatus, Task, get_session
     from app.services import board as svc
