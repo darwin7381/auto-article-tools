@@ -180,9 +180,11 @@ export async function streamJob(
 
 export const apiBase = API_BASE
 
-// ──────────────────────── 部門看板 ────────────────────────
+// ──────────────────────── Delivery 看板 ────────────────────────
 export type BoardColumn = { id: number; name: string; kind: string; position: number; wip_limit: number | null }
 export type TaskJob = { job_id: number; status: string; done_stages: string[]; current_stage: string | null; error: string | null }
+export type QuotaUsage = { total: number; used: number; remaining: number }
+export type ContractBrief = { id: number; client: string; name: string; category: string | null; category_usage: QuotaUsage | null }
 export type Task = {
   id: number
   board_id: number
@@ -191,9 +193,22 @@ export type Task = {
   title: string
   type: 'article' | 'general'
   description: string
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  client: string
+  pipeline: string
+  item_type: string
+  bd_owner: string
+  dm_owner: string
+  editor: string
+  contract_id: number | null
+  contract: ContractBrief | null
+  channels: string[]
+  notes: string
+  draft_deadline: string | null
+  publish_deadline: string | null
+  published_urls: Record<string, string>
   assignee: string
   creator: string
-  priority: 'low' | 'normal' | 'high' | 'urgent'
   due_date: string | null
   source_url: string
   source_file: string
@@ -208,30 +223,37 @@ export type Task = {
 }
 export type BoardComment = { id: number; task_id: number; author: string; body: string; created_at: string }
 export type BoardActivity = { id: number; task_id: number; actor: string; kind: string; detail: string; created_at: string }
-export type Board = { id: number; name: string; columns: BoardColumn[]; tasks: Task[] }
-export type TaskDetail = Task & { comments: BoardComment[]; activity: BoardActivity[] }
+export type BoardNotification = { id: number; task_id: number; channel: string; target: string; body: string; created_at: string }
+export type Contract = {
+  id: number; client: string; name: string; mode: string
+  quota: Record<string, number>; usage: Record<string, QuotaUsage>
+  channels: string; notes: string; start_date: string | null; end_date: string | null; created_at: string
+}
+export type ItemTypeMeta = { pipeline: string; quota: string; billable: boolean }
+export type BoardMeta = { item_types: Record<string, ItemTypeMeta>; quota_categories: string[]; roles: Record<string, string[]> }
+export type Board = { id: number; name: string; columns: BoardColumn[]; tasks: Task[]; contracts: Contract[]; meta: BoardMeta }
+export type TaskDetail = Task & { comments: BoardComment[]; activity: BoardActivity[]; notifications: BoardNotification[] }
+
+const patchJson = <T>(path: string, patch: unknown) =>
+  req(path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }, { retries: 0 }).then((r) => r.json() as Promise<T>)
+const del = (path: string) => req(path, { method: 'DELETE' }, { retries: 0 }).then((r) => r.json())
 
 export const getBoard = () => jget<Board>('/board')
 export const getTask = (id: number) => jget<TaskDetail>(`/board/tasks/${id}`)
-export const createTask = (body: Partial<Task> & { title: string; actor?: string }) =>
-  jpost<Task>('/board/tasks', body)
-export const updateTask = (id: number, patch: Partial<Task> & { actor?: string }) =>
-  req(`/board/tasks/${id}`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
-  }, { retries: 0 }).then((r) => r.json() as Promise<Task>)
-export const deleteTask = (id: number) =>
-  req(`/board/tasks/${id}`, { method: 'DELETE' }, { retries: 0 }).then((r) => r.json())
+export const createTask = (body: Partial<Task> & { title: string; actor?: string }) => jpost<Task>('/board/tasks', body)
+export const updateTask = (id: number, patch: Partial<Task> & { actor?: string }) => patchJson<Task>(`/board/tasks/${id}`, patch)
+export const deleteTask = (id: number) => del(`/board/tasks/${id}`)
 export const runTask = (id: number, actor = '') => jpost<Task>(`/board/tasks/${id}/run`, { actor })
-export const addTaskComment = (id: number, bodyText: string, author = '') =>
-  jpost<BoardComment>(`/board/tasks/${id}/comments`, { body: bodyText, author })
-export const createColumn = (name: string, kind = 'custom') =>
-  jpost<BoardColumn>('/board/columns', { name, kind })
-export const updateColumn = (id: number, patch: Partial<BoardColumn>) =>
-  req(`/board/columns/${id}`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
-  }, { retries: 0 }).then((r) => r.json() as Promise<BoardColumn>)
-export const deleteColumn = (id: number) =>
-  req(`/board/columns/${id}`, { method: 'DELETE' }, { retries: 0 }).then((r) => r.json())
+export const addTaskComment = (id: number, bodyText: string, author = '') => jpost<BoardComment>(`/board/tasks/${id}/comments`, { body: bodyText, author })
+export const setTaskUrls = (id: number, urls: Record<string, string>, actor = '') => jpost<Task>(`/board/tasks/${id}/urls`, { urls, actor })
+export const notifyBd = (id: number, actor = '') => jpost<Task>(`/board/tasks/${id}/notify-bd`, { actor })
+export const createColumn = (name: string, kind = 'custom') => jpost<BoardColumn>('/board/columns', { name, kind })
+export const updateColumn = (id: number, patch: Partial<BoardColumn>) => patchJson<BoardColumn>(`/board/columns/${id}`, patch)
+export const deleteColumn = (id: number) => del(`/board/columns/${id}`)
+export const listContracts = () => jget<Contract[]>('/board/contracts')
+export const createContract = (body: Partial<Contract>) => jpost<Contract>('/board/contracts', body)
+export const updateContract = (id: number, patch: Partial<Contract>) => patchJson<Contract>(`/board/contracts/${id}`, patch)
+export const deleteContract = (id: number) => del(`/board/contracts/${id}`)
 
 /** 看板即時串流(卡建立/移動/更新/刪除、留言、欄位變更)。回傳 cleanup 函式。 */
 export function streamBoard(onEvent: StreamHandler, signal?: AbortSignal): void {
