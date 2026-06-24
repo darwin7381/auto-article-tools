@@ -130,9 +130,17 @@ export default function App() {
       <Toasts />
 
       <aside className={`sidebar ${drawer ? 'open' : ''}`}>
-        <div className="brand">
-          <span className="brand-mark">BD</span>
-          <span className="brand-text"><b>內容自動化</b><i>Content Platform</i></span>
+        <div className="side-top">
+          <div className="brand">
+            <span className="brand-mark">BD</span>
+            <span className="brand-text"><b>內容自動化</b><i>Content Platform</i></span>
+          </div>
+          <button className="side-toggle" onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? '展開側邊欄' : '收合側邊欄'} aria-label="收合側邊欄">
+            <svg viewBox="0 0 24 24" fill="none" className={collapsed ? 'flip' : ''}>
+              <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
         <nav className="nav">
           {NAV.map((n) => n.children ? (
@@ -168,13 +176,6 @@ export default function App() {
             <span className="side-foot-txt">{light ? '☀️ 亮色' : '🌙 暗色'}</span>
             <span className="muted side-foot-txt">切換</span>
             <span className="tt-ic">{light ? '☀️' : '🌙'}</span>
-          </button>
-          <button className="side-collapse" onClick={() => setCollapsed(!collapsed)}
-            title={collapsed ? '展開側邊欄' : '收合側邊欄'} aria-label="收合側邊欄">
-            <svg viewBox="0 0 24 24" fill="none" className={collapsed ? 'flip' : ''}>
-              <path d="M14 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="side-foot-txt">收合</span>
           </button>
         </div>
       </aside>

@@ -27,7 +27,7 @@ const SUPERIOR = [
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 130/131(含合成夾具斷言圖片排列位置;1 skip 需 OCR extra)',
+  '自動化測試 pytest 139 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 43',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -284,15 +284,15 @@ const MAIN_MODULES: MainMod[] = [
         how: 'SPA 真路由(每頁獨立網址 / 深連結 / 上一頁,後端 SPA fallback);可收合側邊欄(記憶);SSE 即時逐階段;localStorage 偏好;全頁拖放;index.html no-cache 防快取毒瘤。',
         scenarios: ['桌面 + 手機操作', '分享某 job 連結(/?job=ID)', '重整保留進度', '暗/亮主題切換'],
         strengths: ['真路由 + 深連結 + 上一頁(本輪)', '可收合側邊欄(本輪)', 'RWD(隔離瀏覽器:桌面 1440 + 390 手機驗)', '快取毒瘤已修'],
-        gaps: ['前端無自動化測試(靠隔離瀏覽器經 tunnel 實測)', 'bundle ~750KB 未 code-split'],
+        gaps: ['深層整合測試(RunPanel 完整狀態機 attach/SSE/poll)待補', 'bundle ~870KB 未 code-split'],
         tests: '隔離瀏覽器經 tunnel:路由/深連結/側邊欄收合/RWD/拖放/主題/0 console 錯誤',
       },
     ],
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '130 通過 / 1 skip(OCR extra)', true],
-  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '35/35 通過(路由/側邊欄/上傳/保真守門/XSS/進度估算/safeUrl/helpers)', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '139 通過 / 1 skip(OCR extra)', true],
+  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '43 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl)', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -324,7 +324,7 @@ function AuditsPanel() {
       <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
       <p className="hint" style={{ marginTop: 0 }}>
         獨立 Claude subagent(<code>module-capability-auditor</code>)讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴。
-        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→130 + 前端 35 vitest</b> → 稽核分全面回升至 78–88。
+        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→139 + 前端 43 vitest</b> → 稽核分全面回升至 78–88。
         欄位:稽核①=補測前、稽核③=最終。<b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
       </p>
       <div className="table-wrap"><table>
@@ -372,7 +372,7 @@ function StatCards() {
       <Stat label="Jobs 總數" value={String(live.jobs)} />
       <Stat label="完成 Jobs" value={String(live.done)} />
       <Stat label="後端測試" value="139 ✓" ok />
-      <Stat label="前端測試" value="38 ✓" ok />
+      <Stat label="前端測試" value="43 ✓" ok />
     </div>
   )
 }
@@ -424,7 +424,7 @@ export function StatusModules() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 139 通過 / 1 skip;前端 <code>pnpm test</code> 38 通過,並以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 139 通過 / 1 skip;前端 <code>pnpm test</code> 43 通過,並以隔離瀏覽器經 tunnel 實測。</p>
       </div>
     </div>
   )
@@ -525,126 +525,226 @@ export function StatusBoard() {
   )
 }
 
-// 使用說明 / API 文件
-function Doc({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="panel doc-sec"><h2>{title}</h2>{children}</div>
+// ════════════════ 使用說明文件 ════════════════
+function Doc({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return <section id={id} className="panel doc-sec"><h2>{title}</h2>{children}</section>
 }
-function Code({ children }: { children: string }) {
-  return <pre className="log doc-code">{children}</pre>
+function Code({ children, lang }: { children: string; lang?: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard?.writeText(children).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1300) }).catch(() => {})
+  }
+  return (
+    <div className="code-block">
+      <div className="code-bar"><span className="code-lang">{lang || 'shell'}</span>
+        <button className="code-copy" onClick={copy}>{copied ? '✓ 已複製' : '複製'}</button></div>
+      <pre className="doc-code">{children}</pre>
+    </div>
+  )
 }
-const API_ENDPOINTS: [string, string, string][] = [
-  ['GET', '/health', '健康檢查 + 可用 workflow 列表'],
-  ['GET', '/workflows', '列出所有 workflow(article / echo / extract / standardize)'],
-  ['POST', '/jobs', '建立並排入 job:{workflow, input, from_stage?} → {id}'],
-  ['GET', '/jobs?limit=50', '列出近期 job(輕量)'],
-  ['GET', '/jobs/{id}?full=true', '取單一 job(含逐階段輸出);full=false 為輕量輪詢'],
-  ['GET', '/jobs/{id}/stream', 'SSE 即時進度(先重播歷史事件再接 live)'],
-  ['POST', '/uploads', 'multipart 上傳檔案 → {file: "data/uploads/…"}'],
-  ['POST', '/publish', '發布 job 結果到 WordPress:{job_id, status, overrides?}'],
-  ['GET', '/templates/builtin', '內建文稿類型 / 押註範本'],
-  ['GET', '/agents · PUT /agents/{name}', 'Agent 設定讀取 / 更新(provider/model/prompt…)'],
-  ['GET/POST', '/versions/{scope}', 'Prompt / 押註的具名版本管理(+ /{id}/activate 切換)'],
-  ['GET', '/board', '看板整板快照(欄位 + 稿件 + 合約 + meta)'],
-  ['POST/PATCH/DELETE', '/board/tasks · /board/tasks/{id}', '稿件 CRUD(建/編/移欄/刪)'],
-  ['POST', '/board/tasks/{id}/run', '從卡片觸發 bd-pr AI 轉稿(建 job + 掛上 + 移製作中)'],
-  ['POST', '/board/tasks/{id}/comments · /urls · /notify-bd', '留言 / 回填發佈連結 / 通知 BD'],
-  ['GET/POST/PATCH/DELETE', '/board/contracts', '合約 + 額度管理'],
-  ['GET', '/board/stream', '看板即時 SSE(卡建立/移動/留言/欄位變更)'],
+function Method({ m }: { m: string }) {
+  return <>{m.split('/').map((x, i) => <span key={x} className={`api-m m-${x.toLowerCase()}`}>{i > 0 ? ' ' : ''}{x}</span>)}</>
+}
+
+const DOC_TOC: [string, string][] = [
+  ['intro', '平台簡介'], ['quickstart', '快速開始'], ['concepts', '核心概念'],
+  ['web', '網頁操作'], ['cli', 'CLI 用法'], ['api', 'REST API'], ['deploy', '部署 / 維運'],
+]
+const API_GROUPS: { group: string; rows: [string, string, string][] }[] = [
+  {
+    group: '稿件處理(Job / Workflow)',
+    rows: [
+      ['GET', '/health', '健康檢查 + 可用 workflow 列表'],
+      ['GET', '/workflows', '列出所有 workflow(article / echo / extract / standardize)'],
+      ['POST', '/jobs', '建立並排入 job:body {workflow, input, from_stage?} → {id, status}'],
+      ['GET', '/jobs?limit=50', '列出近期 job(輕量,不含完整結果)'],
+      ['GET', '/jobs/{id}?full=true', '取單一 job;full=true 含逐階段輸出,false 為輕量輪詢'],
+      ['GET', '/jobs/{id}/stream', 'SSE 即時進度(先重播歷史事件再接 live;event: stage/done/error)'],
+      ['POST', '/uploads', 'multipart 上傳檔案(欄位 file)→ {file:"data/uploads/…"}'],
+      ['POST', '/publish', '發布 job 結果到 WordPress:{job_id, status:"draft"|"publish", overrides?}'],
+      ['GET', '/templates/builtin', '內建文稿類型 / 押註範本'],
+    ],
+  },
+  {
+    group: '設定 / 版本',
+    rows: [
+      ['GET PUT', '/agents/{name}', 'Agent 設定讀取 / 更新(provider/model/prompt/temperature…)'],
+      ['POST', '/agents/{name}/reset', '重置該 agent 回 seed 預設'],
+      ['GET POST', '/versions/{scope}', 'Prompt / 押註的具名版本(scope 如 agent:contentAgent)'],
+      ['POST', '/versions/{scope}/{id}/activate', '切換生效版本'],
+    ],
+  },
+  {
+    group: 'Delivery 看板',
+    rows: [
+      ['GET', '/board', '整板快照:{columns, tasks, contracts, meta}'],
+      ['POST', '/board/tasks', '建稿件卡(填 item_type 自動帶 pipeline/押註)'],
+      ['PATCH DELETE', '/board/tasks/{id}', '編輯 / 移欄(column_id+position)/ 刪除'],
+      ['GET', '/board/tasks/{id}', '稿件詳情(含 comments / activity / notifications)'],
+      ['POST', '/board/tasks/{id}/run', '觸發 bd-pr AI 轉稿(建 job + 掛上 + 移「製作中」)'],
+      ['POST', '/board/tasks/{id}/comments', '留言:{body, author}'],
+      ['POST', '/board/tasks/{id}/urls', '回填發佈連結:{urls:{website,tg,fb,x,line}}'],
+      ['POST', '/board/tasks/{id}/notify-bd', '通知 BD 回傳客戶'],
+      ['GET POST PATCH DELETE', '/board/contracts', '合約 + 各品項額度管理'],
+      ['POST PATCH DELETE', '/board/columns', '欄位(階段)增刪改'],
+      ['GET', '/board/stream', '看板即時 SSE(task.created/updated/deleted、comment.added、column.changed)'],
+    ],
+  },
 ]
 
-/** /status/docs — 使用說明 / API */
+/** /status/docs — 使用說明文件 */
 export function StatusDocs() {
   return (
-    <div className="status-page doc-page">
-      <Doc title="📖 這是什麼">
-        <p>BlockTempo BD 內容自動化平台。把「客戶稿件從進來到上線」整條自動化,並用一個
-          <b>跨部門業務線看板(Delivery)</b>管理進度。後端 FastAPI(Python),前端 Vite + React,
-          同源托管:一條 tunnel 即可用。</p>
-      </Doc>
+    <div className="docs-layout">
+      <div className="docs-main status-page doc-page">
+        <Doc id="intro" title="平台簡介">
+          <p><b>BlockTempo BD 內容自動化平台</b>——把「客戶稿件從談進來到上線結案」整條業務線自動化,
+            並用一個<b>跨部門 Delivery 看板</b>管理全流程進度。後端 FastAPI(Python / SQLite),
+            前端 Vite + React + TypeScript,後端同源托管前端,一條 tunnel 即可使用、免 CORS。</p>
+          <div className="doc-callout">
+            <b>兩個入口</b>
+            <ul className="tick">
+              <li><b>部門看板</b>(/kanban):跨部門業務線的工作管理 —— 三條 pipeline、合約額度、協作。</li>
+              <li><b>處理稿件</b>(/):單篇稿件的 7 階段 AI 流程 —— 上傳/貼連結 → AI 轉稿 → 審稿 → 發布。看板的「AI 轉稿」其實就是呼叫這條。</li>
+            </ul>
+          </div>
+        </Doc>
 
-      <Doc title="🖥 網頁操作">
-        <h3>1. 部門看板(/kanban)</h3>
-        <ul className="tick">
-          <li>「＋ 新增稿件」建卡:填客戶 / 品項(廣編/快訊/新聞/常規/專訪/深度/Banner)/ 角色 / 合約。</li>
-          <li>切「看板 / 清單 / 表格」三視圖;用「分組」與篩選列重新切資料。</li>
-          <li>點卡開抽屜:編欄位、跑 AI 轉稿、回填發佈連結、留言、看活動軸;Pipeline A 的卡可一鍵跑 bd-pr。</li>
-          <li>合約 / 額度:管理各品項額度,稿件結案自動扣抵。</li>
-        </ul>
-        <h3>2. 處理稿件(/)</h3>
-        <ul className="tick">
-          <li>上傳檔案或貼連結 → 選文稿類型 + 押註 + 供稿方 → 跑 7 階段 AI 流程。</li>
-          <li>逐階段檢視輸出 / 行級 diff / 從任一步重跑;成稿可編輯後一鍵發布 WordPress。</li>
-        </ul>
-        <h3>3. 設定 / Prompt(/settings)</h3>
-        <p className="muted">調整各 Agent 的 provider/model/prompt、押註範本,用具名版本管理切換回溯。</p>
-      </Doc>
+        <Doc id="quickstart" title="快速開始">
+          <h3>情境 A:我有一篇客戶廣編稿要上</h3>
+          <ol className="doc-ol">
+            <li>到<b>部門看板</b> →「＋ 新增稿件」→ 填客戶、品項選「廣編稿」、指定 DM/主審、綁合約。</li>
+            <li>打開卡片 → 在「AI 轉稿」區貼進稿連結或上傳檔路徑 → 按「⚙️ 跑 AI 轉稿」。</li>
+            <li>卡片自動移到「製作中」,跑完自動移「待發佈」並通知主審。</li>
+            <li>主審審稿 → 發官網 + 社群 → 在卡片回填發佈連結 →「通知 BD 回傳客戶」→ 拖到「已結案」(自動扣合約額度)。</li>
+          </ol>
+          <h3>情境 B:我只想快速轉一篇稿(不走看板)</h3>
+          <p>到<b>處理稿件</b>頁,上傳檔案或貼連結、選文稿類型 + 押註 + 供稿方,按開始,逐階段檢視後一鍵發布。</p>
+          <h3>情境 C:批次 / 程式化</h3>
+          <p>用下方 <a href="#cli">CLI</a> 或 <a href="#api">REST API</a>。</p>
+        </Doc>
 
-      <Doc title="⌨️ CLI 用法(在 backend/ 下)">
-        <p className="muted">CLI 與 API 共用同一個 runner;適合批次 / 回歸測試,不進 job 系統。</p>
-        <Code>{`# 列出所有 workflow
+        <Doc id="concepts" title="核心概念">
+          <div className="table-wrap"><table>
+            <thead><tr><th>名詞</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td><b>Workflow</b></td><td>一條處理流程定義;主力是 <code>article</code>(7 階段)。</td></tr>
+              <tr><td><b>Job</b></td><td>一次 workflow 執行,狀態存 DB(durable),可查歷史、SSE 重播、從任一階段重跑。</td></tr>
+              <tr><td><b>稿件卡(Task)</b></td><td>看板上一個工作項;Pipeline A 的卡會掛一個 Job(AI 轉稿)。</td></tr>
+              <tr><td><b>Pipeline</b></td><td>A 廣編/快訊/新聞、B 軟文(常規/專訪/深度)、C Banner;由品項自動判定。</td></tr>
+              <tr><td><b>合約 / 額度</b></td><td>合約=N 篇稿件的額度容器;稿件結案自動扣對應品項額度(新聞稿不扣)。</td></tr>
+              <tr><td><b>角色</b></td><td>BD(談案)/ DM(串接)/ 主審(審稿撰稿);純記名,無權限系統。</td></tr>
+            </tbody>
+          </table></div>
+        </Doc>
+
+        <Doc id="web" title="網頁操作">
+          <h3>1. 部門看板(/kanban)</h3>
+          <ul className="tick">
+            <li><b>建卡</b>:「＋ 新增稿件」填客戶 / 品項 / 角色 / 合約;品項自動帶 pipeline 與押註。</li>
+            <li><b>三視圖</b>:看板(可拖拉)/ 清單(分組可收合)/ 表格(可排序)。</li>
+            <li><b>分組 + 篩選</b>:依階段/Pipeline/客戶/DM/主審/合約… 重新切;篩選列 + 搜尋 + 只看逾期。</li>
+            <li><b>卡片抽屜</b>:編欄位、跑 AI 轉稿、回填發佈連結、留言協作、看活動時間軸、開完整管線。</li>
+            <li><b>合約 / 額度</b>:工具列「📑 合約 / 額度」建合約、設各品項額度、看用量。</li>
+          </ul>
+          <h3>2. 處理稿件(/)</h3>
+          <ul className="tick">
+            <li>上傳檔案(pdf/docx/md/txt/html/rtf/doc/odt)或貼連結 → 選文稿類型 + 押註 + 供稿方。</li>
+            <li>跑 7 階段;逐階段檢視輸出 / 行級 diff / 從任一步重跑;成稿可編輯後一鍵發布 WordPress。</li>
+          </ul>
+          <h3>3. 設定 / Prompt(/settings)</h3>
+          <p className="muted">調整各 Agent 的 provider / model / prompt、押註範本,用具名版本管理切換與回溯。</p>
+        </Doc>
+
+        <Doc id="cli" title="CLI 用法">
+          <p className="muted">在 <code>backend/</code> 下執行;CLI 與 API 共用同一個 runner,適合批次 / 回歸,不進 job 系統。</p>
+          <Code lang="shell">{`# 列出所有 workflow
 uv run python cli.py --list
 
 # 跑一條 article(貼連結)
-uv run python cli.py article --input '{"url":"https://example.com/post","article_type":"sponsored","supplier":"客戶名"}'
+uv run python cli.py article \\
+  --input '{"url":"https://example.com/post","article_type":"sponsored","supplier":"客戶名"}'
 
 # 跑 article(本機檔案)
-uv run python cli.py article --input '{"file":"../input-example/sample.docx","article_type":"press-release"}'
+uv run python cli.py article \\
+  --input '{"file":"../input-example/sample.docx","article_type":"press-release"}'
 
 # 回歸評分(跑 article + 結構評分)
 uv run python cli.py eval --file ../input-example/sample.docx
-uv run python cli.py eval --url https://example.com/post
+uv run python cli.py eval --url  https://example.com/post
 
-# 加 --judge 跑 llm_judge 品質評審(選用開發工具,會用 API key;routine 建議走 evals/ subagent)
+# 加 --judge:llm_judge 品質評審(選用開發工具,會用 API key;routine 建議走 evals/ subagent)
 uv run python cli.py eval --file ../input-example/sample.docx --judge`}</Code>
-      </Doc>
+          <p className="hint"><code>article_type</code>:<code>regular</code> / <code>sponsored</code>(廣編)/ <code>press-release</code>(新聞稿)。</p>
+        </Doc>
 
-      <Doc title="🔌 REST API">
-        <p className="muted">同源:前端打相對路徑;外部呼叫用 <code>https://bd-console.mbp.fud.city</code> 為 base。所有回應為 JSON;SSE 端點回 <code>text/event-stream</code>。目前無 auth(內部工具,走 tunnel)。</p>
-        <div className="table-wrap"><table>
-          <thead><tr><th>方法</th><th>路徑</th><th>說明</th></tr></thead>
-          <tbody>{API_ENDPOINTS.map(([m, path, desc]) => (
-            <tr key={path}><td className="api-m">{m}</td><td><code>{path}</code></td><td className="muted">{desc}</td></tr>
-          ))}</tbody>
-        </table></div>
-        <h3>範例:跑一篇稿(curl)</h3>
-        <Code>{`BASE=https://bd-console.mbp.fud.city
+        <Doc id="api" title="REST API">
+          <p>Base:同源時用相對路徑;外部用 <code>https://bd-console.mbp.fud.city</code>。回應皆 JSON;
+            SSE 端點回 <code>text/event-stream</code>。目前<b>無 auth</b>(內部工具,走 tunnel)。</p>
+          {API_GROUPS.map((g) => (
+            <div key={g.group} className="api-group">
+              <h3>{g.group}</h3>
+              <div className="table-wrap"><table>
+                <thead><tr><th>方法</th><th>路徑</th><th>說明</th></tr></thead>
+                <tbody>{g.rows.map(([m, path, desc]) => (
+                  <tr key={path}><td><Method m={m} /></td><td><code>{path}</code></td><td className="muted">{desc}</td></tr>
+                ))}</tbody>
+              </table></div>
+            </div>
+          ))}
+          <h3>範例:跑一篇稿(curl)</h3>
+          <Code lang="shell">{`BASE=https://bd-console.mbp.fud.city
 
 # 1) 建 job(貼連結)
 curl -s -X POST $BASE/jobs -H 'Content-Type: application/json' \\
   -d '{"workflow":"article","input":{"url":"https://example.com/post","article_type":"sponsored"}}'
 # → {"id": 62, "status": "pending"}
 
-# 2) 看即時進度(SSE)
+# 2) 看即時進度(SSE,事件 event: stage/done/error)
 curl -N $BASE/jobs/62/stream
 
-# 3) 取最終結果
+# 3) 取最終結果(含逐階段輸出)
 curl -s "$BASE/jobs/62?full=true"
 
-# 4) 發布到 WordPress(草稿)
+# 4) 發布到 WordPress(先存草稿)
 curl -s -X POST $BASE/publish -H 'Content-Type: application/json' \\
   -d '{"job_id":62,"status":"draft"}'`}</Code>
-        <h3>範例:看板建卡 + 觸發 AI 轉稿</h3>
-        <Code>{`# 建一張 Pipeline A 稿件卡
+          <h3>範例:看板建卡 + 觸發 AI 轉稿</h3>
+          <Code lang="shell">{`# 建一張 Pipeline A 稿件卡(item_type 自動帶 pipeline/押註)
 curl -s -X POST $BASE/board/tasks -H 'Content-Type: application/json' \\
   -d '{"title":"JPEX 廣編","item_type":"廣編稿","client":"JPEX","source_url":"https://...","dm_owner":"Meg"}'
 # → {"id": 7, "pipeline":"A", ...}
 
-# 觸發 bd-pr AI 轉稿(卡自動移「製作中」,完成自動移「待發佈」)
-curl -s -X POST $BASE/board/tasks/7/run -H 'Content-Type: application/json' -d '{"actor":"Meg"}'`}</Code>
-      </Doc>
+# 觸發 AI 轉稿(卡自動移「製作中」,完成自動移「待發佈」+ 通知主審)
+curl -s -X POST $BASE/board/tasks/7/run -H 'Content-Type: application/json' -d '{"actor":"Meg"}'
 
-      <Doc title="🚀 部署 / 維運">
-        <Code>{`# 前端 build(產出 backend 同源托管的 dist)
+# 訂閱看板即時事件
+curl -N $BASE/board/stream`}</Code>
+          <p className="hint">錯誤格式:FastAPI 標準 <code>{'{"detail":"…"}'}</code>(4xx/5xx)。SSE 斷線可重連,歷史事件會重播。</p>
+        </Doc>
+
+        <Doc id="deploy" title="部署 / 維運">
+          <Code lang="shell">{`# 前端 build(產出 backend 同源托管的 dist)
 cd frontend && pnpm build
 
-# 後端測試 / 跑服務
-cd backend && uv run pytest -q
+# 全套測試
+cd backend && uv run pytest -q          # 後端 139 通過 / 1 skip
+cd frontend && pnpm test -- --run       # 前端 43 通過
+
+# 跑服務(本機)
 cd backend && uv run uvicorn app.main:app --port 8000
 
-# 重啟 launchd 服務(MBP)
+# 重啟 launchd 服務(MBP production)
 launchctl kickstart -k gui/$(id -u)/com.btai.bd-backend`}</Code>
-        <p className="hint">前端 production build 走同源相對路徑(免 CORS、免設 VITE_API_BASE);後端啟動會自動建 DB、遷移舊看板、seed Delivery 預設板。</p>
-      </Doc>
+          <p className="hint">前端 production build 走同源相對路徑(免 CORS、免設 VITE_API_BASE);
+            後端啟動會自動建 DB、遷移舊看板、seed Delivery 預設板。OCR 需 <code>uv sync --extra ocr</code>。</p>
+        </Doc>
+      </div>
+
+      <aside className="docs-toc">
+        <div className="toc-title">本頁目錄</div>
+        <nav>{DOC_TOC.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</nav>
+      </aside>
     </div>
   )
 }
