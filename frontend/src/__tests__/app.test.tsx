@@ -52,8 +52,10 @@ describe('App 路由 + 側邊欄', () => {
   test('深連結子頁 /status/docs 顯示使用說明 + API 文件', () => {
     renderAt('/status/docs')
     expect(screen.getByRole('heading', { level: 1, name: '建構進度' })).toBeInTheDocument()
-    expect(screen.getByText('🔌 REST API')).toBeInTheDocument()
-    expect(screen.getByText('⌨️ CLI 用法(在 backend/ 下)')).toBeInTheDocument()
+    // section 標題用 heading role(避開右側目錄同名 anchor)
+    expect(screen.getByRole('heading', { level: 2, name: 'REST API' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'CLI 用法' })).toBeInTheDocument()
+    expect(screen.getByText('本頁目錄')).toBeInTheDocument()
   })
 
   test('深連結子頁 /status/board 顯示看板與協作', () => {
