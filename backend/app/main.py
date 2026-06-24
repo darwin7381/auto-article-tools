@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 import app.workflows  # noqa: F401  匯入即註冊所有 workflow
 from app.api import (
     agents,
+    board,
     files,
     health,
     jobs,
@@ -20,6 +21,7 @@ from app.api import (
     workflows,
 )
 from app.models.job import init_db
+from app.services.board import seed_default_board
 from app.settings import settings
 from app.worker.jobrunner import start_worker
 
@@ -29,6 +31,7 @@ _FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "d
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    seed_default_board()  # 沒有板時建預設部門板 + 七欄(冪等)
     await start_worker()  # durable job worker（asyncio queue + semaphore）
     yield
 
@@ -46,6 +49,7 @@ app.include_router(health.router)
 app.include_router(agents.router)
 app.include_router(workflows.router)
 app.include_router(jobs.router)
+app.include_router(board.router)
 app.include_router(uploads.router)
 app.include_router(files.router)
 app.include_router(publish.router)

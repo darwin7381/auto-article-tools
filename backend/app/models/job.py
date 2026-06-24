@@ -30,6 +30,7 @@ class Job(SQLModel, table=True):
     status: JobStatus = Field(default=JobStatus.pending)
     input_json: str = "{}"
     start_stage: Optional[str] = None  # 從這個階段重跑（None=從頭）
+    task_id: Optional[int] = None  # 反向關聯:這次執行是哪張看板卡觸發的
     result_json: Optional[str] = None
     events_json: str = "[]"  # 逐階段進度事件（含每階段輸出，供檢視/重跑/斷線重播）
     error: Optional[str] = None

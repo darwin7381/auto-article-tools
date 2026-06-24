@@ -179,3 +179,86 @@ export async function streamJob(
 }
 
 export const apiBase = API_BASE
+
+// ──────────────────────── 部門看板 ────────────────────────
+export type BoardColumn = { id: number; name: string; kind: string; position: number; wip_limit: number | null }
+export type TaskJob = { job_id: number; status: string; done_stages: string[]; current_stage: string | null; error: string | null }
+export type Task = {
+  id: number
+  board_id: number
+  column_id: number
+  position: number
+  title: string
+  type: 'article' | 'general'
+  description: string
+  assignee: string
+  creator: string
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  due_date: string | null
+  source_url: string
+  source_file: string
+  article_type: string
+  supplier: string
+  header_disclaimer: string
+  footer_disclaimer: string
+  job_id: number | null
+  job: TaskJob | null
+  created_at: string
+  updated_at: string
+}
+export type BoardComment = { id: number; task_id: number; author: string; body: string; created_at: string }
+export type BoardActivity = { id: number; task_id: number; actor: string; kind: string; detail: string; created_at: string }
+export type Board = { id: number; name: string; columns: BoardColumn[]; tasks: Task[] }
+export type TaskDetail = Task & { comments: BoardComment[]; activity: BoardActivity[] }
+
+export const getBoard = () => jget<Board>('/board')
+export const getTask = (id: number) => jget<TaskDetail>(`/board/tasks/${id}`)
+export const createTask = (body: Partial<Task> & { title: string; actor?: string }) =>
+  jpost<Task>('/board/tasks', body)
+export const updateTask = (id: number, patch: Partial<Task> & { actor?: string }) =>
+  req(`/board/tasks/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+  }, { retries: 0 }).then((r) => r.json() as Promise<Task>)
+export const deleteTask = (id: number) =>
+  req(`/board/tasks/${id}`, { method: 'DELETE' }, { retries: 0 }).then((r) => r.json())
+export const runTask = (id: number, actor = '') => jpost<Task>(`/board/tasks/${id}/run`, { actor })
+export const addTaskComment = (id: number, bodyText: string, author = '') =>
+  jpost<BoardComment>(`/board/tasks/${id}/comments`, { body: bodyText, author })
+export const createColumn = (name: string, kind = 'custom') =>
+  jpost<BoardColumn>('/board/columns', { name, kind })
+export const updateColumn = (id: number, patch: Partial<BoardColumn>) =>
+  req(`/board/columns/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+  }, { retries: 0 }).then((r) => r.json() as Promise<BoardColumn>)
+export const deleteColumn = (id: number) =>
+  req(`/board/columns/${id}`, { method: 'DELETE' }, { retries: 0 }).then((r) => r.json())
+
+/** 看板即時串流(卡建立/移動/更新/刪除、留言、欄位變更)。回傳 cleanup 函式。 */
+export function streamBoard(onEvent: StreamHandler, signal?: AbortSignal): void {
+  void (async () => {
+    try {
+      const resp = await fetch(`${API_BASE}/board/stream`, { signal })
+      if (!resp.body) return
+      const reader = resp.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const chunks = buffer.split(/\r?\n\r?\n/)
+        buffer = chunks.pop() ?? ''
+        for (const chunk of chunks) {
+          const lines = chunk.split(/\r?\n/)
+          const evLine = lines.find((l) => l.startsWith('event:'))
+          const dataLine = lines.find((l) => l.startsWith('data:'))
+          if (!dataLine) continue
+          const ev = evLine ? evLine.slice(6).trim() : 'message'
+          let parsed: unknown = dataLine.slice(5).trim()
+          try { parsed = JSON.parse(parsed as string) } catch { /* keep raw */ }
+          onEvent(ev, parsed)
+        }
+      }
+    } catch { /* 連線中斷:由呼叫端決定重連 */ }
+  })()
+}

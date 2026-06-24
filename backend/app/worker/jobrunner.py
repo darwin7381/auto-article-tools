@@ -31,6 +31,16 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _sync_board(job_id: int) -> None:
+    """通知看板某 job 狀態變了(若由看板卡觸發)。延遲匯入避免循環;失敗不可拖垮 job。"""
+    try:
+        from app.services.board import sync_task_for_job
+
+        sync_task_for_job(job_id)
+    except Exception:  # noqa: BLE001  看板同步壞掉不能影響核心 job 流程
+        pass
+
+
 def _submit(job_id: int) -> None:
     """跨執行緒安全地把 job_id 排入 app loop 的佇列。"""
     if _loop is not None and _queue is not None:
@@ -67,6 +77,7 @@ async def _run_job(job_id: int) -> None:
             job.updated_at = _now()
             s.add(job)
             s.commit()
+        _sync_board(job_id)  # 若這 job 由看板卡觸發 → 自動把卡移到「AI 處理中」
         events: list[dict] = []
         seq = 0
         result = None
@@ -115,6 +126,7 @@ async def _run_job(job_id: int) -> None:
                 job.updated_at = _now()
                 s.add(job)
                 s.commit()
+        _sync_board(job_id)  # 完成/失敗 → 自動把卡移到「待審稿」/標錯
         _emit("end", {"status": "error" if error else "done"}, persist=False)
 
 
