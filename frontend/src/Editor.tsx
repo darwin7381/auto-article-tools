@@ -3,6 +3,17 @@ import Image from '@tiptap/extension-image'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import StarterKit from '@tiptap/starter-kit'
 import { useEffect, useState } from 'react'
+import { toast } from './toast'
+
+/** 只放行安全網址(http/https/mailto;裸網域補 https);擋掉 javascript:/data: 等注入向量。回 null = 不合法。 */
+export function safeUrl(raw: string): string | null {
+  const t = raw.trim()
+  if (!t) return null
+  if (/^(https?:|mailto:)/i.test(t)) return t
+  if (/^\/\//.test(t)) return 'https:' + t
+  if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(t)) return 'https://' + t // 裸網域
+  return null
+}
 
 /** TipTap 富文本審稿器：可視化 / HTML 雙模式（復刻舊版編輯器並強化）。
  *  用 key={job.id} 讓每次換 job 重新掛載。 */
@@ -41,11 +52,16 @@ export function RichEditor({ html, onChange }: { html: string; onChange: (html: 
   }
   function doInsert() {
     if (insert === 'link' && f1) {
-      if (f2) editor!.chain().focus().insertContent(`<a href="${f1}">${f2}</a>`).run()
-      else editor!.chain().focus().setLink({ href: f1 }).run()
+      const href = safeUrl(f1)
+      if (!href) { toast.err('連結網址無效（僅允許 http/https/mailto）'); return }
+      // 結構化插入(非字串拼 HTML):文字當純文字、href 已驗證 → 杜絕 XSS 注入
+      if (f2) editor!.chain().focus().insertContent({ type: 'text', text: f2, marks: [{ type: 'link', attrs: { href } }] }).run()
+      else editor!.chain().focus().setLink({ href }).run()
     }
     if (insert === 'image' && f1) {
-      editor!.chain().focus().setImage({ src: f1, alt: f2 || '' }).run()
+      const src = safeUrl(f1)
+      if (!src) { toast.err('圖片網址無效（僅允許 http/https）'); return }
+      editor!.chain().focus().setImage({ src, alt: f2 || '' }).run()
     }
     setInsert(null); setF1(''); setF2('')
   }

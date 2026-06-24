@@ -8,7 +8,7 @@ import { StatusPanel } from './Status'
 import { FileDrop, UrlInput, acceptOk, useGlobalDrop, type Uploaded } from './Upload'
 import { Toasts, toast } from './toast'
 import {
-  createJob, getHealth, getJob, listJobs, listWorkflows, publishJob, streamJob, uploadFile,
+  apiBase, createJob, getHealth, getJob, listJobs, listWorkflows, publishJob, streamJob, uploadFile,
   type Job, type Workflow,
 } from './api'
 
@@ -18,6 +18,8 @@ type ArticleType = 'regular' | 'sponsored' | 'press-release'
 
 function rec(o: unknown): Record<string, unknown> { return (o ?? {}) as Record<string, unknown> }
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+const STATUS_LABEL: Record<string, string> = { done: '完成', running: '進行中', pending: '處理中', error: '失敗' }
+const statusLabel = (s: string) => STATUS_LABEL[s] ?? s
 
 const PIPELINE = 'article'
 
@@ -180,6 +182,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   const [footerD, setFooterD] = useState('none')
   const [supplier, setSupplier] = useState('')
   const [fmt, setFmt] = pref('formatting', { headings: true, intro_quote: true, dropcap: true, related: true })
+  const [forceCover, setForceCover] = pref('force-cover', false)  // 勾選=不用原文首圖,強制 AI 生成封面
   const [running, setRunning] = useState(false)
   const [setupOpen, setSetupOpen] = useState(true)  // 有 job 在跑/載入後自動收起設定區,把畫面讓給進度與結果
   const [submitted, setSubmitted] = useState(false)  // 目前掛載的 job 是否為「本次 session 剛送出」(才知道 mode/發佈狀態);載入歷史 job 則未知
@@ -262,7 +265,7 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
   }
 
   function gatherInput(): Record<string, unknown> | null {
-    const base = { article_type: atype, header_disclaimer: headerD, footer_disclaimer: footerD, supplier: supplier.trim(), formatting: fmt }
+    const base = { article_type: atype, header_disclaimer: headerD, footer_disclaimer: footerD, supplier: supplier.trim(), formatting: fmt, force_cover: forceCover }
     if (imode === 'url') {
       if (!url.trim() || !/^https?:\/\/.+\..+/.test(url.trim())) { toast.err('請輸入有效的URL'); return null }
       return { ...base, url: url.trim() }
@@ -564,6 +567,10 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
                 </select>
               </div>
             </div>
+            <label className="check-row" style={{ marginTop: 10 }}>
+              <input type="checkbox" checked={forceCover} onChange={(e) => setForceCover(e.target.checked)} />
+              <span>強制 AI 生成封面圖<i>預設有原文配圖時用首圖省成本;勾選則一律用 gpt-image-2 生成</i></span>
+            </label>
           </section>
         </div>
 
@@ -611,10 +618,10 @@ function RunPanel({ openJobId, onOpened }: { openJobId: number | null; onOpened:
           ? <p className="muted" style={{ marginTop: 10 }}>選好進稿後按「開始處理」。進行中或歷史任務可從上方任務列點開。</p>
           : views.length > 0 && <StageList stages={views} originalInput={lastInput} meta={meta} totalMs={totalMs}
               onRerun={(sid, input) => execute(input, sid)} />}
-        {job && job.status === 'done' && <ResultHero job={job} />}
-        {job && mode === 'manual' && <ReviewPublish job={job} defaultStatus={pubStatus} />}
         {job?.status === 'error' && <div className="err-box" style={{ marginTop: 10 }}>處理錯誤：{job.error}</div>}
       </div>
+      {job && job.status === 'done' && <div className="panel"><ResultHero job={job} /></div>}
+      {job && mode === 'manual' && <ReviewPublish job={job} defaultStatus={pubStatus} />}
     </div>
   )
 }
@@ -627,7 +634,7 @@ function ResultHero({ job }: { job: Job }) {
   if (!wp.title) return null
   return (
     <div className="hero">
-      {cover && <img className="hero-cover" src={cover.startsWith('http') ? cover : cover} alt="cover" />}
+      {cover && <img className="hero-cover" src={cover.startsWith('http') ? cover : `${apiBase}${cover}`} alt="cover" />}
       <div className="hero-body">
         <div className="hero-title">{String(wp.title)}</div>
         {Boolean(wp.excerpt) && <div className="hero-excerpt">{String(wp.excerpt)}</div>}
@@ -647,8 +654,8 @@ function ReviewPublish({ job, defaultStatus }: { job: Job; defaultStatus: string
   const [edited, setEdited] = useState(String(wp.content || ''))
   if (!wp.title) return null
   return (
-    <div className="review">
-      <h2 style={{ marginTop: 18 }}>上稿：人工審稿 → 發布</h2>
+    <div className="panel review">
+      <h2 style={{ marginTop: 0 }}>上稿：人工審稿 → 發布</h2>
       <label>內文校稿（可視化 / HTML 雙模式）</label>
       <RichEditor key={job.id} html={String(wp.content || '')} onChange={setEdited} />
       <PublishForm job={job} editedHtml={edited} defaultStatus={defaultStatus} />
@@ -659,43 +666,72 @@ function ReviewPublish({ job, defaultStatus }: { job: Job; defaultStatus: string
 function JobsPanel({ onOpen }: { onOpen: (id: number) => void }) {
   const [jobs, setJobs] = useState<Job[]>([])
   const [filter, setFilter] = useState('all')
-  const load = () => listJobs().then(setJobs).catch(() => {})
+  const [q, setQ] = useState('')
+  const [limit, setLimit] = useState(30)
+  const [loading, setLoading] = useState(true)
+  const load = () => { setLoading(true); listJobs().then(setJobs).catch(() => {}).finally(() => setLoading(false)) }
   useEffect(() => { load() }, [])
-  const shown = jobs.filter((j) => filter === 'all' || j.status === filter)
+
+  const term = q.trim().toLowerCase()
+  const matched = jobs
+    .filter((j) => filter === 'all' || j.status === filter || (filter === 'running' && j.status === 'pending'))
+    .filter((j) => !term || `#${j.id} ${jobSource(j)} ${j.workflow}`.toLowerCase().includes(term))
+  const shown = matched.slice(0, limit)
+  const counts = { all: jobs.length, done: jobs.filter((j) => j.status === 'done').length,
+    running: jobs.filter((j) => j.status === 'running' || j.status === 'pending').length,
+    error: jobs.filter((j) => j.status === 'error').length }
+
   return (
     <div className="panel">
-      <div className="row" style={{ marginBottom: 10 }}>
+      <div className="row" style={{ marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
         <h2 style={{ margin: 0 }}>Jobs 歷史</h2>
-        <div className="seg" style={{ width: 'auto' }}>
-          {['all', 'done', 'running', 'error'].map((f) => (
-            <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
-              {f === 'all' ? '全部' : f === 'done' ? '完成' : f === 'running' ? '進行中' : '失敗'}
-            </button>
-          ))}
-        </div>
+        <span className="recent-n">{jobs.length}</span>
         <span className="spacer" />
+        <input className="job-search" type="search" value={q} placeholder="搜尋 #編號 / 來源…"
+          onChange={(e) => setQ(e.target.value)} />
         <button className="ghost" onClick={load}>重新整理</button>
       </div>
-      <div className="table-wrap"><table>
-        <thead><tr><th>#</th><th>來源</th><th>流程</th><th>狀態</th><th>耗時</th><th>時間</th></tr></thead>
-        <tbody>
-          {shown.map((j) => {
-            const d = jobDurMs(j)
-            return (
-              <tr key={j.id} className="click" onClick={() => onOpen(j.id)}>
-                <td>{j.id}</td>
-                <td className="muted">{jobSource(j)}</td>
-                <td>{j.workflow}{j.start_stage ? ` ↻${j.start_stage}` : ''}</td>
-                <td><span className={`status ${j.status}`}>{j.status}</span></td>
-                <td className="muted">{j.status === 'done' && d ? `${Math.round(d / 1000)}s` : '—'}</td>
-                <td className="muted">{relTime(j.created_at)}</td>
-              </tr>
-            )
-          })}
-          {shown.length === 0 && <tr><td colSpan={6} className="muted">沒有符合的 job</td></tr>}
-        </tbody>
-      </table></div>
-      <p className="hint" style={{ marginTop: 8 }}>點任一筆回到「處理稿件」載入完整視圖（可查看每階段、重跑、發布）。</p>
+      <div className="seg" style={{ marginBottom: 12 }}>
+        {(['all', 'done', 'running', 'error'] as const).map((f) => (
+          <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
+            {f === 'all' ? '全部' : f === 'done' ? '完成' : f === 'running' ? '進行中' : '失敗'} {counts[f]}
+          </button>
+        ))}
+      </div>
+      {loading && jobs.length === 0
+        ? <div className="skeleton-list">{[0, 1, 2, 3].map((i) => <div key={i} className="skel" style={{ animationDelay: `${i * 0.08}s` }} />)}</div>
+        : jobs.length === 0
+          ? <div className="empty-state"><div className="es-ic">📭</div><p>還沒有任何任務</p><p className="muted">到「處理稿件」上傳檔案或貼連結即可開始。</p></div>
+          : matched.length === 0
+            ? <div className="empty-state"><div className="es-ic">🔍</div><p>沒有符合條件的任務</p><p className="muted">換個關鍵字或篩選試試。</p></div>
+            : (
+              <>
+                <div className="table-wrap"><table className="jobs-table">
+                  <thead><tr><th>#</th><th>來源</th><th>狀態</th><th>耗時</th><th>時間</th><th /></tr></thead>
+                  <tbody>
+                    {shown.map((j) => {
+                      const d = jobDurMs(j)
+                      return (
+                        <tr key={j.id} className="click" onClick={() => onOpen(j.id)}>
+                          <td>#{j.id}{j.start_stage ? ' ↻' : ''}</td>
+                          <td className="muted">{jobSource(j)}</td>
+                          <td><span className={`status ${j.status}`}>{statusLabel(j.status)}</span></td>
+                          <td className="muted">{d ? `${Math.round(d / 1000)}s` : '—'}</td>
+                          <td className="muted">{relTime(j.created_at)}</td>
+                          <td className="row-open">開啟 ›</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table></div>
+                {matched.length > shown.length && (
+                  <button className="ghost" style={{ marginTop: 10 }} onClick={() => setLimit((n) => n + 30)}>
+                    載入更多（還有 {matched.length - shown.length} 筆）
+                  </button>
+                )}
+                <p className="hint" style={{ marginTop: 10 }}>點任一筆回到「處理稿件」載入完整視圖（可查看每階段、重跑、發布）。</p>
+              </>
+            )}
     </div>
   )
 }

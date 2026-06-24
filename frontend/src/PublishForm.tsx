@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { publishJob, type Job } from './api'
 import { toast } from './toast'
 
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+
 function rec(o: unknown): Record<string, unknown> {
   return (o ?? {}) as Record<string, unknown>
 }
@@ -64,8 +66,8 @@ export function PublishForm({ job, editedHtml, defaultStatus }: {
       setDone(out)
       toast.ok(`發布成功（${out.status}）`)
     } catch (e) {
-      setErr(String(e))
-      toast.err('發布失敗')
+      setErr(errMsg(e))
+      toast.err('發布失敗：' + errMsg(e))
     } finally { setBusy(false) }
   }
 
@@ -127,13 +129,16 @@ export function PublishForm({ job, editedHtml, defaultStatus }: {
       )}
 
       <div className="row" style={{ marginTop: 14 }}>
-        <button className="primary" style={{ width: 'auto', marginTop: 0 }} disabled={busy || confirming} onClick={onPublishClick}>
-          {busy ? '發布中...' : '發布到WordPress'}
+        <button className="primary" style={{ width: 'auto', marginTop: 0 }} disabled={busy || confirming || !!done} onClick={onPublishClick}>
+          {done ? '✓ 已發布' : busy ? '發布中...' : '發布到WordPress'}
         </button>
         {done && (
           <span className="ok-box">✓ 發布成功！文章已發送到WordPress（{done.status}）
             {done.link && <> · <a href={done.link} target="_blank" rel="noreferrer">在WordPress中查看文章</a></>}
           </span>
+        )}
+        {done && (
+          <button className="ghost" onClick={() => { setDone(null); setErr('') }}>再次編輯 / 重新發布</button>
         )}
       </div>
       {confirming && (

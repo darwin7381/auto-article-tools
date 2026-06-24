@@ -216,6 +216,35 @@ async def test_structured_returns_obj_and_records_usage(monkeypatch):
     assert llm.usage_var.get()[0]["total_tokens"] == 3   # usage 記入 contextvar
 
 
+def test_fidelity_guard_detects_dropped_table():
+    from app.workflows.article import _fidelity_guard
+
+    before = "文字\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n更多"
+    after = "改寫後的文字,沒有表格了"
+    out, warns = _fidelity_guard(before, after)
+    assert warns and "表格" in warns[0]
+    assert out == after  # 表格不自動補(位置會錯),只警示
+
+
+def test_fidelity_guard_reinjects_dropped_image():
+    from app.workflows.article import _fidelity_guard
+
+    before = "前文 ![](https://x/a.png) 中間 ![](https://x/b.jpg) 後文"
+    after = "改寫後只剩 ![](https://x/a.png)"   # b.jpg 被 AI 丟了
+    out, warns = _fidelity_guard(before, after)
+    assert any("圖片遺失" in w for w in warns)
+    assert "https://x/b.jpg" in out             # 自動補回
+    assert "https://x/a.png" in out
+
+
+def test_fidelity_guard_clean_no_warning():
+    from app.workflows.article import _fidelity_guard
+
+    md = "文 ![](https://x/a.png)\n\n| a |\n| --- |\n| 1 |"
+    out, warns = _fidelity_guard(md, md)
+    assert warns == [] and out == md
+
+
 async def test_runner_captures_stage_tokens():
     """token contextvar 經真實 runner round-trip:stage 內 _record → runner 彙總成 stage 事件 tokens。"""
     from app.core.registry import WORKFLOWS, Workflow, register

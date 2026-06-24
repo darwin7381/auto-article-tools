@@ -133,6 +133,32 @@ def _make_job(result=None):
         return j.id
 
 
+def test_upload_rejects_oversize(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.api import uploads
+    from app.main import app
+    monkeypatch.setattr(uploads, "_MAX_BYTES", 10)  # 縮小上限好測
+    with TestClient(app) as c:
+        r = c.post("/uploads", files={"file": ("big.pdf", b"x" * 50, "application/pdf")})
+        assert r.status_code == 413
+
+
+def test_upload_rejects_empty():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    with TestClient(app) as c:
+        r = c.post("/uploads", files={"file": ("empty.pdf", b"", "application/pdf")})
+        assert r.status_code == 400
+
+
+def test_upload_rejects_bad_ext():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    with TestClient(app) as c:
+        r = c.post("/uploads", files={"file": ("x.exe", b"data", "application/octet-stream")})
+        assert r.status_code == 400
+
+
 def test_publish_endpoint_404():
     from fastapi.testclient import TestClient
     from app.main import app
