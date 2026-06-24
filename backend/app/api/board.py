@@ -1,6 +1,6 @@
-"""部門看板 API —— 整板快照、卡片/欄位 CRUD、觸發 pipeline、即時 SSE。
+"""Delivery 看板 API —— 整板快照、稿件/欄位/合約 CRUD、觸發轉稿、通知、發佈連結、即時 SSE。
 
-無 auth(Joey 指示先做功能):actor/author 由前端帶名字,純記名,不驗證。
+無 auth(Joey 指示先做功能):actor/author 由前端帶名字,純記名。
 """
 
 from __future__ import annotations
@@ -20,26 +20,34 @@ from app.services import board as svc
 router = APIRouter(prefix="/board", tags=["board"])
 
 
-def _default_to_json(o: Any):
-    if isinstance(o, datetime):
-        return o.isoformat()
-    return str(o)
+def _json_default(o: Any):
+    return o.isoformat() if isinstance(o, datetime) else str(o)
 
 
 def _dumps(d: Any) -> str:
-    return json.dumps(d, ensure_ascii=False, default=_default_to_json)
+    return json.dumps(d, ensure_ascii=False, default=_json_default)
 
 
 # ──────────────────────────── 請求模型 ────────────────────────────
 
 class CreateTaskReq(BaseModel):
     title: str
-    type: str = "general"
     column_id: int | None = None
+    type: str | None = None
     description: str = ""
-    assignee: str = ""
     priority: str = "normal"
+    client: str = ""
+    item_type: str = ""
+    bd_owner: str = ""
+    dm_owner: str = ""
+    editor: str = ""
+    contract_id: int | None = None
+    channels: str = ""
+    notes: str = ""
+    draft_deadline: datetime | None = None
+    publish_deadline: datetime | None = None
     due_date: datetime | None = None
+    assignee: str = ""
     source_url: str = ""
     source_file: str = ""
     article_type: str = ""
@@ -52,12 +60,22 @@ class CreateTaskReq(BaseModel):
 class UpdateTaskReq(BaseModel):
     title: str | None = None
     description: str | None = None
-    assignee: str | None = None
     priority: str | None = None
-    due_date: datetime | None = None
     type: str | None = None
     column_id: int | None = None
     position: float | None = None
+    client: str | None = None
+    item_type: str | None = None
+    bd_owner: str | None = None
+    dm_owner: str | None = None
+    editor: str | None = None
+    contract_id: int | None = None
+    channels: str | None = None
+    notes: str | None = None
+    draft_deadline: datetime | None = None
+    publish_deadline: datetime | None = None
+    due_date: datetime | None = None
+    assignee: str | None = None
     source_url: str | None = None
     source_file: str | None = None
     article_type: str | None = None
@@ -76,6 +94,11 @@ class RunReq(BaseModel):
     actor: str = ""
 
 
+class UrlsReq(BaseModel):
+    urls: dict[str, str]
+    actor: str = ""
+
+
 class CreateColumnReq(BaseModel):
     name: str
     kind: str = "custom"
@@ -89,7 +112,18 @@ class UpdateColumnReq(BaseModel):
     kind: str | None = None
 
 
-# ──────────────────────────── 路由 ────────────────────────────
+class ContractReq(BaseModel):
+    client: str = ""
+    name: str = ""
+    mode: str = ""
+    quota: dict[str, int] = {}
+    channels: str = ""
+    notes: str = ""
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+
+
+# ──────────────────────────── 稿件 / 板 ────────────────────────────
 
 @router.get("")
 async def get_board() -> dict:
@@ -143,6 +177,24 @@ async def add_comment(task_id: int, body: CommentReq) -> dict:
         raise HTTPException(404, str(e)) from e
 
 
+@router.post("/tasks/{task_id}/urls")
+async def set_urls(task_id: int, body: UrlsReq) -> dict:
+    try:
+        return svc.update_published_urls(task_id, body.urls, actor=body.actor)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+
+
+@router.post("/tasks/{task_id}/notify-bd")
+async def notify_bd(task_id: int, body: RunReq) -> dict:
+    try:
+        return svc.notify_bd(task_id, actor=body.actor)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+
+
+# ──────────────────────────── 欄位 ────────────────────────────
+
 @router.post("/columns")
 async def create_column(body: CreateColumnReq) -> dict:
     return svc.create_column(svc.get_default_board_id(), body.name, kind=body.kind, wip_limit=body.wip_limit)
@@ -162,12 +214,36 @@ async def delete_column(column_id: int) -> dict:
     return {"ok": True}
 
 
+# ──────────────────────────── 合約 ────────────────────────────
+
+@router.get("/contracts")
+async def list_contracts() -> list[dict]:
+    return svc.list_contracts()
+
+
+@router.post("/contracts")
+async def create_contract(body: ContractReq) -> dict:
+    return svc.create_contract(body.model_dump())
+
+
+@router.patch("/contracts/{contract_id}")
+async def update_contract(contract_id: int, body: ContractReq) -> dict:
+    try:
+        return svc.update_contract(contract_id, body.model_dump(exclude_unset=True))
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+
+
+@router.delete("/contracts/{contract_id}")
+async def delete_contract(contract_id: int) -> dict:
+    svc.delete_contract(contract_id)
+    return {"ok": True}
+
+
+# ──────────────────────────── 即時 SSE ────────────────────────────
+
 @router.get("/stream")
 async def stream_board():
-    """看板即時 SSE:卡建立/移動/更新/刪除、留言、欄位變更。多人同看即時同步。
-
-    快照是真相來源:前端先 GET /board 取整板,再接這條串流套用增量事件。
-    """
     board_id = svc.get_default_board_id()
     q = board_bus.subscribe(board_id)
 
@@ -179,7 +255,7 @@ async def stream_board():
                     ev = await asyncio.wait_for(q.get(), timeout=25)
                     yield {"event": ev["event"], "data": _dumps(ev["data"])}
                 except asyncio.TimeoutError:
-                    yield {"event": "ping", "data": "{}"}  # 心跳,撐住反代連線
+                    yield {"event": "ping", "data": "{}"}
         finally:
             board_bus.unsubscribe(board_id, q)
 
