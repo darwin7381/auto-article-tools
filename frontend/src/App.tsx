@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { BoardPanel } from './Board'
 import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
 import { PublishForm } from './PublishForm'
@@ -12,7 +13,7 @@ import {
   type Job, type Workflow,
 } from './api'
 
-type Tab = '/' | '/history' | '/settings' | '/status'
+type Tab = '/kanban' | '/' | '/history' | '/settings' | '/status'
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
 
@@ -63,6 +64,10 @@ export function jobSource(j: Job): string {
 }
 
 const NAV: { key: Tab; label: string; sub: string; icon: ReactNode }[] = [
+  {
+    key: '/kanban', label: '部門看板', sub: '工作管理 · 全流程進度',
+    icon: <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="5" height="15" rx="1.2" stroke="currentColor" strokeWidth="1.6" /><rect x="9.5" y="4.5" width="5" height="10" rx="1.2" stroke="currentColor" strokeWidth="1.6" /><rect x="15.5" y="4.5" width="5" height="13" rx="1.2" stroke="currentColor" strokeWidth="1.6" /></svg>,
+  },
   {
     key: '/', label: '處理稿件', sub: '進稿 → AI 流程 → 上稿',
     icon: <svg viewBox="0 0 24 24" fill="none"><path d="M5 4h10l4 4v12H5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /><path d="M14 4v5h5M8.5 13h7M8.5 16.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
@@ -160,6 +165,7 @@ export default function App() {
           <div style={{ display: tab === '/' ? 'block' : 'none' }}>
             <RunPanel openJobId={openJobId} onOpened={() => { if (sp.has('job')) { sp.delete('job'); setSp(sp, { replace: true }) } }} />
           </div>
+          {tab === '/kanban' && <BoardPanel onOpenJob={(id) => navigate(`/?job=${id}`)} />}
           {tab === '/history' && <JobsPanel onOpen={(id) => navigate(`/?job=${id}`)} />}
           {tab === '/settings' && <ConfigPanel />}
           {tab === '/status' && <StatusPanel />}
