@@ -237,10 +237,23 @@ def test_fidelity_guard_reinjects_dropped_image():
     assert "https://x/a.png" in out
 
 
+def test_fidelity_guard_reinjects_dropped_local_image():
+    # 抽取的內嵌圖是相對路徑(/files/images/…),不是 http(s)。
+    # 這是「上傳檔的圖被 AI 丟掉」的主路徑,絕不能漏。
+    from app.workflows.article import _fidelity_guard
+
+    before = "前文 ![](/files/images/a.png) 中 ![圖2](/files/images/b.jpg) 後"
+    after = "改寫後只剩 ![](/files/images/a.png)"   # b.jpg 被 AI 丟了
+    out, warns = _fidelity_guard(before, after)
+    assert any("圖片遺失" in w for w in warns)
+    assert "/files/images/b.jpg" in out            # 相對路徑也要自動補回
+    assert "/files/images/a.png" in out
+
+
 def test_fidelity_guard_clean_no_warning():
     from app.workflows.article import _fidelity_guard
 
-    md = "文 ![](https://x/a.png)\n\n| a |\n| --- |\n| 1 |"
+    md = "文 ![](/files/images/a.png)\n\n| a |\n| --- |\n| 1 |"
     out, warns = _fidelity_guard(md, md)
     assert warns == [] and out == md
 

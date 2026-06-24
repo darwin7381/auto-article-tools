@@ -27,7 +27,7 @@ const SUPERIOR = [
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 129/130(含合成夾具斷言圖片排列位置;1 skip 需 OCR extra)',
+  '自動化測試 pytest 130/131(含合成夾具斷言圖片排列位置;1 skip 需 OCR extra)',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -291,7 +291,7 @@ const MAIN_MODULES: MainMod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '129 通過 / 1 skip(OCR extra)', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '130 通過 / 1 skip(OCR extra)', true],
   ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '35/35 通過(路由/側邊欄/上傳/保真守門/XSS/進度估算/safeUrl/helpers)', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
@@ -324,7 +324,7 @@ function AuditsPanel() {
       <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
       <p className="hint" style={{ marginTop: 0 }}>
         獨立 Claude subagent(<code>module-capability-auditor</code>)讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴。
-        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→129 + 前端 35 vitest</b> → 稽核分全面回升至 78–88。
+        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→130 + 前端 35 vitest</b> → 稽核分全面回升至 78–88。
         欄位:稽核①=補測前、稽核③=最終。<b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
       </p>
       <div className="table-wrap"><table>
@@ -368,7 +368,7 @@ export function StatusPanel() {
         <Stat label="Workflows" value={String(live.wf)} />
         <Stat label="Jobs 總數" value={String(live.jobs)} />
         <Stat label="完成 Jobs" value={String(live.done)} />
-        <Stat label="後端測試" value="129 ✓" ok />
+        <Stat label="後端測試" value="130 ✓" ok />
         <Stat label="前端測試" value="35 ✓" ok />
       </div>
 
@@ -415,7 +415,7 @@ export function StatusPanel() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 129 通過 / 1 skip;前端 <code>pnpm test</code> 35 通過,並以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 130 通過 / 1 skip;前端 <code>pnpm test</code> 35 通過,並以隔離瀏覽器經 tunnel 實測。</p>
       </div>
 
       <div className="panel">
