@@ -603,12 +603,9 @@ details summary { cursor: pointer; font-size: 12px; margin: 6px 0; }
 .tiptap img { max-width: 100%; }
 
 /* ════════════════════ 部門看板 Kanban ════════════════════ */
-.board-wrap { display: flex; flex-direction: column; height: calc(100vh - 110px); }
-.board-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.board-name { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
-.board-count { font-size: 13px; }
-.whoami { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
-.whoami input { width: 150px; padding: 6px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
+/* 看板頁跳脫文件頁的 1180 寬度上限,吃滿可用寬度(欄位水平捲動) */
+.content:has(.board-wrap) { max-width: none; }
+.board-wrap { display: flex; flex-direction: column; height: calc(100vh - 124px); }
 
 .board-cols { display: flex; gap: 14px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; flex: 1; min-height: 0; }
 .board-col { flex: 0 0 290px; max-width: 290px; background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 14px; display: flex; flex-direction: column; max-height: 100%; transition: border-color .14s, background .14s; }
@@ -618,10 +615,12 @@ details summary { cursor: pointer; font-size: 12px; margin: 6px 0; }
 .kind-backlog .col-dot { background: #8b94a4; }
 .kind-ready .col-dot { background: var(--accent-2); }
 .kind-processing .col-dot { background: var(--warn); }
-.kind-review .col-dot { background: #b794f6; }
+.kind-client_review .col-dot { background: #b794f6; }
 .kind-publish .col-dot { background: #f6ad55; }
+.kind-distribution .col-dot { background: #38bdf8; }
 .kind-done .col-dot { background: var(--ok); }
 .kind-archive .col-dot { background: #5d6878; }
+.kind-custom .col-dot { background: var(--muted); }
 .col-name { font-weight: 600; font-size: 13.5px; flex: 1; }
 .col-count { font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--border-soft); border-radius: 10px; padding: 1px 8px; }
 .col-count.over { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); }
@@ -704,19 +703,34 @@ button.primary.sm { padding: 6px 12px; font-size: 12.5px; }
 .danger-link:hover { text-decoration: underline; }
 
 /* ── Delivery 看板:工具列 / 篩選 / 三視圖 / Modal ── */
-.board-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
-.bt-left, .bt-right { display: flex; align-items: center; gap: 10px; }
+/* 看板獨佔整個寬度(欄位水平捲動);跳脫文件頁的 1180 上限 */
+.board-wrap { max-width: none; }
+.board-toolbar { display: flex; align-items: center; gap: 12px 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.bt-left, .bt-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .bt-right { margin-left: auto; }
-.view-seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 2px; }
-.view-seg button { padding: 5px 14px; background: transparent; border: none; color: var(--muted); border-radius: 7px; cursor: pointer; font-family: var(--font); font-size: 13px; }
+.view-seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+.view-seg button { padding: 6px 16px; background: transparent; border: none; color: var(--muted); border-radius: 7px; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 500; transition: background .12s, color .12s; }
 .view-seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.bt-group { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
-.bt-group select, .filter-bar select { padding: 6px 9px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12.5px; font-family: var(--font); }
+.view-seg button:not(.on):hover { color: var(--text); }
+.bt-group { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+/* 覆蓋全域 select/input{width:100%}:看板控制項一律自動寬度,才不會各自撐滿整列 */
+.board-toolbar select, .filter-bar select, .filter-bar input, .whoami input { width: auto; }
+.bt-group select, .filter-bar select { padding: 7px 11px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12.5px; font-family: var(--font); cursor: pointer; max-width: 168px; }
+.bt-group select:hover, .filter-bar select:hover { border-color: var(--accent); }
+/* 覆蓋全域 button.primary{width:100%;margin-top:16px}:工具列/Modal/抽屜的按鈕要自動寬度 */
+.board-toolbar button.primary, .board-toolbar button.ghost,
+.modal-foot button.primary, .modal-foot button.ghost,
+.cc-actions button, .dr-run button.primary, .dr-jobstate button,
+button.primary.sm, button.ghost.sm { width: auto; margin-top: 0; }
+.bt-right .ghost, .bt-right .primary { white-space: nowrap; }
+.whoami { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.whoami input { width: 110px; padding: 7px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12.5px; }
 
-.filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 10px; }
-.flt-search { flex: 1; min-width: 180px; padding: 7px 11px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
-.flt-chk { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted); }
-.flt-count { font-size: 12px; margin-left: auto; }
+.filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 10px; }
+.flt-search { flex: 1 1 220px; min-width: 160px; max-width: 340px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
+.flt-search:focus { outline: none; border-color: var(--accent); }
+.flt-chk { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.flt-count { font-size: 12px; margin-left: auto; color: var(--muted); white-space: nowrap; }
 
 .tc-client { font-size: 11px; font-weight: 600; color: var(--accent-2); }
 .tc-roles { display: flex; gap: 8px; color: var(--muted); }
