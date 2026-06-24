@@ -39,4 +39,26 @@ describe('App 路由 + 側邊欄', () => {
     fireEvent.click(statusNav)
     expect(screen.getByRole('heading', { level: 1, name: '建構進度' })).toBeInTheDocument()
   })
+
+  test('建構進度有可展開子頁(進入該區段自動展開)', () => {
+    renderAt('/status')
+    // 子項出現且可直接點
+    for (const label of ['總覽', '模組搭建與測試', '稿件處理', '看板與協作', '使用說明 / API']) {
+      expect(document.querySelector('.nav-children')).toBeTruthy()
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+  })
+
+  test('深連結子頁 /status/docs 顯示使用說明 + API 文件', () => {
+    renderAt('/status/docs')
+    expect(screen.getByRole('heading', { level: 1, name: '建構進度' })).toBeInTheDocument()
+    expect(screen.getByText('🔌 REST API')).toBeInTheDocument()
+    expect(screen.getByText('⌨️ CLI 用法(在 backend/ 下)')).toBeInTheDocument()
+  })
+
+  test('深連結子頁 /status/board 顯示看板與協作', () => {
+    renderAt('/status/board')
+    expect(screen.getByText('📋 Delivery 跨部門業務線看板')).toBeInTheDocument()
+    expect(screen.getByText('🧪 看板與協作測試')).toBeInTheDocument()
+  })
 })

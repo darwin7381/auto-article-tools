@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getHealth, listJobs, listWorkflows, type Job } from './api'
 
@@ -347,7 +347,7 @@ function AuditsPanel() {
   )
 }
 
-export function StatusPanel() {
+function useLiveStats() {
   const [live, setLive] = useState<{ health: boolean; wf: number; jobs: number; done: number }>(
     { health: false, wf: 0, jobs: 0, done: 0 })
   useEffect(() => {
@@ -360,18 +360,80 @@ export function StatusPanel() {
       setLive({ health: h, wf: w, jobs: j.length, done: j.filter((x) => x.status === 'done').length })
     })()
   }, [])
+  return live
+}
 
+function StatCards() {
+  const live = useLiveStats()
+  return (
+    <div className="stat-cards">
+      <Stat label="後端" value={live.health ? '運行中' : '未連線'} ok={live.health} />
+      <Stat label="Workflows" value={String(live.wf)} />
+      <Stat label="Jobs 總數" value={String(live.jobs)} />
+      <Stat label="完成 Jobs" value={String(live.done)} />
+      <Stat label="後端測試" value="139 ✓" ok />
+      <Stat label="前端測試" value="38 ✓" ok />
+    </div>
+  )
+}
+
+/** /status — 總覽 */
+export function StatusOverview() {
   return (
     <div className="status-page">
-      <div className="stat-cards">
-        <Stat label="後端" value={live.health ? '運行中' : '未連線'} ok={live.health} />
-        <Stat label="Workflows" value={String(live.wf)} />
-        <Stat label="Jobs 總數" value={String(live.jobs)} />
-        <Stat label="完成 Jobs" value={String(live.done)} />
-        <Stat label="後端測試" value="130 ✓" ok />
-        <Stat label="前端測試" value="35 ✓" ok />
+      <StatCards />
+      <div className="panel">
+        <h2>三大區塊(左側可展開直接點)</h2>
+        <div className="area-cards">
+          <div className="area-card"><b>🧩 模組搭建與測試</b><span>9 大系統模組的成熟度評分、subagent 獨立稽核、單項測試</span></div>
+          <div className="area-card"><b>📄 稿件處理</b><span>7 階段 AI pipeline、E2E 全流程測試、格式轉換保真度測試</span></div>
+          <div className="area-card"><b>📋 看板與協作</b><span>Delivery 跨部門業務線看板、三視圖/分組/篩選、合約額度、即時協作測試</span></div>
+          <div className="area-card"><b>📖 使用說明 / API</b><span>網頁操作、CLI 用法、完整 REST API 文件</span></div>
+        </div>
       </div>
+      <div className="grid">
+        <div className="panel">
+          <h2>✅ 新版超越舊版</h2>
+          <ul className="tick">{SUPERIOR.map((s) => <li key={s}>{s}</li>)}</ul>
+        </div>
+        <div className="panel">
+          <h2>⚖️ 與舊版對等</h2>
+          <ul className="tick eq">{PARITY.map((s) => <li key={s}>{s}</li>)}</ul>
+        </div>
+      </div>
+      <div className="panel">
+        <h2>🚧 還差的(缺口,依優先序)</h2>
+        <div className="table-wrap"><table>
+          <thead><tr><th>優先</th><th>項目</th><th>說明</th></tr></thead>
+          <tbody>{GAPS.map(([sev, item, desc]) => (
+            <tr key={item}><td style={{ whiteSpace: 'nowrap' }}>{sev}</td><td><b>{item}</b></td><td className="muted">{desc}</td></tr>
+          ))}</tbody>
+        </table></div>
+        <p className="hint">完整逐行比對見 repo <code>docs/OLD-VS-NEW.md</code>。</p>
+      </div>
+    </div>
+  )
+}
 
+/** /status/modules — 模組搭建與測試 */
+export function StatusModules() {
+  return (
+    <div className="status-page">
+      <ModulesPanel />
+      <AuditsPanel />
+      <div className="panel">
+        <h2>🔬 單項測試（unit / 元件）</h2>
+        <TestTable rows={UNIT_TESTS} />
+        <p className="hint">後端 <code>uv run pytest</code> 139 通過 / 1 skip;前端 <code>pnpm test</code> 38 通過,並以隔離瀏覽器經 tunnel 實測。</p>
+      </div>
+    </div>
+  )
+}
+
+/** /status/article — 稿件處理 */
+export function StatusArticle() {
+  return (
+    <div className="status-page">
       <div className="panel">
         <h2>處理流程(7 階段 pipeline)</h2>
         <div className="flow">
@@ -384,50 +446,205 @@ export function StatusPanel() {
           ))}
         </div>
       </div>
-
-      <div className="grid">
-        <div className="panel">
-          <h2>✅ 新版超越舊版</h2>
-          <ul className="tick">{SUPERIOR.map((s) => <li key={s}>{s}</li>)}</ul>
-        </div>
-        <div className="panel">
-          <h2>⚖️ 與舊版對等</h2>
-          <ul className="tick eq">{PARITY.map((s) => <li key={s}>{s}</li>)}</ul>
-        </div>
-      </div>
-
-      <ModulesPanel />
-
-      <AuditsPanel />
-
       <div className="panel">
         <h2>🧪 完整流程測試（E2E,跑整條 pipeline）</h2>
         <TestTable rows={E2E_TESTS} />
-        <p className="hint">最近一次完整重跑:見第一列 job#47(2026-06-18 console 路徑從頭跑)。</p>
+        <p className="hint">最近一次完整重跑:job#61(看板觸發 AI 轉稿,7 階段跑完自動移待發佈)。</p>
       </div>
-
       <div className="panel">
         <h2>🔧 格式轉換保真度測試（最易掉東西的環節 — 合成夾具斷言排列位置 + 真實素材）</h2>
         <TestTable rows={CONV_TESTS} />
-        <p className="hint">🔑 = 用程式即時造夾具,精準斷言「圖片/文字的排列位置」(肉眼難查)。後端 <code>tests/test_conversion.py</code> 30 項;模組覆蓋面/指標/依賴審計見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
+        <p className="hint">🔑 = 用程式即時造夾具,精準斷言「圖片/文字的排列位置」(肉眼難查)。後端 <code>tests/test_conversion.py</code>;模組覆蓋面/指標/依賴審計見 <code>docs/EXTRACTION-MODULE.md</code>。</p>
       </div>
+    </div>
+  )
+}
 
-      <div className="panel">
-        <h2>🔬 單項測試（unit / 元件）</h2>
-        <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 130 通過 / 1 skip;前端 <code>pnpm test</code> 35 通過,並以隔離瀏覽器經 tunnel 實測。</p>
-      </div>
+// 看板與協作:pipeline / 功能 / 測試
+const BOARD_PIPELINES: [string, string, string][] = [
+  ['A', '廣編稿 / 官網快訊 / 新聞稿', '接稿 → 審稿 → AI 轉稿(bd-pr)→ WordPress 草稿 → 編輯審+發官網 → 社群推播 → 回傳'],
+  ['B', '軟文(常規 / 專訪 / 深度)', '登錄需求 → 主審撰稿 → 客戶過稿 → 排程 → 發官網 → 社群 → 回傳'],
+  ['C', 'Banner', '整理規格 → 通知 Joe 上架 → 驗證回傳 → 追下架日 → 下架 → 登錄'],
+]
+const BOARD_FEATURES = [
+  '三視圖:看板(可拖拉)/ 清單(分組可收合)/ 表格(可排序)',
+  'Group by 10 維:階段 / Pipeline / 品項 / 客戶 / DM / BD / 主審 / 優先級 / 合約 / 不分組',
+  'Filter:搜尋 + Pipeline / 品項 / 客戶 / DM / 主審 / 合約 + 只看逾期',
+  '合約=額度容器:6 品項額度,稿件結案自動扣抵,剩餘量顯示在卡片/合約頁(新聞稿不扣)',
+  '品項自動帶 pipeline 與押註參數(廣編→sponsored、新聞稿→press-release…)',
+  'bd-pr AI 轉稿連動:卡片直接觸發,job 跑時卡上即時管線進度,完成自動移「待發佈」',
+  '通知雙線(留接口):到「待發佈」自動通知主審審稿;一鍵通知 BD 回傳客戶',
+  '即時協作:看板 SSE 多人同步(建卡/移卡/留言),留言開著抽屜即時顯示',
+  '發佈連結回填(官網/TG/FB/X/LINE)、留言、活動時間軸、通知紀錄',
+  '舊版看板啟動自動遷移成 Delivery 設計(冪等,不崩潰、保留卡片)',
+]
+const BOARD_TESTS: Row[] = [
+  ['seed 八階段 + meta(品項/額度/角色)', 'test_board_seeded_with_delivery_stages', '通過', true],
+  ['品項自動帶 pipeline / 押註', 'test_item_type_derives_pipeline_and_disclaimer', '通過', true],
+  ['合約額度 + 結案自動扣抵', 'test_contract_quota_and_billing_on_done', '通過', true],
+  ['新聞稿不扣額度', 'test_news_release_not_billable', '通過', true],
+  ['移卡 / 留言 / 刪除 + 活動軸', 'test_move_comment_delete_with_activity', '通過', true],
+  ['發佈連結回填 + 通知 BD', 'test_published_urls_and_notify_bd', '通過', true],
+  ['觸發轉稿需來源 + 掛 job', 'test_run_requires_source_and_links_job', '通過', true],
+  ['job 完成自動移待發佈 + 通知編輯', 'test_sync_moves_to_publish_and_notifies_editor', '通過', true],
+  ['舊版看板自動遷移 Delivery', 'test_migrate_legacy_board_to_delivery', '通過', true],
+  ['前端:三視圖 / 分組 / 篩選 / 建卡', 'board.test.tsx(vitest)', '5 通過', true],
+  ['即時協作:他人留言即時顯示', '隔離瀏覽器(API 注入他人留言)', '無重整即現 ✅', true],
+  ['E2E:建卡→AI轉稿→自動移待發佈→通知編輯', '隔離瀏覽器 job#61', '7 階段 · 自動移欄 ✅', true],
+]
 
+/** /status/board — 看板與協作 */
+export function StatusBoard() {
+  return (
+    <div className="status-page">
       <div className="panel">
-        <h2>🚧 還差的(缺口,依優先序)</h2>
+        <h2>📋 Delivery 跨部門業務線看板</h2>
+        <p className="hint" style={{ marginTop: 0 }}>
+          取代 Notion 兩張進度表 + Google Sheet 合約額度,把整條 Delivery(業務稿處理)搬進平台:
+          BD 談案 → DM 串接 → 主審 → 上稿 → 社群推播 → 回傳客戶 → 扣合約額度。設計依據
+          <code>auto-bd-sys-v1/Delivery_操作手冊</code>,對照 <code>docs/DELIVERY-BOARD.md</code>。
+          文章自動化(bd-pr)只是 Pipeline A 的「AI 轉稿」一步。
+        </p>
         <div className="table-wrap"><table>
-          <thead><tr><th>優先</th><th>項目</th><th>說明</th></tr></thead>
-          <tbody>{GAPS.map(([sev, item, desc]) => (
-            <tr key={item}><td style={{ whiteSpace: 'nowrap' }}>{sev}</td><td><b>{item}</b></td><td className="muted">{desc}</td></tr>
+          <thead><tr><th>Pipeline</th><th>品項</th><th>流向</th></tr></thead>
+          <tbody>{BOARD_PIPELINES.map(([p, items, flow]) => (
+            <tr key={p}><td><b>{p}</b></td><td>{items}</td><td className="muted">{flow}</td></tr>
           ))}</tbody>
         </table></div>
-        <p className="hint">完整逐行比對見 repo <code>docs/OLD-VS-NEW.md</code>。</p>
       </div>
+      <div className="panel">
+        <h2>✅ 功能(正規 kanban 產品)</h2>
+        <ul className="tick">{BOARD_FEATURES.map((s) => <li key={s}>{s}</li>)}</ul>
+      </div>
+      <div className="panel">
+        <h2>🧪 看板與協作測試</h2>
+        <TestTable rows={BOARD_TESTS} />
+        <p className="hint">後端 <code>tests/test_board.py</code> 9 項 + 前端 <code>board.test.tsx</code> 5 項 + 隔離瀏覽器 E2E。</p>
+      </div>
+    </div>
+  )
+}
+
+// 使用說明 / API 文件
+function Doc({ title, children }: { title: string; children: ReactNode }) {
+  return <div className="panel doc-sec"><h2>{title}</h2>{children}</div>
+}
+function Code({ children }: { children: string }) {
+  return <pre className="log doc-code">{children}</pre>
+}
+const API_ENDPOINTS: [string, string, string][] = [
+  ['GET', '/health', '健康檢查 + 可用 workflow 列表'],
+  ['GET', '/workflows', '列出所有 workflow(article / echo / extract / standardize)'],
+  ['POST', '/jobs', '建立並排入 job:{workflow, input, from_stage?} → {id}'],
+  ['GET', '/jobs?limit=50', '列出近期 job(輕量)'],
+  ['GET', '/jobs/{id}?full=true', '取單一 job(含逐階段輸出);full=false 為輕量輪詢'],
+  ['GET', '/jobs/{id}/stream', 'SSE 即時進度(先重播歷史事件再接 live)'],
+  ['POST', '/uploads', 'multipart 上傳檔案 → {file: "data/uploads/…"}'],
+  ['POST', '/publish', '發布 job 結果到 WordPress:{job_id, status, overrides?}'],
+  ['GET', '/templates/builtin', '內建文稿類型 / 押註範本'],
+  ['GET', '/agents · PUT /agents/{name}', 'Agent 設定讀取 / 更新(provider/model/prompt…)'],
+  ['GET/POST', '/versions/{scope}', 'Prompt / 押註的具名版本管理(+ /{id}/activate 切換)'],
+  ['GET', '/board', '看板整板快照(欄位 + 稿件 + 合約 + meta)'],
+  ['POST/PATCH/DELETE', '/board/tasks · /board/tasks/{id}', '稿件 CRUD(建/編/移欄/刪)'],
+  ['POST', '/board/tasks/{id}/run', '從卡片觸發 bd-pr AI 轉稿(建 job + 掛上 + 移製作中)'],
+  ['POST', '/board/tasks/{id}/comments · /urls · /notify-bd', '留言 / 回填發佈連結 / 通知 BD'],
+  ['GET/POST/PATCH/DELETE', '/board/contracts', '合約 + 額度管理'],
+  ['GET', '/board/stream', '看板即時 SSE(卡建立/移動/留言/欄位變更)'],
+]
+
+/** /status/docs — 使用說明 / API */
+export function StatusDocs() {
+  return (
+    <div className="status-page doc-page">
+      <Doc title="📖 這是什麼">
+        <p>BlockTempo BD 內容自動化平台。把「客戶稿件從進來到上線」整條自動化,並用一個
+          <b>跨部門業務線看板(Delivery)</b>管理進度。後端 FastAPI(Python),前端 Vite + React,
+          同源托管:一條 tunnel 即可用。</p>
+      </Doc>
+
+      <Doc title="🖥 網頁操作">
+        <h3>1. 部門看板(/kanban)</h3>
+        <ul className="tick">
+          <li>「＋ 新增稿件」建卡:填客戶 / 品項(廣編/快訊/新聞/常規/專訪/深度/Banner)/ 角色 / 合約。</li>
+          <li>切「看板 / 清單 / 表格」三視圖;用「分組」與篩選列重新切資料。</li>
+          <li>點卡開抽屜:編欄位、跑 AI 轉稿、回填發佈連結、留言、看活動軸;Pipeline A 的卡可一鍵跑 bd-pr。</li>
+          <li>合約 / 額度:管理各品項額度,稿件結案自動扣抵。</li>
+        </ul>
+        <h3>2. 處理稿件(/)</h3>
+        <ul className="tick">
+          <li>上傳檔案或貼連結 → 選文稿類型 + 押註 + 供稿方 → 跑 7 階段 AI 流程。</li>
+          <li>逐階段檢視輸出 / 行級 diff / 從任一步重跑;成稿可編輯後一鍵發布 WordPress。</li>
+        </ul>
+        <h3>3. 設定 / Prompt(/settings)</h3>
+        <p className="muted">調整各 Agent 的 provider/model/prompt、押註範本,用具名版本管理切換回溯。</p>
+      </Doc>
+
+      <Doc title="⌨️ CLI 用法(在 backend/ 下)">
+        <p className="muted">CLI 與 API 共用同一個 runner;適合批次 / 回歸測試,不進 job 系統。</p>
+        <Code>{`# 列出所有 workflow
+uv run python cli.py --list
+
+# 跑一條 article(貼連結)
+uv run python cli.py article --input '{"url":"https://example.com/post","article_type":"sponsored","supplier":"客戶名"}'
+
+# 跑 article(本機檔案)
+uv run python cli.py article --input '{"file":"../input-example/sample.docx","article_type":"press-release"}'
+
+# 回歸評分(跑 article + 結構評分)
+uv run python cli.py eval --file ../input-example/sample.docx
+uv run python cli.py eval --url https://example.com/post
+
+# 加 --judge 跑 llm_judge 品質評審(選用開發工具,會用 API key;routine 建議走 evals/ subagent)
+uv run python cli.py eval --file ../input-example/sample.docx --judge`}</Code>
+      </Doc>
+
+      <Doc title="🔌 REST API">
+        <p className="muted">同源:前端打相對路徑;外部呼叫用 <code>https://bd-console.mbp.fud.city</code> 為 base。所有回應為 JSON;SSE 端點回 <code>text/event-stream</code>。目前無 auth(內部工具,走 tunnel)。</p>
+        <div className="table-wrap"><table>
+          <thead><tr><th>方法</th><th>路徑</th><th>說明</th></tr></thead>
+          <tbody>{API_ENDPOINTS.map(([m, path, desc]) => (
+            <tr key={path}><td className="api-m">{m}</td><td><code>{path}</code></td><td className="muted">{desc}</td></tr>
+          ))}</tbody>
+        </table></div>
+        <h3>範例:跑一篇稿(curl)</h3>
+        <Code>{`BASE=https://bd-console.mbp.fud.city
+
+# 1) 建 job(貼連結)
+curl -s -X POST $BASE/jobs -H 'Content-Type: application/json' \\
+  -d '{"workflow":"article","input":{"url":"https://example.com/post","article_type":"sponsored"}}'
+# → {"id": 62, "status": "pending"}
+
+# 2) 看即時進度(SSE)
+curl -N $BASE/jobs/62/stream
+
+# 3) 取最終結果
+curl -s "$BASE/jobs/62?full=true"
+
+# 4) 發布到 WordPress(草稿)
+curl -s -X POST $BASE/publish -H 'Content-Type: application/json' \\
+  -d '{"job_id":62,"status":"draft"}'`}</Code>
+        <h3>範例:看板建卡 + 觸發 AI 轉稿</h3>
+        <Code>{`# 建一張 Pipeline A 稿件卡
+curl -s -X POST $BASE/board/tasks -H 'Content-Type: application/json' \\
+  -d '{"title":"JPEX 廣編","item_type":"廣編稿","client":"JPEX","source_url":"https://...","dm_owner":"Meg"}'
+# → {"id": 7, "pipeline":"A", ...}
+
+# 觸發 bd-pr AI 轉稿(卡自動移「製作中」,完成自動移「待發佈」)
+curl -s -X POST $BASE/board/tasks/7/run -H 'Content-Type: application/json' -d '{"actor":"Meg"}'`}</Code>
+      </Doc>
+
+      <Doc title="🚀 部署 / 維運">
+        <Code>{`# 前端 build(產出 backend 同源托管的 dist)
+cd frontend && pnpm build
+
+# 後端測試 / 跑服務
+cd backend && uv run pytest -q
+cd backend && uv run uvicorn app.main:app --port 8000
+
+# 重啟 launchd 服務(MBP)
+launchctl kickstart -k gui/$(id -u)/com.btai.bd-backend`}</Code>
+        <p className="hint">前端 production build 走同源相對路徑(免 CORS、免設 VITE_API_BASE);後端啟動會自動建 DB、遷移舊看板、seed Delivery 預設板。</p>
+      </Doc>
     </div>
   )
 }
