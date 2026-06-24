@@ -42,7 +42,7 @@ describe('Delivery 看板', () => {
     expect(screen.getByText('需求進線')).toBeInTheDocument()
     expect(screen.getByText('製作中 / AI 轉稿')).toBeInTheDocument()
     expect(screen.getAllByText('JPEX').length).toBeGreaterThan(0)  // 客戶徽章
-    expect(screen.getByText('廣編稿')).toBeInTheDocument()          // 品項
+    expect(document.querySelector('.task-card .tc-type')?.textContent).toBe('廣編稿')  // 卡片品項標(避開篩選 option 同名)
   })
 
   test('切換到表格視圖顯示欄位表頭', async () => {
@@ -50,9 +50,11 @@ describe('Delivery 看板', () => {
     render(<BoardPanel onOpenJob={() => {}} />)
     await screen.findByText('JPEX 廣編稿')
     fireEvent.click(screen.getByText('表格'))
-    expect(screen.getByText('Pipeline')).toBeInTheDocument()
-    expect(screen.getByText('品項')).toBeInTheDocument()
-    expect(screen.getByText('主審')).toBeInTheDocument()
+    // 查表頭(避開 group-by/篩選 下拉同名 option)
+    const headers = [...document.querySelectorAll('.dlv-table thead th')].map((th) => th.textContent || '')
+    expect(headers.some((h) => /Pipeline/.test(h))).toBe(true)
+    expect(headers.some((h) => /品項/.test(h))).toBe(true)
+    expect(headers.some((h) => /主審/.test(h))).toBe(true)
   })
 
   test('分組可切換成 Pipeline', async () => {
