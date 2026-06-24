@@ -21,7 +21,7 @@ from app.api import (
     workflows,
 )
 from app.models.job import init_db
-from app.services.board import seed_default_board
+from app.services.board import migrate_board, seed_default_board
 from app.settings import settings
 from app.worker.jobrunner import start_worker
 
@@ -31,7 +31,8 @@ _FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "d
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    seed_default_board()  # 沒有板時建預設部門板 + 七欄(冪等)
+    migrate_board()       # 舊版看板(含已移除的 kind)→ Delivery 設計(冪等,防 ORM 崩潰)
+    seed_default_board()  # 全新 DB 時建 Delivery 預設板(冪等)
     await start_worker()  # durable job worker（asyncio queue + semaphore）
     yield
 

@@ -86,6 +86,44 @@ def reset_default_board() -> int:
     return seed_default_board()
 
 
+def migrate_board() -> None:
+    """一次性遷移:把舊版看板(內容部 7 欄,含已移除的 ColumnKind 'review')升級成 Delivery 設計。
+
+    為何需要:舊欄位的 kind 值已不在現行 enum → ORM 一載入就 LookupError 崩潰,且 seed 對
+    既有板是 no-op(不會自己換成新設計)。這裡用 raw SQL 偵測(避開 enum 載入),偵測到舊版就
+    把欄位重建為 Delivery 八階段、既有卡片移到「需求進線」保留不刪、看板改名。
+    冪等:遷移後欄位全為合法 Delivery kind,不再觸發。"""
+    from sqlalchemy import text
+
+    from app.models import engine
+
+    valid = {k.value for k in ColumnKind}
+    with engine.begin() as conn:
+        try:
+            cols = conn.execute(text('SELECT id, board_id, kind FROM "column"')).fetchall()
+        except Exception:  # noqa: BLE001  表還沒建(全新 DB)→ 交給 seed
+            return
+        bad_boards = {bid for (_cid, bid, kind) in cols if kind not in valid}
+        if not bad_boards:
+            return
+        now = _now()
+        for bid in bad_boards:
+            old_ids = [cid for (cid, b, _k) in cols if b == bid]
+            new_backlog = None
+            for i, (name, kind) in enumerate(DEFAULT_COLUMNS):
+                res = conn.execute(
+                    text('INSERT INTO "column" (board_id, name, kind, position, created_at) '
+                         'VALUES (:b, :n, :k, :p, :t)'),
+                    {"b": bid, "n": name, "k": kind.value, "p": float(i), "t": now},
+                )
+                if i == 0:
+                    new_backlog = res.lastrowid
+            if old_ids:
+                conn.execute(text("UPDATE task SET column_id = :bk WHERE board_id = :b"), {"bk": new_backlog, "b": bid})
+                conn.execute(text('DELETE FROM "column" WHERE id IN (%s)' % ",".join(str(i) for i in old_ids)))
+            conn.execute(text("UPDATE board SET name = :n WHERE id = :b"), {"n": DEFAULT_BOARD_NAME, "b": bid})
+
+
 def get_default_board_id() -> int:
     with get_session() as s:
         b = s.exec(select(Board).order_by(Board.id)).first()  # type: ignore[attr-defined]
