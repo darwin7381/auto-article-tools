@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   addTaskComment, createColumn, createTask, deleteTask, getBoard, getTask,
   runTask, streamBoard, streamJob, updateTask,
-  type Board, type BoardColumn, type Task, type TaskDetail,
+  type Board, type BoardColumn, type BoardComment, type Task, type TaskDetail,
 } from './api'
 import { STAGE_LABELS, weightedProgress } from './Stages'
 import { toast } from './toast'
@@ -360,6 +360,23 @@ function TaskDrawer({ taskId, me, onClose, onChanged, onOpenJob }: {
   const [busy, setBusy] = useState(false)
   const reload = () => getTask(taskId).then(setT).catch((e) => toast.err(errMsg(e)))
   useEffect(() => { reload() }, [taskId])
+
+  // 即時協作:別人留言/改這張卡 → 開著抽屜的人立刻看到(不必重整)。dedupe by id 防自己的樂觀更新重複。
+  useEffect(() => {
+    const ac = new AbortController()
+    streamBoard((ev, data) => {
+      const d = (data ?? {}) as Record<string, unknown>
+      if (ev === 'comment.added' && d.task_id === taskId) {
+        const c = d.comment as BoardComment
+        setT((prev) => prev && !prev.comments.some((x) => x.id === c.id)
+          ? { ...prev, comments: [...prev.comments, c] } : prev)
+      } else if (ev === 'task.updated' && (d as { id?: number }).id === taskId) {
+        // 別人移卡/改了狀態 → 同步 job 進度與欄位,但保留留言/活動與正在編輯的本地草稿不被蓋掉
+        setT((prev) => prev ? { ...prev, job: (d as TaskDetail).job, job_id: (d as TaskDetail).job_id, column_id: (d as TaskDetail).column_id } : prev)
+      }
+    }, ac.signal)
+    return () => ac.abort()
+  }, [taskId])
 
   if (!t) return (
     <div className="drawer-scrim" onClick={onClose}><div className="drawer" onClick={(e) => e.stopPropagation()}><p className="muted">載入中…</p></div></div>
