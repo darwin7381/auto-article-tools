@@ -94,6 +94,17 @@ h1, h2, h3 { font-family: var(--font); }
 .nav-label { font-size: 13.5px; font-weight: 500; }
 .nav-sub { font-size: 10.5px; color: #6f7b91; }
 .nav-item.on .nav-sub { color: #93cbb4; }
+/* 可展開子群組(建構進度) */
+.nav-group { display: flex; flex-direction: column; }
+.nav-caret { margin-left: auto; flex: none; color: #7e8aa0; display: flex; align-items: center; padding: 4px; border-radius: 6px; transition: transform .16s, background .14s; }
+.nav-caret svg { width: 15px; height: 15px; display: block; }
+.nav-caret.open { transform: rotate(90deg); }
+.nav-caret:hover { background: #ffffff14; color: #cfd6e2; }
+.nav-children { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 4px 30px; padding-left: 10px; border-left: 1px solid var(--border); }
+.nav-child { text-align: left; background: transparent; border: none; color: #8b94a4; cursor: pointer; font-size: 12.5px; padding: 7px 10px; border-radius: 8px; font-family: var(--font); transition: background .12s, color .12s; }
+.nav-child:hover { background: #ffffff0a; color: #d6dce6; }
+.nav-child.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-weight: 600; }
+.shell.collapsed .nav-children, .shell.collapsed .nav-caret { display: none; }
 
 .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid #ffffff10; }
 .side-health { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #8b94a4; padding: 2px 8px; }
@@ -805,3 +816,18 @@ button.primary.sm, button.ghost.sm { width: auto; margin-top: 0; }
   .dr-meta, .form-grid { grid-template-columns: 1fr; }
   .cn-quota { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── 建構進度子頁:總覽區塊卡 / 看板 / 文件 ── */
+.area-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.area-card { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.area-card b { font-size: 14px; }
+.area-card span { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+.doc-page { max-width: 980px; }
+.doc-sec h3 { font-size: 14px; margin: 16px 0 8px; color: var(--text); }
+.doc-sec p { font-size: 13.5px; line-height: 1.7; color: #c2cad6; }
+.doc-sec ul.tick li { font-size: 13px; }
+.doc-code { background: #0a0c12; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: #cdd6e4; overflow-x: auto; white-space: pre; margin: 8px 0; }
+:root.light .doc-code { background: #0e1117; }
+.api-m { font-family: var(--mono); font-size: 11px; color: var(--accent); white-space: nowrap; font-weight: 600; }
+.doc-sec code, .doc-page code { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); padding: 1px 6px; border-radius: 5px; font-family: var(--mono); font-size: 12px; }

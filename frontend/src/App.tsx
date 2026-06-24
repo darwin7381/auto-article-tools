@@ -5,7 +5,7 @@ import { ConfigPanel } from './Config'
 import { RichEditor } from './Editor'
 import { PublishForm } from './PublishForm'
 import { StageList, type StageView } from './Stages'
-import { StatusPanel } from './Status'
+import { StatusArticle, StatusBoard, StatusDocs, StatusModules, StatusOverview } from './Status'
 import { FileDrop, UrlInput, acceptOk, useGlobalDrop, type Uploaded } from './Upload'
 import { Toasts, toast } from './toast'
 import {
@@ -14,6 +14,8 @@ import {
 } from './api'
 
 type Tab = '/kanban' | '/' | '/history' | '/settings' | '/status'
+  | '/status/modules' | '/status/article' | '/status/board' | '/status/docs'
+type NavChild = { key: Tab; label: string }
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
 
@@ -63,7 +65,7 @@ export function jobSource(j: Job): string {
   return '—'
 }
 
-const NAV: { key: Tab; label: string; sub: string; icon: ReactNode }[] = [
+const NAV: { key: Tab; label: string; sub: string; icon: ReactNode; children?: NavChild[] }[] = [
   {
     key: '/kanban', label: '部門看板', sub: '工作管理 · 全流程進度',
     icon: <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="5" height="15" rx="1.2" stroke="currentColor" strokeWidth="1.6" /><rect x="9.5" y="4.5" width="5" height="10" rx="1.2" stroke="currentColor" strokeWidth="1.6" /><rect x="15.5" y="4.5" width="5" height="13" rx="1.2" stroke="currentColor" strokeWidth="1.6" /></svg>,
@@ -81,8 +83,15 @@ const NAV: { key: Tab; label: string; sub: string; icon: ReactNode }[] = [
     icon: <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 7a2 2 0 104 0 2 2 0 00-4 0zM6 17a2 2 0 104 0 2 2 0 00-4 0z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
   },
   {
-    key: '/status', label: '建構進度', sub: '對照舊版 / 缺口 / 測試',
+    key: '/status', label: '建構進度', sub: '進度 / 測試 / 說明文件',
     icon: <svg viewBox="0 0 24 24" fill="none"><path d="M5 19V9M10 19V5M15 19v-6M20 19v-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>,
+    children: [
+      { key: '/status', label: '總覽' },
+      { key: '/status/modules', label: '模組搭建與測試' },
+      { key: '/status/article', label: '稿件處理' },
+      { key: '/status/board', label: '看板與協作' },
+      { key: '/status/docs', label: '使用說明 / API' },
+    ],
   },
 ]
 
@@ -91,8 +100,11 @@ export default function App() {
   const navigate = useNavigate()
   const [sp, setSp] = useSearchParams()
   // 容忍尾斜線(伺服器/反代會把 /status 正規化成 /status/),否則重整後比對不到會退回首頁
-  const path0 = (loc.pathname.replace(/\/+$/, '') || '/')
-  const tab: Tab = (NAV.find((n) => n.key === path0)?.key ?? '/')
+  const path0 = (loc.pathname.replace(/\/+$/, '') || '/') as Tab
+  // 區段比對:子路徑(/status/*)歸屬到父項(建構進度);'/' 不可吃掉所有路徑故用 key+'/'
+  const section = NAV.find((n) => n.key === path0)
+    ?? NAV.find((n) => n.children && path0.startsWith(n.key + '/'))
+    ?? NAV[0]
   const [health, setHealth] = useState<{ status: string } | null>(null)
   const [light, setLight] = pref('theme-light', false)
   const [collapsed, setCollapsed] = pref('side-collapsed', false)
@@ -105,8 +117,11 @@ export default function App() {
   }, [])
   useEffect(() => { document.documentElement.classList.toggle('light', light) }, [light])
 
-  const cur = NAV.find((n) => n.key === tab)!
   const go = (k: Tab) => { navigate(k); setDrawer(false) }
+  // 側邊欄可展開的子群組(建構進度);進到該區段自動展開,caret 可手動收合
+  const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set(section.children ? [section.key] : []))
+  useEffect(() => { if (section.children) setOpenKeys((p) => new Set(p).add(section.key)) }, [section.key]) // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleGroup = (k: string) => setOpenKeys((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n })
   // 深連結:Jobs 歷史點開某筆 → /?job=ID(可分享/重整保留);RunPanel 接手後清掉參數
   const openJobId = sp.get('job') ? Number(sp.get('job')) : null
 
@@ -120,8 +135,26 @@ export default function App() {
           <span className="brand-text"><b>內容自動化</b><i>Content Platform</i></span>
         </div>
         <nav className="nav">
-          {NAV.map((n) => (
-            <button key={n.key} title={n.label} className={`nav-item ${tab === n.key ? 'on' : ''}`} onClick={() => go(n.key)}>
+          {NAV.map((n) => n.children ? (
+            <div key={n.key} className="nav-group">
+              <button title={n.label} className={`nav-item ${path0.startsWith(n.key) ? 'on' : ''}`} onClick={() => go(n.key)}>
+                <span className="nav-ic">{n.icon}</span>
+                <span className="nav-txt"><span className="nav-label">{n.label}</span><span className="nav-sub">{n.sub}</span></span>
+                <span className={`nav-caret ${openKeys.has(n.key) ? 'open' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); toggleGroup(n.key) }} aria-label="展開子項">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </span>
+              </button>
+              {openKeys.has(n.key) && (
+                <div className="nav-children">
+                  {n.children.map((c) => (
+                    <button key={c.key} className={`nav-child ${path0 === c.key ? 'on' : ''}`} onClick={() => go(c.key)}>{c.label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <button key={n.key} title={n.label} className={`nav-item ${path0 === n.key ? 'on' : ''}`} onClick={() => go(n.key)}>
               <span className="nav-ic">{n.icon}</span>
               <span className="nav-txt"><span className="nav-label">{n.label}</span><span className="nav-sub">{n.sub}</span></span>
             </button>
@@ -153,8 +186,8 @@ export default function App() {
             <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
           </button>
           <div className="page-head">
-            <h1>{cur.label}</h1>
-            <span className="page-sub">{cur.sub}</span>
+            <h1>{section.label}</h1>
+            <span className="page-sub">{section.sub}</span>
           </div>
           <span className="spacer" />
           <span className={`pill ${health ? 'ok' : 'down'}`}><span className="dot" />{health ? 'online' : 'offline'}</span>
@@ -162,13 +195,17 @@ export default function App() {
 
         <div className="content">
           {/* RunPanel 永遠掛載(display 切換),這樣切到其他頁再回來,進行中的串流/接回狀態不會斷 */}
-          <div style={{ display: tab === '/' ? 'block' : 'none' }}>
+          <div style={{ display: path0 === '/' ? 'block' : 'none' }}>
             <RunPanel openJobId={openJobId} onOpened={() => { if (sp.has('job')) { sp.delete('job'); setSp(sp, { replace: true }) } }} />
           </div>
-          {tab === '/kanban' && <BoardPanel onOpenJob={(id) => navigate(`/?job=${id}`)} />}
-          {tab === '/history' && <JobsPanel onOpen={(id) => navigate(`/?job=${id}`)} />}
-          {tab === '/settings' && <ConfigPanel />}
-          {tab === '/status' && <StatusPanel />}
+          {path0 === '/kanban' && <BoardPanel onOpenJob={(id) => navigate(`/?job=${id}`)} />}
+          {path0 === '/history' && <JobsPanel onOpen={(id) => navigate(`/?job=${id}`)} />}
+          {path0 === '/settings' && <ConfigPanel />}
+          {path0 === '/status' && <StatusOverview />}
+          {path0 === '/status/modules' && <StatusModules />}
+          {path0 === '/status/article' && <StatusArticle />}
+          {path0 === '/status/board' && <StatusBoard />}
+          {path0 === '/status/docs' && <StatusDocs />}
         </div>
       </div>
     </div>
