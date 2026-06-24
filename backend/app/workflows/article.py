@@ -30,7 +30,9 @@ def _fill(template: str, content: str, key: str) -> str:
 
 
 _TABLE_SEP = re.compile(r"\|\s*:?-{2,}")          # markdown 表格分隔列(每表一條)
-_IMG = re.compile(r"!\[[^\]]*\]\((https?://[^)\s]+)\)")
+# 任何 markdown 圖片來源都要顧:抽取的內嵌圖是相對路徑(/files/images/…),
+# URL 稿才是 http(s)。只認 http(s) 會漏掉「上傳檔的圖被 AI 丟掉」這條主路徑。
+_IMG = re.compile(r"!\[[^\]]*\]\(\s*([^)\s]+)")
 
 
 def _fidelity_guard(before: str, after: str) -> tuple[str, list[str]]:
