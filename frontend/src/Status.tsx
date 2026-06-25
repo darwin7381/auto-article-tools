@@ -689,7 +689,7 @@ uv run python cli.py eval --file ../input-example/sample.docx --judge`}</Code>
               <div className="table-wrap"><table>
                 <thead><tr><th>方法</th><th>路徑</th><th>說明</th></tr></thead>
                 <tbody>{g.rows.map(([m, path, desc]) => (
-                  <tr key={path}><td><Method m={m} /></td><td><code>{path}</code></td><td className="muted">{desc}</td></tr>
+                  <tr key={`${m}_${path}`}><td><Method m={m} /></td><td><code>{path}</code></td><td className="muted">{desc}</td></tr>
                 ))}</tbody>
               </table></div>
             </div>
