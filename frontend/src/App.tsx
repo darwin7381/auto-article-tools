@@ -12,9 +12,10 @@ import {
   apiBase, createJob, getHealth, getJob, listJobs, listWorkflows, publishJob, streamJob, uploadFile,
   type Job, type Workflow,
 } from './api'
+import { DesignSystemPanel } from './DesignSystem'
 
 type Tab = '/kanban' | '/' | '/history' | '/settings' | '/status'
-  | '/status/modules' | '/status/article' | '/status/board' | '/status/docs'
+  | '/status/modules' | '/status/article' | '/status/board' | '/status/docs' | '/design'
 type NavChild = { key: Tab; label: string }
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
@@ -92,6 +93,10 @@ const NAV: { key: Tab; label: string; sub: string; icon: ReactNode; children?: N
       { key: '/status/board', label: '看板與協作' },
       { key: '/status/docs', label: '使用說明 / API' },
     ],
+  },
+  {
+    key: '/design', label: '設計系統', sub: '色彩 / 字級 / 元件',
+    icon: <svg viewBox="0 0 24 24" fill="none"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="1.6" /><circle cx="7.5" cy="10.5" r="1.5" fill="currentColor" /><circle cx="11.5" cy="7.5" r="1.5" fill="currentColor" /><circle cx="16.5" cy="9.5" r="1.5" fill="currentColor" /><circle cx="15.5" cy="14.5" r="1.5" fill="currentColor" /></svg>,
   },
 ]
 
@@ -207,6 +212,7 @@ export default function App() {
           {path0 === '/status/article' && <StatusArticle />}
           {path0 === '/status/board' && <StatusBoard />}
           {path0 === '/status/docs' && <StatusDocs />}
+          {path0 === '/design' && <DesignSystemPanel />}
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Colors - Restrained, Professional Slate & Indigo theme */
+  /* Colors - Restrained, Professional Slate & Teal theme */
   --bg: #090d16;
   --bg-grid: rgba(255, 255, 255, 0.008);
   --panel: #111625;
@@ -11,9 +11,9 @@
   --border-soft: rgba(255, 255, 255, 0.04);
   --text: #f8fafc;
   --muted: #94a3b8;
-  --accent: #6366f1;        /* Indigo */
+  --accent: #14b8a6;        /* Teal */
   --accent-ink: #ffffff;
-  --accent-2: #3b82f6;      /* Blue */
+  --accent-2: #10b981;      /* Emerald */
   --warn: #f59e0b;
   --err: #ef4444;
   --ok: #10b981;
@@ -34,7 +34,7 @@
   --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 25%, transparent);
   --accent-2-glow: 0 0 12px color-mix(in srgb, var(--accent-2) 20%, transparent);
   --sidebar-shadow: 1px 0 0 var(--border);
-  --bg-grad: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.05), transparent 60%);
+  --bg-grad: radial-gradient(ellipse at top, rgba(20, 184, 166, 0.05), transparent 60%);
   --transition-smooth: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-fast: all 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -49,9 +49,9 @@
   --border-soft: #f1f5f9;
   --text: #0f172a;
   --muted: #64748b;
-  --accent: #4f46e5;        /* Indigo-600 */
+  --accent: #0d9488;        /* Teal-600 */
   --accent-ink: #ffffff;
-  --accent-2: #2563eb;      /* Blue-600 */
+  --accent-2: #059669;      /* Emerald-600 */
   --warn: #d97706;
   --err: #dc2626;
   --ok: #16a34a;
@@ -68,7 +68,7 @@
 
   --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 15%, transparent);
   --accent-2-glow: 0 0 12px color-mix(in srgb, var(--accent-2) 12%, transparent);
-  --bg-grad: radial-gradient(ellipse at top, rgba(79, 70, 229, 0.03), transparent 60%);
+  --bg-grad: radial-gradient(ellipse at top, rgba(13, 148, 136, 0.03), transparent 60%);
 }
 
 :root.light pre.log { background: #f8fafc; color: #0f172a; }
