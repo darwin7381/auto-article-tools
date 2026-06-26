@@ -27,8 +27,8 @@
   --side-text: #94a3b8;
   --side-text-active: #ffffff;
   --side-bg-hover: rgba(255, 255, 255, 0.03);
-  --side-bg-active: rgba(255, 255, 255, 0.06);
-  --side-border-active: rgba(255, 255, 255, 0.04);
+  --side-bg-active: rgba(255, 255, 255, 0.10);
+  --side-border-active: rgba(255, 255, 255, 0.12);
   --side-border: rgba(255, 255, 255, 0.04);
 
   --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 25%, transparent);
@@ -62,8 +62,8 @@
   --side-text: #64748b;
   --side-text-active: #0f172a;
   --side-bg-hover: rgba(15, 23, 42, 0.03);
-  --side-bg-active: rgba(15, 23, 42, 0.05);
-  --side-border-active: rgba(15, 23, 42, 0.03);
+  --side-bg-active: rgba(15, 23, 42, 0.07);
+  --side-border-active: rgba(15, 23, 42, 0.09);
   --side-border: rgba(15, 23, 42, 0.04);
 
   --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 15%, transparent);
@@ -250,8 +250,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 .nav-item.on {
   background: var(--side-bg-active);
-  color: var(--accent);
+  color: var(--side-text-active);
   border-color: var(--side-border-active);
+  font-weight: 600;
 }
 .nav-item.on .nav-ic {
   color: var(--accent);
@@ -287,7 +288,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--muted);
 }
 .nav-item.on .nav-sub {
-  color: color-mix(in srgb, var(--accent) 70%, var(--muted));
+  color: var(--side-text);
 }
 
 /* 可展開子群組(建構進度) */
@@ -346,7 +347,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .nav-child.on {
   background: var(--side-bg-active);
-  color: var(--accent);
+  color: var(--side-text-active);
   font-weight: 600;
 }
 .nav-child.on::before {
