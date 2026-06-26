@@ -1,73 +1,73 @@
 import { useState } from 'react'
 
 const DARK_COLORS = [
-  { name: '--bg', label: '全域背景 (Background)', hex: '#090d16' },
-  { name: '--panel', label: '主面板背景 (Panel)', hex: '#111625' },
-  { name: '--panel-2', label: '次級/分段背景 (Panel 2)', hex: '#192030' },
-  { name: '--side', label: '側邊欄背景 (Sidebar BG)', hex: '#0d121f' },
-  { name: '--text', label: '主要文字 (Text)', hex: '#f8fafc' },
-  { name: '--muted', label: '次要/靜音文字 (Muted)', hex: '#94a3b8' },
+  { name: '--bg', label: '全域背景 (Background)', hex: '#0a0a0c' },
+  { name: '--panel', label: '主面板背景 (Panel)', hex: '#141416' },
+  { name: '--panel-2', label: '次級/分段背景 (Panel 2)', hex: '#1f1f22' },
+  { name: '--side', label: '側邊欄背景 (Sidebar BG)', hex: '#0e0e10' },
+  { name: '--text', label: '主要文字 (Text)', hex: '#f3f4f6' },
+  { name: '--muted', label: '次要/靜音文字 (Muted)', hex: '#9ca3af' },
   { name: '--border', label: '主要邊框 (Border)', hex: 'rgba(255, 255, 255, 0.08)' },
   { name: '--border-soft', label: '細/軟邊框 (Soft Border)', hex: 'rgba(255, 255, 255, 0.04)' },
-  { name: '--accent', label: '主品牌特徵色 (Accent Teal)', hex: '#14b8a6' },
-  { name: '--accent-2', label: '次要輔助色 (Accent Emerald)', hex: '#10b981' },
-  { name: '--ok', label: '成功/健康 (Success)', hex: '#10b981' },
+  { name: '--accent', label: '主品牌特徵色 (Accent Green)', hex: '#2ebb77' },
+  { name: '--accent-2', label: '次要輔助色 (Accent Blue)', hex: '#58a6ff' },
+  { name: '--ok', label: '成功/健康 (Success)', hex: '#2ebb77' },
   { name: '--warn', label: '警告/提醒 (Warning)', hex: '#f59e0b' },
   { name: '--err', label: '錯誤/危險 (Error)', hex: '#ef4444' },
 ]
 
 const LIGHT_COLORS = [
-  { name: '--bg', label: '全域背景 (Background)', hex: '#f8fafc' },
+  { name: '--bg', label: '全域背景 (Background)', hex: '#f9fafb' },
   { name: '--panel', label: '主面板背景 (Panel)', hex: '#ffffff' },
-  { name: '--panel-2', label: '次級/分段背景 (Panel 2)', hex: '#f1f5f9' },
+  { name: '--panel-2', label: '次級/分段背景 (Panel 2)', hex: '#f3f4f6' },
   { name: '--side', label: '側邊欄背景 (Sidebar BG)', hex: '#ffffff' },
-  { name: '--text', label: '主要文字 (Text)', hex: '#0f172a' },
-  { name: '--muted', label: '次要/靜音文字 (Muted)', hex: '#64748b' },
-  { name: '--border', label: '主要邊框 (Border)', hex: '#e2e8f0' },
-  { name: '--border-soft', label: '細/軟邊框 (Soft Border)', hex: '#f1f5f9' },
-  { name: '--accent', label: '主品牌特徵色 (Accent Teal)', hex: '#0d9488' },
-  { name: '--accent-2', label: '次要輔助色 (Accent Emerald)', hex: '#059669' },
-  { name: '--ok', label: '成功/健康 (Success)', hex: '#16a34a' },
+  { name: '--text', label: '主要文字 (Text)', hex: '#111827' },
+  { name: '--muted', label: '次要/靜音文字 (Muted)', hex: '#6b7280' },
+  { name: '--border', label: '主要邊框 (Border)', hex: '#e5e7eb' },
+  { name: '--border-soft', label: '細/軟邊框 (Soft Border)', hex: '#f3f4f6' },
+  { name: '--accent', label: '主品牌特徵色 (Accent Green)', hex: '#168051' },
+  { name: '--accent-2', label: '次要輔助色 (Accent Blue)', hex: '#0969da' },
+  { name: '--ok', label: '成功/健康 (Success)', hex: '#168051' },
   { name: '--warn', label: '警告/提醒 (Warning)', hex: '#d97706' },
   { name: '--err', label: '錯誤/危險 (Error)', hex: '#dc2626' },
 ]
 
 const darkThemeVars = {
-  '--bg': '#090d16',
-  '--panel': '#111625',
-  '--panel-2': '#192030',
-  '--side': '#0d121f',
+  '--bg': '#0a0a0c',
+  '--panel': '#141416',
+  '--panel-2': '#1f1f22',
+  '--side': '#0e0e10',
   '--border': 'rgba(255, 255, 255, 0.08)',
   '--border-soft': 'rgba(255, 255, 255, 0.04)',
-  '--text': '#f8fafc',
-  '--muted': '#94a3b8',
-  '--accent': '#14b8a6',
+  '--text': '#f3f4f6',
+  '--muted': '#9ca3af',
+  '--accent': '#2ebb77',
   '--accent-ink': '#ffffff',
-  '--accent-2': '#10b981',
+  '--accent-2': '#58a6ff',
   '--warn': '#f59e0b',
   '--err': '#ef4444',
-  '--ok': '#10b981',
-  '--accent-glow': '0 0 12px rgba(20, 184, 166, 0.25)',
-  '--accent-2-glow': '0 0 12px rgba(16, 185, 129, 0.20)',
+  '--ok': '#2ebb77',
+  '--accent-glow': '0 0 12px rgba(46, 187, 119, 0.25)',
+  '--accent-2-glow': '0 0 12px rgba(88, 166, 255, 0.20)',
 }
 
 const lightThemeVars = {
-  '--bg': '#f8fafc',
+  '--bg': '#f9fafb',
   '--panel': '#ffffff',
-  '--panel-2': '#f1f5f9',
+  '--panel-2': '#f3f4f6',
   '--side': '#ffffff',
-  '--border': '#e2e8f0',
-  '--border-soft': '#f1f5f9',
-  '--text': '#0f172a',
-  '--muted': '#64748b',
-  '--accent': '#0d9488',
+  '--border': '#e5e7eb',
+  '--border-soft': '#f3f4f6',
+  '--text': '#111827',
+  '--muted': '#6b7280',
+  '--accent': '#168051',
   '--accent-ink': '#ffffff',
-  '--accent-2': '#059669',
+  '--accent-2': '#0969da',
   '--warn': '#d97706',
   '--err': '#dc2626',
-  '--ok': '#16a34a',
-  '--accent-glow': '0 0 12px rgba(13, 148, 136, 0.15)',
-  '--accent-2-glow': '0 0 12px rgba(5, 150, 105, 0.12)',
+  '--ok': '#168051',
+  '--accent-glow': '0 0 12px rgba(22, 128, 81, 0.15)',
+  '--accent-2-glow': '0 0 12px rgba(9, 105, 218, 0.12)',
 }
 
 export function DesignSystemPanel() {
@@ -113,8 +113,8 @@ export function DesignSystemPanel() {
                   gap: '12px',
                   padding: '12px',
                   borderRadius: '8px',
-                  background: '#192030',
-                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                  background: 'var(--panel-2)',
+                  border: '1px solid var(--border)'
                 }}>
                   <div style={{
                     width: '42px',
@@ -143,9 +143,9 @@ export function DesignSystemPanel() {
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', fontFamily: 'var(--mono)' }}>{c.name}</span>
-                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{c.label}</span>
-                    <span style={{ fontSize: '10.5px', color: '#14b8a6', fontFamily: 'var(--mono)' }}>{c.hex}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--mono)' }}>{c.name}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{c.label}</span>
+                    <span style={{ fontSize: '10.5px', color: 'var(--accent)', fontFamily: 'var(--mono)' }}>{c.hex}</span>
                   </div>
                 </div>
               ))}
@@ -186,9 +186,9 @@ export function DesignSystemPanel() {
                     fontSize: '10px'
                   }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', fontFamily: 'var(--mono)' }}>{c.name}</span>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>{c.label}</span>
-                    <span style={{ fontSize: '10.5px', color: '#0d9488', fontFamily: 'var(--mono)' }}>{c.hex}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--mono)' }}>{c.name}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{c.label}</span>
+                    <span style={{ fontSize: '10.5px', color: 'var(--accent)', fontFamily: 'var(--mono)' }}>{c.hex}</span>
                   </div>
                 </div>
               ))}
