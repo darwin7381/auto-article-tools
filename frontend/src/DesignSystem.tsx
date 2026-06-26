@@ -579,7 +579,7 @@ export function DesignSystemPanel() {
               } as React.CSSProperties}>
                 <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', borderBottom: '1px solid var(--border-soft)', paddingBottom: '8px' }}>
                   <span style={{ fontWeight: 600, fontSize: '13px' }}>🌙 Dark Mode</span>
-                  <span style={{ fontSize: '10px', color: 'var(--muted)', fontFamily: 'var(--mono)' }}>--bg: #090d16</span>
+                  <span style={{ fontSize: '10px', color: 'var(--muted)', fontFamily: 'var(--mono)' }}>--bg: #0a0a0c</span>
                 </div>
                 <div className="panel" style={{ padding: '16px' }}>
                   <h3>預設面版 Card</h3>
@@ -587,7 +587,7 @@ export function DesignSystemPanel() {
                     搭配 Accent Glow 特效按鈕展示：
                   </p>
                   <button className="primary" style={{ marginTop: 0, padding: '8px 12px', fontSize: '12px' }}>
-                    Accent Teal 按鈕
+                    Accent Green 按鈕
                   </button>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -610,7 +610,7 @@ export function DesignSystemPanel() {
               } as React.CSSProperties}>
                 <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', borderBottom: '1px solid var(--border-soft)', paddingBottom: '8px' }}>
                   <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text)' }}>☀️ Light Mode</span>
-                  <span style={{ fontSize: '10px', color: 'var(--muted)', fontFamily: 'var(--mono)' }}>--bg: #f8fafc</span>
+                  <span style={{ fontSize: '10px', color: 'var(--muted)', fontFamily: 'var(--mono)' }}>--bg: #f9fafb</span>
                 </div>
                 <div className="panel" style={{ padding: '16px' }}>
                   <h3 style={{ color: 'var(--text)' }}>預設面版 Card</h3>
@@ -618,7 +618,7 @@ export function DesignSystemPanel() {
                     搭配 Accent Glow 特效按鈕展示：
                   </p>
                   <button className="primary" style={{ marginTop: 0, padding: '8px 12px', fontSize: '12px' }}>
-                    Accent Teal 按鈕
+                    Accent Green 按鈕
                   </button>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
