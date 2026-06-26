@@ -1,66 +1,66 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Colors - Restrained, Professional Slate & Teal theme */
-  --bg: #090d16;
-  --bg-grid: rgba(255, 255, 255, 0.008);
-  --panel: #111625;
-  --panel-2: #192030;
-  --side: #0d121f;
+  /* Colors - Restrained, Professional Neutral Dark Grey & Green/Blue theme */
+  --bg: #0a0a0c;
+  --bg-grid: rgba(255, 255, 255, 0.005);
+  --panel: #141416;
+  --panel-2: #1f1f22;
+  --side: #0e0e10;
   --border: rgba(255, 255, 255, 0.08);
   --border-soft: rgba(255, 255, 255, 0.04);
-  --text: #f8fafc;
-  --muted: #94a3b8;
-  --accent: #14b8a6;        /* Teal */
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --accent: #2ebb77;        /* Green */
   --accent-ink: #ffffff;
-  --accent-2: #10b981;      /* Emerald */
+  --accent-2: #58a6ff;      /* Blue */
   --warn: #f59e0b;
   --err: #ef4444;
-  --ok: #10b981;
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-  --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.4);
+  --ok: #2ebb77;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.5);
   --r: 10px;
   --font: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: 'JetBrains Mono', monospace;
 
   /* Sidebar Theme Variables (Dark Sidebar) */
-  --side-text: #94a3b8;
+  --side-text: #9ca3af;
   --side-text-active: #ffffff;
-  --side-bg-hover: rgba(255, 255, 255, 0.03);
-  --side-bg-active: rgba(255, 255, 255, 0.10);
-  --side-border-active: rgba(255, 255, 255, 0.12);
-  --side-border: rgba(255, 255, 255, 0.04);
+  --side-bg-hover: rgba(255, 255, 255, 0.02);
+  --side-bg-active: rgba(255, 255, 255, 0.07);
+  --side-border-active: rgba(255, 255, 255, 0.09);
+  --side-border: rgba(255, 255, 255, 0.03);
 
-  --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 25%, transparent);
-  --accent-2-glow: 0 0 12px color-mix(in srgb, var(--accent-2) 20%, transparent);
+  --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent);
+  --accent-2-glow: 0 0 12px color-mix(in srgb, var(--accent-2) 15%, transparent);
   --sidebar-shadow: 1px 0 0 var(--border);
-  --bg-grad: radial-gradient(ellipse at top, rgba(20, 184, 166, 0.05), transparent 60%);
+  --bg-grad: radial-gradient(ellipse at top, rgba(46, 187, 119, 0.04), transparent 60%);
   --transition-smooth: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-fast: all 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :root.light {
-  --bg: #f8fafc;
+  --bg: #f9fafb;
   --bg-grid: rgba(15, 23, 42, 0.015);
   --panel: #ffffff;
-  --panel-2: #f1f5f9;
+  --panel-2: #f3f4f6;
   --side: #ffffff;
-  --border: #e2e8f0;
-  --border-soft: #f1f5f9;
-  --text: #0f172a;
-  --muted: #64748b;
-  --accent: #0d9488;        /* Teal-600 */
+  --border: #e5e7eb;
+  --border-soft: #f3f4f6;
+  --text: #111827;
+  --muted: #6b7280;
+  --accent: #168051;        /* Green-600 */
   --accent-ink: #ffffff;
-  --accent-2: #059669;      /* Emerald-600 */
+  --accent-2: #0969da;      /* Blue-600 */
   --warn: #d97706;
   --err: #dc2626;
-  --ok: #16a34a;
+  --ok: #168051;
   --shadow: 0 4px 20px rgba(15, 23, 42, 0.02);
   --shadow-hover: 0 12px 30px rgba(15, 23, 42, 0.04);
 
   /* Sidebar Theme Variables (Light Sidebar) */
-  --side-text: #64748b;
-  --side-text-active: #0f172a;
+  --side-text: #6b7280;
+  --side-text-active: #111827;
   --side-bg-hover: rgba(15, 23, 42, 0.03);
   --side-bg-active: rgba(15, 23, 42, 0.07);
   --side-border-active: rgba(15, 23, 42, 0.09);
@@ -68,7 +68,7 @@
 
   --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 15%, transparent);
   --accent-2-glow: 0 0 12px color-mix(in srgb, var(--accent-2) 12%, transparent);
-  --bg-grad: radial-gradient(ellipse at top, rgba(13, 148, 136, 0.03), transparent 60%);
+  --bg-grad: radial-gradient(ellipse at top, rgba(22, 128, 81, 0.02), transparent 60%);
 }
 
 :root.light pre.log { background: #f8fafc; color: #0f172a; }
