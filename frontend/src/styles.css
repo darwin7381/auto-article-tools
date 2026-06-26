@@ -1,76 +1,74 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Colors */
-  --bg: #07080a;
-  --bg-grid: rgba(255, 255, 255, 0.012);
-  --panel: rgba(15, 18, 28, 0.75);
-  --panel-2: rgba(26, 32, 48, 0.45);
-  --side: #07080b;
-  --border: rgba(255, 255, 255, 0.07);
+  /* Colors - Restrained, Professional Slate & Indigo theme */
+  --bg: #090d16;
+  --bg-grid: rgba(255, 255, 255, 0.008);
+  --panel: #111625;
+  --panel-2: #192030;
+  --side: #0d121f;
+  --border: rgba(255, 255, 255, 0.08);
   --border-soft: rgba(255, 255, 255, 0.04);
-  --text: #f3f4f6;
-  --muted: #8392a5;
-  --accent: #10b981;        /* mint green */
-  --accent-ink: #05140e;
-  --accent-2: #3b82f6;      /* blue */
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --accent: #6366f1;        /* Indigo */
+  --accent-ink: #ffffff;
+  --accent-2: #3b82f6;      /* Blue */
   --warn: #f59e0b;
   --err: #ef4444;
   --ok: #10b981;
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.15);
-  --shadow-hover: 0 20px 50px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.2);
-  --r: 12px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.4);
+  --r: 10px;
   --font: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: 'JetBrains Mono', monospace;
 
   /* Sidebar Theme Variables (Dark Sidebar) */
-  --side-text: rgba(255, 255, 255, 0.55);
+  --side-text: #94a3b8;
   --side-text-active: #ffffff;
-  --side-bg-hover: rgba(255, 255, 255, 0.04);
-  --side-bg-active: rgba(255, 255, 255, 0.07);
-  --side-border-active: rgba(255, 255, 255, 0.05);
-  --side-border: rgba(255, 255, 255, 0.05);
+  --side-bg-hover: rgba(255, 255, 255, 0.03);
+  --side-bg-active: rgba(255, 255, 255, 0.06);
+  --side-border-active: rgba(255, 255, 255, 0.04);
+  --side-border: rgba(255, 255, 255, 0.04);
 
-  --accent-glow: 0 0 16px rgba(16, 185, 129, 0.35);
-  --accent-2-glow: 0 0 16px rgba(59, 130, 246, 0.25);
-  --sidebar-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
-  --bg-grad: radial-gradient(1200px 600px at 12% -8%, rgba(52, 224, 161, 0.04) 0%, transparent 60%),
-             radial-gradient(900px 500px at 100% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 50%);
-  --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-fast: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 25%, transparent);
+  --accent-2-glow: 0 0 12px color-mix(in srgb, var(--accent-2) 20%, transparent);
+  --sidebar-shadow: 1px 0 0 var(--border);
+  --bg-grad: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.05), transparent 60%);
+  --transition-smooth: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: all 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :root.light {
   --bg: #f8fafc;
-  --bg-grid: rgba(15, 23, 42, 0.02);
-  --panel: rgba(255, 255, 255, 0.85);
-  --panel-2: rgba(241, 245, 249, 0.75);
+  --bg-grid: rgba(15, 23, 42, 0.015);
+  --panel: #ffffff;
+  --panel-2: #f1f5f9;
   --side: #ffffff;
-  --border: rgba(15, 23, 42, 0.06);
-  --border-soft: rgba(15, 23, 42, 0.03);
+  --border: #e2e8f0;
+  --border-soft: #f1f5f9;
   --text: #0f172a;
   --muted: #64748b;
-  --accent: #0d9488;        /* Teal */
+  --accent: #4f46e5;        /* Indigo-600 */
   --accent-ink: #ffffff;
-  --accent-2: #1d4ed8;      /* Royal blue */
+  --accent-2: #2563eb;      /* Blue-600 */
   --warn: #d97706;
   --err: #dc2626;
-  --ok: #0d9488;
-  --shadow: 0 10px 30px rgba(15, 23, 42, 0.02);
-  --shadow-hover: 0 20px 40px rgba(15, 23, 42, 0.05);
+  --ok: #16a34a;
+  --shadow: 0 4px 20px rgba(15, 23, 42, 0.02);
+  --shadow-hover: 0 12px 30px rgba(15, 23, 42, 0.04);
 
   /* Sidebar Theme Variables (Light Sidebar) */
   --side-text: #64748b;
   --side-text-active: #0f172a;
-  --side-bg-hover: rgba(15, 23, 42, 0.04);
-  --side-bg-active: rgba(15, 23, 42, 0.06);
-  --side-border-active: rgba(15, 23, 42, 0.04);
-  --side-border: rgba(15, 23, 42, 0.05);
+  --side-bg-hover: rgba(15, 23, 42, 0.03);
+  --side-bg-active: rgba(15, 23, 42, 0.05);
+  --side-border-active: rgba(15, 23, 42, 0.03);
+  --side-border: rgba(15, 23, 42, 0.04);
 
-  --accent-glow: 0 0 12px rgba(13, 148, 136, 0.2);
-  --accent-2-glow: 0 0 12px rgba(29, 78, 216, 0.15);
-  --bg-grad: radial-gradient(1100px 560px at 10% -10%, rgba(52, 224, 161, 0.06) 0%, transparent 60%),
-             radial-gradient(900px 480px at 100% 0%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
+  --accent-glow: 0 0 12px color-mix(in srgb, var(--accent) 15%, transparent);
+  --accent-2-glow: 0 0 12px color-mix(in srgb, var(--accent-2) 12%, transparent);
+  --bg-grad: radial-gradient(ellipse at top, rgba(79, 70, 229, 0.03), transparent 60%);
 }
 
 :root.light pre.log { background: #f8fafc; color: #0f172a; }
@@ -136,7 +134,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--side) 0%, color-mix(in srgb, var(--side) 96%, #000) 100%);
+  background: var(--side);
   border-right: 1px solid var(--border-soft);
   padding: 22px 16px;
   gap: 12px;
@@ -193,17 +191,17 @@ h1, h2, h3, h4, h5, h6 {
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 75%, #000) 100%);
+  border-radius: 8px;
+  background: var(--accent);
   color: var(--accent-ink);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
   letter-spacing: -.02em;
-  box-shadow: var(--accent-glow);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   transition: var(--transition-fast);
 }
 .brand-mark:hover {
-  transform: scale(1.05) rotate(-3deg);
+  opacity: 0.9;
 }
 .brand-text {
   display: flex;
@@ -249,17 +247,14 @@ h1, h2, h3, h4, h5, h6 {
 .nav-item:hover {
   background: var(--side-bg-hover);
   color: var(--side-text-active);
-  transform: translateX(2px);
 }
 .nav-item.on {
   background: var(--side-bg-active);
-  color: var(--side-text-active);
+  color: var(--accent);
   border-color: var(--side-border-active);
-  box-shadow: inset 3px 0 0 var(--accent);
 }
 .nav-item.on .nav-ic {
   color: var(--accent);
-  filter: drop-shadow(0 0 5px var(--accent-glow));
 }
 .nav-ic {
   width: 18px;
@@ -362,7 +357,6 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--accent);
   border-radius: 50%;
   margin-right: 6px;
-  box-shadow: var(--accent-glow);
 }
 .shell.collapsed .nav-children, .shell.collapsed .nav-caret { display: none; }
 
@@ -491,14 +485,10 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-weight: 700;
   letter-spacing: -.02em;
-  background: linear-gradient(135deg, var(--text) 50%, color-mix(in srgb, var(--text) 70%, var(--accent)) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--text);
 }
 :root.light .topbar h1 {
-  background: linear-gradient(135deg, var(--text) 60%, var(--accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--text);
 }
 .page-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .hamburger { display: none; background: none; border: none; color: var(--text); cursor: pointer; padding: 4px; }
@@ -606,10 +596,9 @@ details.adv[open] .adv-sum { display: none; }
   display: inline-block;
   width: 4px;
   height: 13px;
-  background: linear-gradient(180deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 60%, #000) 100%);
+  background: var(--accent);
   border-radius: 4px;
   margin-right: 8px;
-  box-shadow: var(--accent-glow);
 }
 
 label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 5px; font-weight: 500; }
@@ -868,7 +857,7 @@ pre.log.content { color: #d0d7e2; }
 @media (max-width: 900px) { .stat-cards { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 500px) { .stat-cards { grid-template-columns: repeat(2, 1fr); } }
 .stat-card {
-  background: linear-gradient(135deg, var(--panel) 0%, var(--panel-2) 100%);
+  background: var(--panel);
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 20px;
@@ -879,13 +868,6 @@ pre.log.content { color: #d0d7e2; }
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-}
-.stat-card::before {
-  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(52, 224, 161, 0.15), transparent);
-}
-:root.light .stat-card::before {
-  background: linear-gradient(90deg, transparent, rgba(15, 118, 110, 0.1), transparent);
 }
 .stat-card:hover {
   transform: translateY(-2px);
@@ -1346,7 +1328,7 @@ details summary { cursor: pointer; font-size: 12px; margin: 6px 0; }
 .tc-prog-top { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--warn); margin-bottom: 4px; font-weight: 600; }
 .tc-prog-spin { width: 8px; height: 8px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--warn) 30%, transparent); border-top-color: var(--warn); animation: spin .8s linear infinite; flex: none; }
 .tc-bar { height: 4px; background: var(--border-soft); border-radius: 4px; overflow: hidden; }
-.tc-fill { height: 100%; background: linear-gradient(90deg, var(--warn), var(--accent)); border-radius: 4px; transition: width .4s ease; }
+.tc-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .4s ease; }
 .tc-job { font-size: 11px; margin: 8px 0 2px; padding: 4px 10px; border-radius: 6px; font-weight: 600; border: 1px solid transparent; width: fit-content; }
 .tc-job.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, transparent); border-color: color-mix(in srgb, var(--ok) 15%, transparent); }
 .tc-job.err { color: var(--err); background: color-mix(in srgb, var(--err) 8%, transparent); border-color: color-mix(in srgb, var(--err) 15%, transparent); }
@@ -1522,7 +1504,7 @@ button.primary.sm, button.ghost.sm { width: auto; margin-top: 0; }
 /* ── 建構進度子頁 ── */
 .area-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
 .area-card {
-  background: linear-gradient(135deg, var(--panel) 0%, var(--panel-2) 100%);
+  background: var(--panel);
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 20px 22px;
