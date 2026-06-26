@@ -288,7 +288,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--muted);
 }
 .nav-item.on .nav-sub {
-  color: var(--side-text);
+  color: color-mix(in srgb, var(--side-text-active) 75%, transparent);
 }
 
 /* 可展開子群組(建構進度) */
