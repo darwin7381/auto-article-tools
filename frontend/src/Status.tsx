@@ -22,12 +22,13 @@ const SUPERIOR = [
   'gpt-image-2 streaming(根治長連線被掐斷)',
   'instructor+pydantic 結構化驗證(殺壞 JSON)',
   'Dashboard UI + RWD + 主題 + 全頁拖放',
+  '廣告版位視覺化管理(版位地圖 / 規格 / 檔期甘特圖 / 當日預覽 / 狀態看板 + 素材狀態追蹤)',
   '觀測:per-stage 耗時 + token + 結構評分;品質評審 routine 走 Claude subagent(訂閱、不燒 API)+ llm_judge 選用工具',
   '抽取位置保真:PDF 圖/表依座標插回原位(舊版圖片會被丟到頁尾)',
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 139 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 43',
+  '自動化測試 pytest 139 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 54',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -292,7 +293,7 @@ const MAIN_MODULES: MainMod[] = [
 ]
 const UNIT_TESTS: Row[] = [
   ['後端自動化測試 pytest', 'uv run pytest', '139 通過 / 1 skip(OCR extra)', true],
-  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '43 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl)', true],
+  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '54 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl/廣告版位地圖/檔期解析/狀態看板)', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -324,7 +325,7 @@ function AuditsPanel() {
       <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
       <p className="hint" style={{ marginTop: 0 }}>
         獨立 Claude subagent(<code>module-capability-auditor</code>)讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴。
-        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→139 + 前端 43 vitest</b> → 稽核分全面回升至 78–88。
+        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→139 + 前端 54 vitest</b> → 稽核分全面回升至 78–88。
         欄位:稽核①=補測前、稽核③=最終。<b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
       </p>
       <div className="table-wrap"><table>
@@ -372,7 +373,7 @@ function StatCards() {
       <Stat label="Jobs 總數" value={String(live.jobs)} />
       <Stat label="完成 Jobs" value={String(live.done)} />
       <Stat label="後端測試" value="139 ✓" ok />
-      <Stat label="前端測試" value="43 ✓" ok />
+      <Stat label="前端測試" value="54 ✓" ok />
     </div>
   )
 }
@@ -548,7 +549,7 @@ function Method({ m }: { m: string }) {
 
 const DOC_TOC: [string, string][] = [
   ['intro', '平台簡介'], ['quickstart', '快速開始'], ['concepts', '核心概念'],
-  ['web', '網頁操作'], ['cli', 'CLI 用法'], ['api', 'REST API'], ['deploy', '部署 / 維運'],
+  ['web', '網頁操作'], ['placements', '廣告版位'], ['cli', 'CLI 用法'], ['api', 'REST API'], ['deploy', '部署 / 維運'],
 ]
 const API_GROUPS: { group: string; rows: [string, string, string][] }[] = [
   {
@@ -656,6 +657,23 @@ export function StatusDocs() {
           </ul>
           <h3>3. 設定 / Prompt(/settings)</h3>
           <p className="muted">調整各 Agent 的 provider / model / prompt、押註範本,用具名版本管理切換與回溯。</p>
+        </Doc>
+
+        <Doc id="placements" title="廣告版位">
+          <p>把官網 / 電子報 / Line@ / 社群的<b>廣告版位</b>(banner inventory)視覺化,給 BD 展示與管理。
+            側邊欄「廣告版位」下分五個子頁,共用同一份版位資料(存瀏覽器 localStorage <code>pref:placements-data</code>,即時自動存檔)。</p>
+          <ul className="tick">
+            <li><b>版位地圖(/placements)</b>:各載體的版位示意圖,點任一版位看右側詳情 —— 尺寸 / 格式 / 檔案上限 / 曝光位置、目前客戶與檔期(含單一版位迷你時間軸)、素材狀態。非展示模式可直接改狀態 / 客戶 / 檔期 / 素材。</li>
+            <li><b>規格(/placements/specs)</b>:全版位規格表,可依狀態 / 載體篩選、搜尋名稱 / 說明 / 客戶。</li>
+            <li><b>檔期(/placements/schedule)</b>:檔期總覽,日曆甘特圖(橫軸日期、今日線、依狀態上色)/ 列表兩種檢視;點任一日看該日整體狀況(已售 / 洽談 / 可售與佔用客戶)。</li>
+            <li><b>當日預覽(/placements/preview)</b>:選任一日期(可上 / 下一天、回今天),所見即所得預覽各載體當天版位樣貌 —— 有素材顯示實際 creative,沒素材顯示虛線示意 +「等待素材」,未預定顯示開放銷售。</li>
+            <li><b>狀態看板(/placements/board)</b>:依業務生命週期管理版位卡片(預設 洽談中 / 安排中 / 已安排 / 已上架 / 進行中 / 結案準備 / 已結案 + 可售 backlog)。欄位可自訂(新增 / 刪除 / 重命名 / 重設,存 <code>pref:placements-stages</code>);卡片可拖拉或下拉換欄。</li>
+          </ul>
+          <div className="doc-callout">
+            <b>展示模式(Pitch Mode)</b>
+            <p className="muted" style={{ margin: '4px 0 0' }}>地圖頁可開「展示簡報模式」,遮去客戶名等內部資訊、保留檔期與版位視覺,適合對外 pitch。</p>
+          </div>
+          <p className="muted">註:廣告版位目前為前端 localStorage 管理(尚未接後端 API),資料存在各自瀏覽器。</p>
         </Doc>
 
         <Doc id="cli" title="CLI 用法">
