@@ -17,7 +17,7 @@ import { PlacementsPanel } from './Placements'
 
 type Tab = '/kanban' | '/' | '/history' | '/settings' | '/status'
   | '/status/modules' | '/status/article' | '/status/board' | '/status/docs' | '/design'
-  | '/placements' | '/placements/specs' | '/placements/schedule'
+  | '/placements' | '/placements/specs' | '/placements/schedule' | '/placements/preview' | '/placements/board'
 type NavChild = { key: Tab; label: string }
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
@@ -79,7 +79,9 @@ const NAV: { key: Tab; label: string; sub: string; icon: ReactNode; children?: N
     children: [
       { key: '/placements', label: '版位地圖' },
       { key: '/placements/specs', label: '規格' },
-      { key: '/placements/schedule', label: '檔期' }
+      { key: '/placements/schedule', label: '檔期' },
+      { key: '/placements/preview', label: '當日預覽' },
+      { key: '/placements/board', label: '狀態看板' }
     ]
   },
   {
@@ -218,7 +220,12 @@ export default function App() {
           {path0 === '/kanban' && <BoardPanel onOpenJob={(id) => navigate(`/?job=${id}`)} />}
           {path0.startsWith('/placements') && (
             <PlacementsPanel
-              subTab={path0 === '/placements/specs' ? 'specs' : path0 === '/placements/schedule' ? 'schedule' : 'map'}
+              subTab={
+                path0 === '/placements/specs' ? 'specs' :
+                path0 === '/placements/schedule' ? 'schedule' :
+                path0 === '/placements/preview' ? 'preview' :
+                path0 === '/placements/board' ? 'board' : 'map'
+              }
               onNavigate={(p) => navigate(p)}
             />
           )}

@@ -101,4 +101,43 @@ describe('PlacementsPanel 廣告版位', () => {
     fireEvent.click(editButtons[0])
     expect(visited).toContain('/placements')
   })
+
+  test('當日預覽模式渲染與切換日期', () => {
+    render(
+      <MemoryRouter>
+        <PlacementsPanel subTab="preview" />
+      </MemoryRouter>
+    )
+
+    // 應該要有選擇日期的文字
+    expect(screen.getByText(/選擇預覽日期/)).toBeInTheDocument()
+    expect(screen.getByText(/今天/)).toBeInTheDocument()
+    expect(screen.getByText(/上一天/)).toBeInTheDocument()
+    expect(screen.getByText(/下一天/)).toBeInTheDocument()
+  })
+
+  test('狀態看板模式渲染各生命週期階段與自訂管理', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <PlacementsPanel subTab="board" />
+      </MemoryRouter>
+    )
+
+    // 預設狀態看板欄位應被渲染(限定欄位標頭,避免與卡片內 select 的 option 同字撞名)
+    const colTitles = Array.from(
+      container.querySelectorAll('.kanban-column-header')
+    ).map((el) => el.textContent ?? '')
+    expect(colTitles.some((t) => t.includes('洽談中'))).toBe(true)
+    expect(colTitles.some((t) => t.includes('已安排'))).toBe(true)
+    expect(colTitles.some((t) => t.includes('進行中'))).toBe(true)
+
+    // 管理狀態欄位按鈕應存在
+    const manageBtn = screen.getByText(/管理狀態欄位/)
+    expect(manageBtn).toBeInTheDocument()
+    
+    // 點選展開設定
+    fireEvent.click(manageBtn)
+    expect(screen.getByText('自訂看板狀態欄位 (自左至右順序)')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('輸入新狀態欄名稱...')).toBeInTheDocument()
+  })
 })
