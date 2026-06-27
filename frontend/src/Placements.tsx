@@ -12,6 +12,10 @@ export interface PlacementSlot {
   status: 'available' | 'negotiating' | 'booked';
   client: string;
   schedule: string;
+  stage?: string; // Kanban lifecycle stage
+  hasMaterial?: boolean; // Ad creative material status
+  materialColor?: string; // Visual color for demo creative
+  materialText?: string; // Visual text for demo creative
 }
 
 const DEFAULT_PLACEMENTS: PlacementSlot[] = [
@@ -27,7 +31,11 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '首頁最頂部導航欄下方橫幅',
     status: 'booked',
     client: 'Binance 幣安',
-    schedule: '2026/07/01–07/31'
+    schedule: '2026/07/01–07/31',
+    stage: '進行中',
+    hasMaterial: true,
+    materialColor: '#F3BA2F',
+    materialText: 'Binance'
   },
   {
     id: 'hp-sidebar-1',
@@ -40,7 +48,11 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '首頁右側欄最上層方塊廣告',
     status: 'negotiating',
     client: 'OKX',
-    schedule: '2026/07/05–07/12'
+    schedule: '2026/07/05–07/12',
+    stage: '洽談中',
+    hasMaterial: false,
+    materialColor: '#EB6A1B',
+    materialText: 'OKX'
   },
   {
     id: 'hp-sidebar-2',
@@ -53,7 +65,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '首頁右側欄第二層方塊廣告',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'hp-sidebar-3',
@@ -66,7 +80,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '首頁右側欄下方推薦文章旁廣告',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'hp-content-1',
@@ -79,7 +95,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '首頁最新文章列表之中橫幅廣告',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'hp-footer-1',
@@ -92,7 +110,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '首頁底部分類欄位上方橫幅廣告',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'hp-footer-banner',
@@ -105,7 +125,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '首頁最底端版權宣告下方橫幅',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
 
   // Newsletter
@@ -120,7 +142,11 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '動區電子報信件最上方 Header 下橫幅',
     status: 'booked',
     client: 'Bybit',
-    schedule: '2026/07/01–07/15'
+    schedule: '2026/07/01–07/15',
+    stage: '已安排',
+    hasMaterial: false,
+    materialColor: '#F0A818',
+    materialText: 'Bybit'
   },
   {
     id: 'nl-body-1',
@@ -133,7 +159,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '電子報左側或中段精選方塊廣告',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'nl-body-2',
@@ -146,7 +174,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '電子報後段精選方塊廣告',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'nl-inline-1',
@@ -159,7 +189,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '電子報文章段落間寬幅廣告',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
 
   // Line@
@@ -174,7 +206,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: 'Line 官方帳號聊天室下方固定六格選單置入',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'line-push',
@@ -187,7 +221,11 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: 'Line 群發訊息文字推播置入',
     status: 'negotiating',
     client: 'Crypto.com',
-    schedule: '2026/07/10'
+    schedule: '2026/07/10',
+    stage: '洽談中',
+    hasMaterial: false,
+    materialColor: '#103F91',
+    materialText: 'Crypto.com'
   },
   {
     id: 'line-post',
@@ -198,9 +236,13 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     format: '—',
     maxKB: null,
     position: 'Line 官方號貼文牆 (VOOM) 置入帖文',
-    status: 'available',
-    client: '',
-    schedule: ''
+    status: 'booked',
+    client: 'Arbitrum',
+    schedule: '2026/07/12–07/18',
+    stage: '已安排',
+    hasMaterial: true,
+    materialColor: '#28A0F0',
+    materialText: 'Arbitrum'
   },
 
   // Social & Distribution
@@ -215,7 +257,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: 'Facebook 官方粉專主頁頂部封面置入',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'soc-fb-post',
@@ -228,7 +272,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: 'Facebook 每日重點新聞貼文贊助標記與置入',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'soc-tg-post',
@@ -241,7 +287,9 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: 'Telegram 新聞頻道推送貼文尾端置入廣告連結',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
   {
     id: 'soc-art-footer',
@@ -254,8 +302,21 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '官方網頁所有新聞文章最末尾固定橫幅廣告',
     status: 'available',
     client: '',
-    schedule: ''
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   }
+];
+
+const DEFAULT_STAGES = [
+  '可售 / 待洽談',
+  '洽談中',
+  '安排中',
+  '已安排',
+  '已上架',
+  '進行中',
+  '結案準備',
+  '已結案'
 ];
 
 // Helper functions for date parsing and comparison
@@ -333,13 +394,31 @@ export function isDateWithinPlacement(date: Date, slot: PlacementSlot): boolean 
   return d >= s && d <= e;
 }
 
+function getMaterialColor(slot: PlacementSlot): string {
+  if (slot.materialColor) return slot.materialColor;
+  if (slot.client.toLowerCase().includes('binance')) return '#F3BA2F';
+  if (slot.client.toLowerCase().includes('bybit')) return '#F0A818';
+  if (slot.client.toLowerCase().includes('okx')) return '#EB6A1B';
+  if (slot.client.toLowerCase().includes('crypto')) return '#103F91';
+  if (slot.client.toLowerCase().includes('arbitrum')) return '#28A0F0';
+  const colors = ['#8247e5', '#00c087', '#e84142', '#f43f5e', '#3b82f6'];
+  const index = Math.abs(slot.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+  return colors[index];
+}
+
+function getMaterialText(slot: PlacementSlot): string {
+  if (slot.materialText) return slot.materialText;
+  if (!slot.client) return 'AD';
+  return slot.client.split(' ')[0].toUpperCase();
+}
+
 interface PlacementsPanelProps {
-  subTab: 'map' | 'specs' | 'schedule';
+  subTab: 'map' | 'specs' | 'schedule' | 'preview' | 'board';
   onNavigate?: (path: string) => void;
 }
 
 export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
-  // Persistence state
+  // Persistence state for placement slots
   const [placements, setPlacements] = useState<PlacementSlot[]>(() => {
     try {
       const saved = localStorage.getItem('pref:placements-data');
@@ -353,10 +432,24 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
     localStorage.setItem('pref:placements-data', JSON.stringify(placements));
   }, [placements]);
 
-  // Selected surface state for Map Tab
+  // Persistence state for custom stages (Kanban lifecycles)
+  const [stages, setStages] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('pref:placements-stages');
+      return saved ? JSON.parse(saved) : DEFAULT_STAGES;
+    } catch {
+      return DEFAULT_STAGES;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pref:placements-stages', JSON.stringify(stages));
+  }, [stages]);
+
+  // Selected surface state for Map and Preview tabs
   const [selectedSurface, setSelectedSurface] = useState<'homepage' | 'newsletter' | 'line' | 'social'>('homepage');
 
-  // Selected slot state for Map Tab (default to first slot of current surface)
+  // Selected slot state for Map Tab (defaults to first slot of current surface)
   const [selectedSlotId, setSelectedSlotId] = useState<string>(() => {
     const defaultSlot = DEFAULT_PLACEMENTS.find(p => p.surface === 'homepage');
     return defaultSlot ? defaultSlot.id : '';
@@ -388,6 +481,22 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
   // Selected date filter for displaying details in calendar/Gantt mode (defaults to July 10, 2026)
   const [selectedDateFilter, setSelectedDateFilter] = useState<Date>(() => new Date(2026, 6, 10));
 
+  // Date Preview state: date string format (defaults to '2026-07-10')
+  const [previewDateStr, setPreviewDateStr] = useState('2026-07-10');
+  const previewDate = (() => {
+    const parts = previewDateStr.split('-');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
+    return new Date();
+  })();
+
+  // Kanban states
+  const [newStageName, setNewStageName] = useState('');
+  const [editingStageIndex, setEditingStageIndex] = useState<number | null>(null);
+  const [editingStageName, setEditingStageName] = useState('');
+  const [showStageSettings, setShowStageSettings] = useState(false);
+
   // Quick select slot of new surface when surface changes
   const handleSurfaceChange = (surf: 'homepage' | 'newsletter' | 'line' | 'social') => {
     setSelectedSurface(surf);
@@ -406,10 +515,98 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
   const negotiatingCount = placements.filter(p => p.status === 'negotiating').length;
   const bookedCount = placements.filter(p => p.status === 'booked').length;
 
-  // Handle slot booking status / client / schedule updates (management)
+  // Handle slot updates
   const updateSlot = (id: string, updates: Partial<PlacementSlot>) => {
     setPlacements(prev =>
       prev.map(slot => (slot.id === id ? { ...slot, ...updates } : slot))
+    );
+  };
+
+  // Move card to a different stage (synced with status/client/schedule if appropriate)
+  const handleMoveCard = (slotId: string, newStage: string) => {
+    setPlacements(prev =>
+      prev.map(slot => {
+        if (slot.id !== slotId) return slot;
+        
+        let status = slot.status;
+        let client = slot.client;
+        let schedule = slot.schedule;
+        let hasMaterial = slot.hasMaterial;
+        
+        if (newStage === '可售 / 待洽談') {
+          status = 'available';
+          client = '';
+          schedule = '';
+          hasMaterial = false;
+        } else if (newStage === '洽談中') {
+          status = 'negotiating';
+          if (!client) client = '洽談中客戶';
+          if (!schedule) schedule = '2026/07/10';
+        } else {
+          status = 'booked';
+          if (!client) client = '預定客戶';
+          if (!schedule) schedule = '2026/07/01–07/31';
+        }
+        
+        return {
+          ...slot,
+          stage: newStage,
+          status,
+          client,
+          schedule,
+          hasMaterial
+        };
+      })
+    );
+  };
+
+  // Add a new stage to lifecycle list
+  const handleAddStage = () => {
+    if (!newStageName.trim()) return;
+    if (stages.includes(newStageName.trim())) return;
+    setStages(prev => [...prev, newStageName.trim()]);
+    setNewStageName('');
+  };
+
+  // Delete stage from lifecycle list
+  const handleDeleteStage = (stageName: string) => {
+    setStages(prev => prev.filter(s => s !== stageName));
+    // Fall back slots currently in this deleted stage to backlog
+    setPlacements(prev =>
+      prev.map(slot => slot.stage === stageName ? { ...slot, stage: '可售 / 待洽談', status: 'available', client: '', schedule: '', hasMaterial: false } : slot)
+    );
+  };
+
+  // Rename a stage
+  const handleRenameStage = (index: number) => {
+    if (!editingStageName.trim()) return;
+    const oldName = stages[index];
+    const newName = editingStageName.trim();
+    if (oldName === newName) {
+      setEditingStageIndex(null);
+      return;
+    }
+    setStages(prev => prev.map((s, i) => i === index ? newName : s));
+    setPlacements(prev =>
+      prev.map(slot => slot.stage === oldName ? { ...slot, stage: newName } : slot)
+    );
+    setEditingStageIndex(null);
+  };
+
+  // Reset stages to default list
+  const handleResetStages = () => {
+    setStages(DEFAULT_STAGES);
+    // Align all placements stages to match default mapping
+    setPlacements(prev =>
+      prev.map(slot => {
+        let stage = slot.stage;
+        if (!DEFAULT_STAGES.includes(stage || '')) {
+          if (slot.status === 'available') stage = '可售 / 待洽談';
+          else if (slot.status === 'negotiating') stage = '洽談中';
+          else stage = '進行中';
+        }
+        return { ...slot, stage };
+      })
     );
   };
 
@@ -432,21 +629,28 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
   });
 
   // Calculate dates of the selected month for Gantt rendering
-  const [yearStr, monthStr] = selectedMonthStr.split('/');
-  const currentYear = parseInt(yearStr, 10);
-  const currentMonth = parseInt(monthStr, 10) - 1; // 0-indexed month
+  const [daysYear, daysMonth] = selectedMonthStr.split('/');
+  const currentYear = parseInt(daysYear, 10);
+  const currentMonth = parseInt(daysMonth, 10) - 1; // 0-indexed month
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Real "today" reference so the Gantt today-marker never goes stale
-  const today = new Date();
-  const todayYear = today.getFullYear();
-  const todayMonth = today.getMonth();
-  const todayDate = today.getDate();
+  // Formatting dates for preview inputs and timeline bars
+  const fmtYYYYMMDD = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const handleDayShift = (days: number) => {
+    const nextD = new Date(previewDate.getTime() + days * 24 * 60 * 60 * 1000);
+    setPreviewDateStr(fmtYYYYMMDD(nextD));
+  };
 
   return (
     <div className="placements-container">
-      {/* Dynamic Scoped CSS Styles for Visual Wireframes */}
+      {/* Dynamic Scoped CSS Styles for Visual Wireframes & Previews */}
       <style>{`
         .placements-container {
           display: flex;
@@ -521,7 +725,29 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
           border-color: rgba(88, 166, 255, 0.2);
         }
 
-        /* 2-Column layout for Map */
+        /* Material status badges */
+        .material-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 10px;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 4px;
+          text-transform: uppercase;
+        }
+        .material-badge.ready {
+          background: rgba(46, 187, 119, 0.08);
+          color: var(--accent);
+          border: 1px solid rgba(46, 187, 119, 0.2);
+        }
+        .material-badge.pending {
+          background: rgba(245, 158, 11, 0.08);
+          color: var(--warn);
+          border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        /* 2-Column layout for Map & Preview */
         .map-layout {
           display: grid;
           grid-template-columns: 1fr 340px;
@@ -1378,6 +1604,238 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
         .gantt-legend-color.negotiating {
           background: var(--warn);
         }
+
+        /* Day Preview Styles */
+        .preview-controls {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: var(--panel);
+          border: 1px solid var(--border-soft);
+          border-radius: var(--r);
+          padding: 16px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .preview-date-picker-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .preview-date-picker-wrap input[type="date"] {
+          background: var(--panel-2);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          color: var(--text);
+          padding: 6px 10px;
+          font-size: 13px;
+          outline: none;
+        }
+
+        .preview-btn {
+          background: var(--panel-2);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          color: var(--text);
+          padding: 6px 12px;
+          font-size: 12.5px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: var(--transition-fast);
+        }
+
+        .preview-btn:hover {
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+
+        .preview-ad-card {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          padding: 8px;
+          box-sizing: border-box;
+          transition: var(--transition-smooth);
+        }
+
+        .preview-creative {
+          border-radius: 4px;
+          color: #fff;
+          font-weight: 700;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          gap: 4px;
+          text-align: center;
+        }
+
+        .preview-stripe-bg {
+          background-color: var(--panel-2);
+          background-image: repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 10px,
+            rgba(245, 158, 11, 0.05) 10px,
+            rgba(245, 158, 11, 0.05) 20px
+          );
+          border: 2px dashed var(--warn);
+          border-radius: 6px;
+          color: var(--warn);
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          text-align: center;
+        }
+
+        .preview-open-bg {
+          border: 2px dashed var(--accent);
+          background: rgba(46, 187, 119, 0.02);
+          border-radius: 6px;
+          color: var(--accent);
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          text-align: center;
+          opacity: 0.75;
+        }
+
+        /* Kanban Styles */
+        .kanban-board {
+          display: flex;
+          gap: 16px;
+          overflow-x: auto;
+          padding-bottom: 12px;
+          align-items: start;
+        }
+
+        .kanban-column {
+          flex: 0 0 280px;
+          background: var(--panel);
+          border: 1px solid var(--border-soft);
+          border-radius: var(--r);
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          min-height: 480px;
+          max-height: 700px;
+          overflow-y: auto;
+          box-shadow: var(--shadow);
+        }
+
+        .kanban-column-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 2px solid var(--border-soft);
+          padding-bottom: 8px;
+          font-weight: 700;
+          font-size: 13px;
+          color: var(--text);
+        }
+
+        .kanban-column-count {
+          font-size: 10.5px;
+          font-family: var(--mono);
+          background: var(--panel-2);
+          border: 1px solid var(--border-soft);
+          color: var(--muted);
+          padding: 2px 6px;
+          border-radius: 10px;
+        }
+
+        .kanban-card {
+          background: var(--panel-2);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 12px;
+          cursor: grab;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          transition: var(--transition-fast);
+        }
+
+        .kanban-card:active {
+          cursor: grabbing;
+        }
+
+        .kanban-card:hover {
+          border-color: var(--accent-2);
+          transform: translateY(-1px);
+          box-shadow: var(--shadow-hover);
+        }
+
+        .kanban-card-title {
+          font-size: 12.5px;
+          font-weight: 600;
+          color: var(--text);
+          line-height: 1.3;
+        }
+
+        .kanban-card-meta {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 11px;
+          color: var(--muted);
+        }
+
+        .kanban-settings-panel {
+          background: var(--panel);
+          border: 1px solid var(--border-soft);
+          border-radius: var(--r);
+          padding: 16px;
+          margin-bottom: 16px;
+        }
+
+        .kanban-settings-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+        }
+
+        .kanban-settings-stage-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: var(--panel-2);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 4px 10px;
+          font-size: 12.5px;
+        }
+
+        .kanban-settings-stage-chip input {
+          background: transparent;
+          border: none;
+          color: var(--text);
+          font-size: 12.5px;
+          font-weight: 500;
+          width: 90px;
+          padding: 0;
+          outline: none;
+        }
       `}</style>
 
       {/* Top Level KPI Metrics Strip */}
@@ -1403,7 +1861,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
       {/* Header and Presentation Toggle */}
       <div className="placements-header-actions">
         <div>
-          {subTab === 'map' && (
+          {(subTab === 'map' || subTab === 'preview') && (
             <div className="seg view-seg">
               <button className={selectedSurface === 'homepage' ? 'on' : ''} onClick={() => handleSurfaceChange('homepage')}>首頁 Web</button>
               <button className={selectedSurface === 'newsletter' ? 'on' : ''} onClick={() => handleSurfaceChange('newsletter')}>動區電子報</button>
@@ -1750,7 +2208,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   </div>
                 </div>
 
-                {/* Task 1: Currently booked / Availability visual block */}
+                {/* Currently booked / Availability visual block */}
                 <div className="detail-status-card" style={{
                   background: 'var(--panel-2)',
                   border: '1px solid var(--border-soft)',
@@ -1762,9 +2220,16 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                     <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' }}>
                       目前檔期 / 銷售狀態
                     </span>
-                    <span className={`status-badge ${selectedSlot.status}`}>
-                      {statusLabelMap[selectedSlot.status]}
-                    </span>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      {selectedSlot.status !== 'available' && (
+                        <span className={`material-badge ${selectedSlot.hasMaterial ? 'ready' : 'pending'}`}>
+                          {selectedSlot.hasMaterial ? '素材已就緒' : '等待素材'}
+                        </span>
+                      )}
+                      <span className={`status-badge ${selectedSlot.status}`}>
+                        {statusLabelMap[selectedSlot.status]}
+                      </span>
+                    </div>
                   </div>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
@@ -1785,6 +2250,12 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                         {selectedSlot.schedule || '開放中'}
                       </span>
                     </div>
+                    {selectedSlot.stage && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: 'var(--muted)' }}>看板階段</span>
+                        <span style={{ fontWeight: '600', color: 'var(--accent-2)' }}>{selectedSlot.stage}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Mini timeline bar */}
@@ -1883,7 +2354,18 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                       <label>檔期狀態</label>
                       <select
                         value={selectedSlot.status}
-                        onChange={(e) => updateSlot(selectedSlot.id, { status: e.target.value as any })}
+                        onChange={(e) => {
+                          const status = e.target.value as any;
+                          let stage = selectedSlot.stage;
+                          if (status === 'available') {
+                            stage = '可售 / 待洽談';
+                          } else if (status === 'negotiating' && stage === '可售 / 待洽談') {
+                            stage = '洽談中';
+                          } else if (status === 'booked' && (stage === '可售 / 待洽談' || stage === '洽談中')) {
+                            stage = '已安排';
+                          }
+                          updateSlot(selectedSlot.id, { status, stage });
+                        }}
                       >
                         <option value="available">可用 可銷售</option>
                         <option value="negotiating">洽談中</option>
@@ -1910,6 +2392,48 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                         onChange={(e) => updateSlot(selectedSlot.id, { schedule: e.target.value })}
                       />
                     </div>
+
+                    {/* Task 2: hasMaterial control in details edit panel */}
+                    <div className="detail-edit-row" style={{ marginTop: '6px' }}>
+                      <label className="check-row" style={{ display: 'inline-flex', flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={!!selectedSlot.hasMaterial}
+                          onChange={(e) => updateSlot(selectedSlot.id, { hasMaterial: e.target.checked })}
+                        />
+                        <span>廣告素材已就緒 (已上傳)</span>
+                      </label>
+                    </div>
+
+                    {selectedSlot.status !== 'available' && (
+                      <Fragment>
+                        <div className="detail-edit-row">
+                          <label>視覺展示代表色 (預覽色塊)</label>
+                          <select
+                            value={selectedSlot.materialColor || '#3b82f6'}
+                            onChange={(e) => updateSlot(selectedSlot.id, { materialColor: e.target.value })}
+                          >
+                            <option value="#F3BA2F">金色黃 (Binance)</option>
+                            <option value="#F0A818">明亮黃 (Bybit)</option>
+                            <option value="#EB6A1B">橘色 (OKX)</option>
+                            <option value="#103F91">深藍 (Crypto.com)</option>
+                            <option value="#28A0F0">天藍 (Arbitrum)</option>
+                            <option value="#8247e5">紫色 (Polygon)</option>
+                            <option value="#00c087">綠色 (USDT)</option>
+                            <option value="#e84142">紅色 (Avalanche)</option>
+                          </select>
+                        </div>
+                        <div className="detail-edit-row">
+                          <label>廣告簡稱 (Preview文字/拼寫)</label>
+                          <input
+                            type="text"
+                            value={selectedSlot.materialText || ''}
+                            placeholder="例如: BINANCE"
+                            onChange={(e) => updateSlot(selectedSlot.id, { materialText: e.target.value })}
+                          />
+                        </div>
+                      </Fragment>
+                    )}
 
                     <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span className="muted" style={{ fontSize: '11px' }}>編輯即時自動存檔</span>
@@ -2006,9 +2530,16 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                       <td className="mono">{slot.size}</td>
                       <td>{slot.format}</td>
                       <td>
-                        <span className={`status-badge ${slot.status}`}>
-                          {statusLabelMap[slot.status]}
-                        </span>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <span className={`status-badge ${slot.status}`}>
+                            {statusLabelMap[slot.status]}
+                          </span>
+                          {slot.status !== 'available' && (
+                            <span className={`material-badge ${slot.hasMaterial ? 'ready' : 'pending'}`} style={{ fontSize: '9px', padding: '1px 4px' }}>
+                              {slot.hasMaterial ? '就緒' : '待素材'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       {!pitchMode && (
                         <td style={{ fontWeight: slot.client ? '600' : 'normal' }}>
@@ -2045,7 +2576,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
             </div>
           )}
 
-          {/* Task 2: Rebuild schedule subtab into a Calendar/Gantt timeline */}
+          {/* Time timeline controls */}
           <div className="gantt-header-actions" style={{ marginBottom: '16px' }}>
             <div className="seg view-seg">
               <button
@@ -2107,7 +2638,8 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                         const cellDate = new Date(currentYear, currentMonth, d);
                         const dayOfWeek = cellDate.getDay();
                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                        const isToday = currentYear === todayYear && currentMonth === todayMonth && d === todayDate;
+                        const today = new Date();
+                        const isToday = currentYear === today.getFullYear() && currentMonth === today.getMonth() && d === today.getDate();
                         const isSelected = selectedDateFilter.getFullYear() === currentYear &&
                           selectedDateFilter.getMonth() === currentMonth &&
                           selectedDateFilter.getDate() === d;
@@ -2173,7 +2705,8 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                   const cellDate = new Date(currentYear, currentMonth, d);
                                   const dayOfWeek = cellDate.getDay();
                                   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                                  const isToday = currentYear === todayYear && currentMonth === todayMonth && d === todayDate;
+                                  const today = new Date();
+                                  const isToday = currentYear === today.getFullYear() && currentMonth === today.getMonth() && d === today.getDate();
                                   const isSelected = selectedDateFilter.getFullYear() === currentYear &&
                                     selectedDateFilter.getMonth() === currentMonth &&
                                     selectedDateFilter.getDate() === d;
@@ -2198,7 +2731,12 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                       {inRange && !isAvailable && (
                                         <div
                                           className={`gantt-bar-segment ${slot.status} ${isStart ? 'start-cap' : ''} ${isEnd ? 'end-cap' : ''}`}
-                                          title={`${slot.name} - ${pitchMode ? (slot.status === 'booked' ? '已預訂' : '洽談中') : slot.client || '無客戶'} (${slot.schedule})`}
+                                          style={{
+                                            // Task 2: Subtle indicator on timeline bar if material is ready vs waiting
+                                            borderStyle: slot.hasMaterial ? 'solid' : 'dashed',
+                                            opacity: slot.hasMaterial ? 0.9 : 0.65
+                                          }}
+                                          title={`${slot.name} - ${pitchMode ? (slot.status === 'booked' ? '已預訂' : '洽談中') : slot.client || '無客戶'} (${slot.schedule}) - ${slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}`}
                                         />
                                       )}
                                       {isToday && (
@@ -2242,6 +2780,10 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                 <div className="gantt-legend-item">
                   <div className="gantt-legend-color" style={{ border: '1px dashed var(--border)', background: 'transparent' }} />
                   <span>開放銷售 (Open Inventory)</span>
+                </div>
+                <div className="gantt-legend-item">
+                  <span style={{ fontSize: '13px', display: 'inline-block', borderBottom: '1px dashed var(--muted)', width: '15px', height: '2px', verticalAlign: 'middle', marginRight: '4px' }} />
+                  <span>邊框虛線代表「等待素材」</span>
                 </div>
               </div>
             </div>
@@ -2292,8 +2834,14 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                             >
                               <div>
                                 <div style={{ fontSize: '12.5px', fontWeight: 600 }}>{slot.name}</div>
-                                <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '2px' }}>
-                                  客戶: {pitchMode ? (slot.status === 'booked' ? '🔒 已預訂' : '⏳ 洽談中') : slot.client} • 檔期: {slot.schedule}
+                                <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span>客戶: {pitchMode ? (slot.status === 'booked' ? '🔒 已預訂' : '⏳ 洽談中') : slot.client}</span>
+                                  <span>•</span>
+                                  <span className={`material-badge ${slot.hasMaterial ? 'ready' : 'pending'}`} style={{ fontSize: '9px', padding: '0px 4px' }}>
+                                    {slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}
+                                  </span>
+                                  <span>•</span>
+                                  <span>檔期: {slot.schedule}</span>
                                 </div>
                               </div>
                               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -2436,6 +2984,840 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task 1: Day Preview tab */}
+      {subTab === 'preview' && (
+        <div className="preview-layout" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Preview date switcher bar */}
+          <div className="preview-controls">
+            <div className="preview-date-picker-wrap">
+              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>📅 選擇預覽日期：</span>
+              <input
+                type="date"
+                value={previewDateStr}
+                onChange={(e) => setPreviewDateStr(e.target.value)}
+              />
+              <button
+                className="preview-btn"
+                onClick={() => {
+                  const today = new Date();
+                  setPreviewDateStr(fmtYYYYMMDD(today));
+                }}
+              >
+                今天
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="preview-btn" onClick={() => handleDayShift(-1)}>上一天 ‹</button>
+              <button className="preview-btn" onClick={() => handleDayShift(1)}>› 下一天</button>
+            </div>
+          </div>
+
+          <div className="map-layout">
+            {/* WYSIWYG Mockup (Left) */}
+            <div className="wireframe-container" style={{ padding: '36px' }}>
+              {selectedSurface === 'homepage' && (
+                <div className="wireframe-mock" style={{ minHeight: '480px' }}>
+                  <div className="wf-hp-header">
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--muted)' }}>BlockTempo</span>
+                    <div className="wf-hp-nav">
+                      <div className="wf-hp-nav-dot" />
+                      <div className="wf-hp-nav-dot" />
+                      <div className="wf-hp-nav-dot" />
+                    </div>
+                  </div>
+
+                  {/* Leaderboard slot */}
+                  <div style={{ height: '56px' }}>
+                    {(() => {
+                      const slot = placements.find(p => p.id === 'hp-leaderboard')!;
+                      const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                      return occupied ? (
+                        slot.hasMaterial ? (
+                          <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                            <div style={{ fontSize: '13px', letterSpacing: '0.05em' }}>{getMaterialText(slot)}</div>
+                            <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材已就緒 • Leaderboard ({slot.size})</div>
+                          </div>
+                        ) : (
+                          <div className="preview-ad-card preview-stripe-bg">
+                            <div style={{ fontSize: '12px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                            <div style={{ fontSize: '9px' }}>檔期: {slot.schedule}</div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="preview-ad-card preview-open-bg">
+                          <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可供銷售 (Leaderboard)</div>
+                          <div style={{ fontSize: '9px' }}>{slot.size}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Hero Slider */}
+                  <div className="wf-hp-hero">
+                    <div className="wf-rect">精選首圖 Slider</div>
+                    <div className="wf-rect" style={{ fontSize: '10px' }}>熱門新聞排行</div>
+                  </div>
+
+                  {/* Main feed / Sidebar */}
+                  <div className="wf-hp-main-cols">
+                    <div className="wf-hp-posts">
+                      <div className="wf-hp-post-card">
+                        <div className="wf-hp-post-thumb" />
+                        <div className="wf-hp-post-lines">
+                          <div className="wf-hp-line title" />
+                          <div className="wf-hp-line desc" />
+                        </div>
+                      </div>
+
+                      {/* Content ad slot */}
+                      <div style={{ height: '48px' }}>
+                        {(() => {
+                          const slot = placements.find(p => p.id === 'hp-content-1')!;
+                          const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                          return occupied ? (
+                            slot.hasMaterial ? (
+                              <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                                <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                                <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材已就緒 ({slot.size})</div>
+                              </div>
+                            ) : (
+                              <div className="preview-ad-card preview-stripe-bg">
+                                <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                              </div>
+                            )
+                          ) : (
+                            <div className="preview-ad-card preview-open-bg">
+                              <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可供銷售 (內容區寬幅)</div>
+                              <div style={{ fontSize: '9px' }}>{slot.size}</div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="wf-hp-post-card">
+                        <div className="wf-hp-post-thumb" />
+                        <div className="wf-hp-post-lines">
+                          <div className="wf-hp-line title" />
+                          <div className="wf-hp-line desc" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="wf-hp-sidebar">
+                      {/* B+ square */}
+                      <div style={{ height: '70px' }}>
+                        {(() => {
+                          const slot = placements.find(p => p.id === 'hp-sidebar-1')!;
+                          const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                          return occupied ? (
+                            slot.hasMaterial ? (
+                              <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                                <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                                <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                              </div>
+                            ) : (
+                              <div className="preview-ad-card preview-stripe-bg">
+                                <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                              </div>
+                            )
+                          ) : (
+                            <div className="preview-ad-card preview-open-bg">
+                              <div style={{ fontSize: '10px', fontWeight: 600 }}>✨ 可售 (Area B+)</div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* B square */}
+                      <div style={{ height: '70px' }}>
+                        {(() => {
+                          const slot = placements.find(p => p.id === 'hp-sidebar-2')!;
+                          const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                          return occupied ? (
+                            slot.hasMaterial ? (
+                              <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                                <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                                <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                              </div>
+                            ) : (
+                              <div className="preview-ad-card preview-stripe-bg">
+                                <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                              </div>
+                            )
+                          ) : (
+                            <div className="preview-ad-card preview-open-bg">
+                              <div style={{ fontSize: '10px', fontWeight: 600 }}>✨ 可售 (Area B)</div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* C square */}
+                      <div style={{ height: '70px' }}>
+                        {(() => {
+                          const slot = placements.find(p => p.id === 'hp-sidebar-3')!;
+                          const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                          return occupied ? (
+                            slot.hasMaterial ? (
+                              <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                                <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                                <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                              </div>
+                            ) : (
+                              <div className="preview-ad-card preview-stripe-bg">
+                                <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                              </div>
+                            )
+                          ) : (
+                            <div className="preview-ad-card preview-open-bg">
+                              <div style={{ fontSize: '10px', fontWeight: 600 }}>✨ 可售 (Area C)</div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Area E */}
+                  <div style={{ height: '48px' }}>
+                    {(() => {
+                      const slot = placements.find(p => p.id === 'hp-footer-1')!;
+                      const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                      return occupied ? (
+                        slot.hasMaterial ? (
+                          <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                            <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                            <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                          </div>
+                        ) : (
+                          <div className="preview-ad-card preview-stripe-bg">
+                            <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="preview-ad-card preview-open-bg">
+                          <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可售 (Area E)</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Footer banner */}
+                  <div style={{ height: '42px' }}>
+                    {(() => {
+                      const slot = placements.find(p => p.id === 'hp-footer-banner')!;
+                      const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                      return occupied ? (
+                        slot.hasMaterial ? (
+                          <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                            <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                            <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                          </div>
+                        ) : (
+                          <div className="preview-ad-card preview-stripe-bg">
+                            <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="preview-ad-card preview-open-bg">
+                          <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可售 (頁尾橫幅)</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {selectedSurface === 'newsletter' && (
+                <div className="wireframe-mock wf-nl-email" style={{ minHeight: '400px' }}>
+                  <div className="wf-nl-header">動區 BlockTempo NEWSLETTER</div>
+
+                  {/* nl header slot */}
+                  <div style={{ height: '56px' }}>
+                    {(() => {
+                      const slot = placements.find(p => p.id === 'nl-header')!;
+                      const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                      return occupied ? (
+                        slot.hasMaterial ? (
+                          <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                            <div style={{ fontSize: '13px' }}>{getMaterialText(slot)}</div>
+                            <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材已就緒 ({slot.size})</div>
+                          </div>
+                        ) : (
+                          <div className="preview-ad-card preview-stripe-bg">
+                            <div style={{ fontSize: '12px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                            <div style={{ fontSize: '9px' }}>檔期: {slot.schedule}</div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="preview-ad-card preview-open-bg">
+                          <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可供銷售 (信頭橫幅)</div>
+                          <div style={{ fontSize: '9px' }}>{slot.size}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="wf-nl-hero">
+                    <div className="wf-hp-line title" style={{ width: '80%' }} />
+                    <div className="wf-hp-line desc" style={{ width: '60%' }} />
+                  </div>
+
+                  {/* nl squares */}
+                  <div className="wf-nl-body-squares">
+                    <div style={{ height: '90px' }}>
+                      {(() => {
+                        const slot = placements.find(p => p.id === 'nl-body-1')!;
+                        const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                        return occupied ? (
+                          slot.hasMaterial ? (
+                            <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                              <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                              <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                            </div>
+                          ) : (
+                            <div className="preview-ad-card preview-stripe-bg">
+                              <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                            </div>
+                          )
+                        ) : (
+                          <div className="preview-ad-card preview-open-bg">
+                            <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可售 (方塊一)</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div style={{ height: '90px' }}>
+                      {(() => {
+                        const slot = placements.find(p => p.id === 'nl-body-2')!;
+                        const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                        return occupied ? (
+                          slot.hasMaterial ? (
+                            <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                              <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                              <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                            </div>
+                          ) : (
+                            <div className="preview-ad-card preview-stripe-bg">
+                              <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                            </div>
+                          )
+                        ) : (
+                          <div className="preview-ad-card preview-open-bg">
+                            <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可售 (方塊二)</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Inline banner */}
+                  <div style={{ height: '48px' }}>
+                    {(() => {
+                      const slot = placements.find(p => p.id === 'nl-inline-1')!;
+                      const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                      return occupied ? (
+                        slot.hasMaterial ? (
+                          <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                            <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                            <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                          </div>
+                        ) : (
+                          <div className="preview-ad-card preview-stripe-bg">
+                            <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="preview-ad-card preview-open-bg">
+                          <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可售 (內嵌橫幅)</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {selectedSurface === 'line' && (
+                <div className="wf-line-phone">
+                  <div className="wf-phone-ear" />
+                  <div className="wf-line-chat-header">
+                    <span>Line@ BlockTempo 預覽</span>
+                  </div>
+                  <div className="wf-line-chat-body">
+                    <div className="wf-line-bubble bot">
+                      👋 Line@ 模擬聊天室
+                    </div>
+
+                    {/* Line Push ad */}
+                    <div style={{ height: '60px', width: '80%', alignSelf: 'flex-start' }}>
+                      {(() => {
+                        const slot = placements.find(p => p.id === 'line-push')!;
+                        const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                        return occupied ? (
+                          slot.hasMaterial ? (
+                            <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot), borderRadius: '12px' }}>
+                              <div style={{ fontSize: '11px' }}>{getMaterialText(slot)}</div>
+                              <div style={{ fontSize: '8px', opacity: 0.8 }}>✅ 素材就緒 (推播置入)</div>
+                            </div>
+                          ) : (
+                            <div className="preview-ad-card preview-stripe-bg" style={{ borderRadius: '12px' }}>
+                              <div style={{ fontSize: '10px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                            </div>
+                          )
+                        ) : (
+                          <div className="preview-ad-card preview-open-bg" style={{ borderRadius: '12px' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 600 }}>✨ 可供銷售 (文字推播)</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Line Post ad */}
+                    <div style={{ height: '60px', width: '80%', alignSelf: 'flex-start' }}>
+                      {(() => {
+                        const slot = placements.find(p => p.id === 'line-post')!;
+                        const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                        return occupied ? (
+                          slot.hasMaterial ? (
+                            <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot), borderRadius: '12px' }}>
+                              <div style={{ fontSize: '11px' }}>{getMaterialText(slot)}</div>
+                              <div style={{ fontSize: '8px', opacity: 0.8 }}>✅ 素材就緒 (貼文牆置入)</div>
+                            </div>
+                          ) : (
+                            <div className="preview-ad-card preview-stripe-bg" style={{ borderRadius: '12px' }}>
+                              <div style={{ fontSize: '10px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                            </div>
+                          )
+                        ) : (
+                          <div className="preview-ad-card preview-open-bg" style={{ borderRadius: '12px' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 600 }}>✨ 可供銷售 (官方號帖文)</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Rich menu slot */}
+                  <div style={{ height: '80px' }}>
+                    {(() => {
+                      const slot = placements.find(p => p.id === 'line-menu')!;
+                      const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                      return occupied ? (
+                        slot.hasMaterial ? (
+                          <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot), borderRadius: '0 0 20px 20px' }}>
+                            <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                            <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 (Rich Menu)</div>
+                          </div>
+                        ) : (
+                          <div className="preview-ad-card preview-stripe-bg" style={{ borderRadius: '0 0 20px 20px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="preview-ad-card preview-open-bg" style={{ borderRadius: '0 0 20px 20px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可售 (Rich Menu 選單)</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {selectedSurface === 'social' && (
+                <div className="wireframe-mock wf-soc" style={{ minHeight: '440px' }}>
+                  {/* FB Cover */}
+                  <div className="wf-soc-cover-container" style={{ height: '110px' }}>
+                    {(() => {
+                      const slot = placements.find(p => p.id === 'soc-fb-cover')!;
+                      const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                      return occupied ? (
+                        slot.hasMaterial ? (
+                          <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot), borderRadius: '6px' }}>
+                            <div style={{ fontSize: '13px' }}>{getMaterialText(slot)}</div>
+                            <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 (FB 封面)</div>
+                          </div>
+                        ) : (
+                          <div className="preview-ad-card preview-stripe-bg" style={{ borderRadius: '6px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="preview-ad-card preview-open-bg" style={{ borderRadius: '6px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600 }}>✨ 可售 (Facebook 封面)</div>
+                        </div>
+                      );
+                    })()}
+                    <div className="wf-soc-avatar" />
+                  </div>
+
+                  <div className="wf-soc-feed">
+                    <div className="wf-soc-column">
+                      {/* FB Post ad */}
+                      <div className="wf-soc-card">
+                        <div className="wf-soc-card-header">
+                          <div className="wf-soc-card-avatar" />
+                          <div className="wf-soc-card-title">BlockTempo</div>
+                          <span className="wf-soc-card-sponsored">Sponsored</span>
+                        </div>
+                        <div className="wf-hp-line" style={{ width: '90%' }} />
+                        <div style={{ height: '70px' }}>
+                          {(() => {
+                            const slot = placements.find(p => p.id === 'soc-fb-post')!;
+                            const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                            return occupied ? (
+                              slot.hasMaterial ? (
+                                <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                                  <div style={{ fontSize: '12px' }}>{getMaterialText(slot)}</div>
+                                  <div style={{ fontSize: '9px', opacity: 0.8 }}>✅ 素材就緒 (FB 發布置入)</div>
+                                </div>
+                              ) : (
+                                <div className="preview-ad-card preview-stripe-bg">
+                                  <div style={{ fontSize: '11px', fontWeight: 600 }}>⏳ 等待素材 ({pitchMode ? '已預訂' : slot.client})</div>
+                                </div>
+                              )
+                            ) : (
+                              <div className="preview-ad-card preview-open-bg">
+                                <div style={{ fontSize: '10px', fontWeight: 600 }}>✨ 可售 (FB 貼文置入)</div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="wf-soc-column">
+                      {/* TG Post ad */}
+                      <div className="wf-soc-card" style={{ background: '#1c252e', borderColor: '#2b3945' }}>
+                        <div className="wf-soc-card-header">
+                          <div className="wf-soc-card-avatar" style={{ background: '#54b3e6' }} />
+                          <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#fff' }}>Telegram 晨報</span>
+                        </div>
+                        <div style={{ height: '48px' }}>
+                          {(() => {
+                            const slot = placements.find(p => p.id === 'soc-tg-post')!;
+                            const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                            return occupied ? (
+                              slot.hasMaterial ? (
+                                <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                                  <div style={{ fontSize: '11px' }}>{getMaterialText(slot)}</div>
+                                  <div style={{ fontSize: '8px', opacity: 0.8 }}>✅ 素材就緒 (TG 推播)</div>
+                                </div>
+                              ) : (
+                                <div className="preview-ad-card preview-stripe-bg">
+                                  <div style={{ fontSize: '9px', fontWeight: 600 }}>⏳ 等待素材</div>
+                                </div>
+                              )
+                            ) : (
+                              <div className="preview-ad-card preview-open-bg">
+                                <div style={{ fontSize: '9px', fontWeight: 600 }}>✨ 可售 (TG 頻道置入)</div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Article footer ad */}
+                      <div className="wf-soc-card" style={{ padding: '8px' }}>
+                        <div style={{ height: '40px' }}>
+                          {(() => {
+                            const slot = placements.find(p => p.id === 'soc-art-footer')!;
+                            const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                            return occupied ? (
+                              slot.hasMaterial ? (
+                                <div className="preview-ad-card preview-creative" style={{ background: getMaterialColor(slot) }}>
+                                  <div style={{ fontSize: '11px' }}>{getMaterialText(slot)}</div>
+                                  <div style={{ fontSize: '8px', opacity: 0.8 }}>✅ 素材就緒 ({slot.size})</div>
+                                </div>
+                              ) : (
+                                <div className="preview-ad-card preview-stripe-bg">
+                                  <div style={{ fontSize: '10px', fontWeight: 600 }}>⏳ 待素材</div>
+                                </div>
+                              )
+                            ) : (
+                              <div className="preview-ad-card preview-open-bg">
+                                <div style={{ fontSize: '9px', fontWeight: 600 }}>✨ 可售 (文章末尾)</div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Preview Day Placements Details Panel (Right) */}
+            <div className="panel detail-panel">
+              <div>
+                <div style={{ borderBottom: '1px solid var(--border-soft)', paddingBottom: '10px', marginBottom: '14px' }}>
+                  <span className="muted" style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
+                    {selectedSurface === 'homepage' ? '首頁 Web' : selectedSurface === 'newsletter' ? '動區電子報' : selectedSurface === 'line' ? 'Line@ 官方號' : '社群發布'}
+                  </span>
+                  <h3 style={{ margin: '2px 0 0', fontSize: '14px', fontWeight: 700 }}>
+                    📅 {previewDateStr} 版位狀態
+                  </h3>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {placements
+                    .filter(p => p.surface === selectedSurface)
+                    .map(slot => {
+                      const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
+                      return (
+                        <div
+                          key={slot.id}
+                          style={{
+                            background: 'var(--panel-2)',
+                            border: '1px solid var(--border-soft)',
+                            borderRadius: '6px',
+                            padding: '10px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600 }}>{slot.name}</span>
+                            <span className={`status-badge ${occupied ? slot.status : 'available'}`}>
+                              {occupied ? statusLabelMap[slot.status] : '可用'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '4px' }}>
+                            尺寸: {slot.size} • 格式: {slot.format}
+                          </div>
+                          
+                          {occupied && (
+                            <div style={{
+                              marginTop: '8px',
+                              paddingTop: '8px',
+                              borderTop: '1px dashed var(--border-soft)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}>
+                              <span style={{ fontSize: '11.5px', fontWeight: 600 }}>
+                                客戶: {pitchMode ? '🔒 已預訂' : slot.client}
+                              </span>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <span className={`material-badge ${slot.hasMaterial ? 'ready' : 'pending'}`}>
+                                  {slot.hasMaterial ? '素材已就緒' : '等待素材'}
+                                </span>
+                                {!pitchMode && (
+                                  <button
+                                    className="schedule-quick-edit-btn"
+                                    onClick={() => updateSlot(slot.id, { hasMaterial: !slot.hasMaterial })}
+                                    style={{ fontSize: '10px', padding: '2px 6px' }}
+                                  >
+                                    切換
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {!pitchMode && (
+                            <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+                              <button
+                                className="schedule-quick-edit-btn"
+                                onClick={() => {
+                                  handleSurfaceChange(slot.surface);
+                                  setSelectedSlotId(slot.id);
+                                  onNavigate?.('/placements');
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                style={{ fontSize: '10px', padding: '2px 6px' }}
+                              >
+                                詳細編輯
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task 3: Configurable Kanban board subtab */}
+      {subTab === 'board' && (
+        <div className="kanban-layout" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Kanban settings topbar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>
+              💡 支援拖移卡片更變生命週期狀態，編輯即時自動同步排期系統。
+            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="preview-btn" onClick={() => setShowStageSettings(!showStageSettings)}>
+                ⚙️ {showStageSettings ? '隱藏狀態欄設定' : '管理狀態欄位'}
+              </button>
+              <button className="preview-btn" onClick={handleResetStages}>
+                🔄 重設預設狀態
+              </button>
+            </div>
+          </div>
+
+          {showStageSettings && (
+            <div className="kanban-settings-panel">
+              <h4 style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                自訂看板狀態欄位 (自左至右順序)
+              </h4>
+              <div className="kanban-settings-row">
+                {stages.map((stage, idx) => (
+                  <div key={stage} className="kanban-settings-stage-chip">
+                    {editingStageIndex === idx ? (
+                      <input
+                        type="text"
+                        value={editingStageName}
+                        onChange={(e) => setEditingStageName(e.target.value)}
+                        onBlur={() => handleRenameStage(idx)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleRenameStage(idx) }}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        style={{ cursor: 'pointer', fontWeight: 600 }}
+                        onClick={() => { setEditingStageIndex(idx); setEditingStageName(stage) }}
+                        title="點選重新命名"
+                      >
+                        {stage}
+                      </span>
+                    )}
+                    {stage !== '可售 / 待洽談' && (
+                      <button
+                        onClick={() => handleDeleteStage(stage)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--err)', cursor: 'pointer', padding: 0, fontSize: '11px', fontWeight: 'bold' }}
+                        title="刪除此狀態"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '12px' }}>
+                <input
+                  type="text"
+                  placeholder="輸入新狀態欄名稱..."
+                  value={newStageName}
+                  onChange={(e) => setNewStageName(e.target.value)}
+                  style={{ width: '220px', padding: '6px 10px', background: 'var(--panel-2)', border: '1px solid var(--border-soft)', borderRadius: '6px', fontSize: '12.5px', color: 'var(--text)' }}
+                />
+                <button
+                  className="preview-btn"
+                  onClick={handleAddStage}
+                  style={{ padding: '6px 12px' }}
+                >
+                  ＋ 新增狀態
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Kanban drag-and-drop board grid */}
+          <div className="kanban-board">
+            {stages.map((stage) => {
+              const stageSlots = placements.filter(p => (p.stage || '可售 / 待洽談') === stage);
+              return (
+                <div
+                  key={stage}
+                  className="kanban-column"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    const slotId = e.dataTransfer.getData('text/plain');
+                    if (slotId) {
+                      handleMoveCard(slotId, stage);
+                    }
+                  }}
+                >
+                  <div className="kanban-column-header">
+                    <span>{stage}</span>
+                    <span className="kanban-column-count">{stageSlots.length}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, overflowY: 'auto' }}>
+                    {stageSlots.map((slot) => {
+                      return (
+                        <div
+                          key={slot.id}
+                          className="kanban-card"
+                          draggable={true}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', slot.id);
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
+                            <span className="kanban-card-title">{slot.name}</span>
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            <span className="meta-badge" style={{ fontSize: '9px', padding: '1px 5px' }}>
+                              {slot.surfaceName}
+                            </span>
+                            <span className={`status-badge ${slot.status}`} style={{ fontSize: '9px', padding: '1px 5px' }}>
+                              {statusLabelMap[slot.status]}
+                            </span>
+                          </div>
+
+                          {slot.status !== 'available' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11.5px', borderTop: '1px dashed var(--border-soft)', paddingTop: '6px', marginTop: '2px' }}>
+                              <div>
+                                <span className="muted">客戶:</span>{' '}
+                                <span style={{ fontWeight: 600 }}>{pitchMode ? '🔒 已預訂' : slot.client}</span>
+                              </div>
+                              {slot.schedule && (
+                                <div style={{ fontSize: '10px', color: 'var(--muted)', fontFamily: 'var(--mono)' }}>
+                                  {slot.schedule}
+                                </div>
+                              )}
+                              <div style={{ marginTop: '2px' }}>
+                                <span className={`material-badge ${slot.hasMaterial ? 'ready' : 'pending'}`}>
+                                  {slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Action drop-down for touch-fallback or manual shift */}
+                          <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '9px', color: 'var(--muted)' }}>搬移階段</span>
+                            <select
+                              value={stage}
+                              onChange={(e) => handleMoveCard(slot.id, e.target.value)}
+                              style={{
+                                width: 'auto',
+                                padding: '2px 4px',
+                                fontSize: '10px',
+                                background: 'var(--panel)',
+                                border: '1px solid var(--border-soft)',
+                                borderRadius: '4px',
+                                color: 'var(--text)'
+                              }}
+                            >
+                              {stages.map(st => (
+                                <option key={st} value={st}>{st}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {stageSlots.length === 0 && (
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--border-soft)', borderRadius: '8px', minHeight: '80px', color: 'var(--muted)', fontSize: '11.5px' }}>
+                        空欄位
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
