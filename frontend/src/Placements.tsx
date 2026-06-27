@@ -18,6 +18,38 @@ export interface PlacementSlot {
   materialText?: string; // Visual text for demo creative
 }
 
+const SURFACES: PlacementSlot['surface'][] = ['homepage', 'newsletter', 'line', 'social'];
+const STATUSES: PlacementSlot['status'][] = ['available', 'negotiating', 'booked'];
+const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
+
+/**
+ * Coerce an arbitrary persisted value into a well-typed PlacementSlot so malformed
+ * localStorage (missing/wrong-typed fields) can never crash rendering downstream.
+ * Returns null only when there is no usable id to key on.
+ */
+export function normalizeSlot(s: unknown): PlacementSlot | null {
+  if (s == null || typeof s !== 'object') return null;
+  const o = s as Record<string, unknown>;
+  if (typeof o.id !== 'string' || o.id === '') return null;
+  return {
+    id: o.id,
+    surface: SURFACES.includes(o.surface as PlacementSlot['surface']) ? (o.surface as PlacementSlot['surface']) : 'homepage',
+    surfaceName: str(o.surfaceName),
+    name: str(o.name, '(未命名版位)'),
+    size: str(o.size),
+    format: str(o.format),
+    maxKB: typeof o.maxKB === 'number' ? o.maxKB : null,
+    position: str(o.position),
+    status: STATUSES.includes(o.status as PlacementSlot['status']) ? (o.status as PlacementSlot['status']) : 'available',
+    client: str(o.client),
+    schedule: str(o.schedule),
+    stage: typeof o.stage === 'string' ? o.stage : undefined,
+    hasMaterial: typeof o.hasMaterial === 'boolean' ? o.hasMaterial : false,
+    materialColor: typeof o.materialColor === 'string' ? o.materialColor : undefined,
+    materialText: typeof o.materialText === 'string' ? o.materialText : undefined,
+  };
+}
+
 const DEFAULT_PLACEMENTS: PlacementSlot[] = [
   // Homepage
   {
@@ -427,8 +459,8 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
       if (!saved) return DEFAULT_PLACEMENTS;
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_PLACEMENTS;
-      const valid = parsed.filter((s): s is PlacementSlot =>
-        s != null && typeof s === 'object' && typeof s.id === 'string' && s.id !== '');
+      // Normalize every entry so missing/wrong-typed fields get safe defaults.
+      const valid = parsed.map(normalizeSlot).filter((s): s is PlacementSlot => s !== null);
       return valid.length > 0 ? valid : DEFAULT_PLACEMENTS;
     } catch {
       return DEFAULT_PLACEMENTS;
