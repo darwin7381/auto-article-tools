@@ -438,6 +438,12 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
+  // Real "today" reference so the Gantt today-marker never goes stale
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth();
+  const todayDate = today.getDate();
+
   return (
     <div className="placements-container">
       {/* Dynamic Scoped CSS Styles for Visual Wireframes */}
@@ -2101,7 +2107,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                         const cellDate = new Date(currentYear, currentMonth, d);
                         const dayOfWeek = cellDate.getDay();
                         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                        const isToday = currentYear === 2026 && currentMonth === 5 && d === 27; // June 27, 2026
+                        const isToday = currentYear === todayYear && currentMonth === todayMonth && d === todayDate;
                         const isSelected = selectedDateFilter.getFullYear() === currentYear &&
                           selectedDateFilter.getMonth() === currentMonth &&
                           selectedDateFilter.getDate() === d;
@@ -2167,7 +2173,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                   const cellDate = new Date(currentYear, currentMonth, d);
                                   const dayOfWeek = cellDate.getDay();
                                   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                                  const isToday = currentYear === 2026 && currentMonth === 5 && d === 27;
+                                  const isToday = currentYear === todayYear && currentMonth === todayMonth && d === todayDate;
                                   const isSelected = selectedDateFilter.getFullYear() === currentYear &&
                                     selectedDateFilter.getMonth() === currentMonth &&
                                     selectedDateFilter.getDate() === d;
