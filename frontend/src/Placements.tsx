@@ -418,11 +418,18 @@ interface PlacementsPanelProps {
 }
 
 export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
-  // Persistence state for placement slots
+  // Persistence state for placement slots.
+  // Validate shape on load: must be a non-empty array of objects with an id,
+  // otherwise fall back to defaults so a corrupted value can't break the page.
   const [placements, setPlacements] = useState<PlacementSlot[]>(() => {
     try {
       const saved = localStorage.getItem('pref:placements-data');
-      return saved ? JSON.parse(saved) : DEFAULT_PLACEMENTS;
+      if (!saved) return DEFAULT_PLACEMENTS;
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_PLACEMENTS;
+      const valid = parsed.filter((s): s is PlacementSlot =>
+        s != null && typeof s === 'object' && typeof s.id === 'string' && s.id !== '');
+      return valid.length > 0 ? valid : DEFAULT_PLACEMENTS;
     } catch {
       return DEFAULT_PLACEMENTS;
     }
@@ -432,11 +439,19 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
     localStorage.setItem('pref:placements-data', JSON.stringify(placements));
   }, [placements]);
 
-  // Persistence state for custom stages (Kanban lifecycles)
+  // Persistence state for custom stages (Kanban lifecycles).
+  // Validate shape on load: must be a non-empty array of non-empty unique strings,
+  // otherwise fall back to defaults so a corrupted value can't render an empty board.
   const [stages, setStages] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('pref:placements-stages');
-      return saved ? JSON.parse(saved) : DEFAULT_STAGES;
+      if (!saved) return DEFAULT_STAGES;
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return DEFAULT_STAGES;
+      const cleaned = Array.from(
+        new Set(parsed.filter((s): s is string => typeof s === 'string' && s.trim() !== '').map(s => s.trim()))
+      );
+      return cleaned.length > 0 ? cleaned : DEFAULT_STAGES;
     } catch {
       return DEFAULT_STAGES;
     }
@@ -570,10 +585,14 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
 
   // Delete stage from lifecycle list
   const handleDeleteStage = (stageName: string) => {
-    setStages(prev => prev.filter(s => s !== stageName));
-    // Fall back slots currently in this deleted stage to backlog
+    // Never allow deleting the last remaining column (would leave an empty board).
+    if (stages.length <= 1) return;
+    const remaining = stages.filter(s => s !== stageName);
+    setStages(remaining);
+    // Move slots from the deleted stage into the first remaining column so none vanish.
+    const fallback = remaining[0];
     setPlacements(prev =>
-      prev.map(slot => slot.stage === stageName ? { ...slot, stage: '可售 / 待洽談', status: 'available', client: '', schedule: '', hasMaterial: false } : slot)
+      prev.map(slot => slot.stage === stageName ? { ...slot, stage: fallback, status: 'available', client: '', schedule: '', hasMaterial: false } : slot)
     );
   };
 
@@ -3724,7 +3743,12 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
           {/* Kanban drag-and-drop board grid */}
           <div className="kanban-board">
             {stages.map((stage) => {
-              const stageSlots = placements.filter(p => (p.stage || '可售 / 待洽談') === stage);
+              // Resolve each slot to an existing column; any slot whose stage was
+              // deleted/renamed/corrupted falls into the first column instead of vanishing.
+              const stageSlots = placements.filter(p => {
+                const effective = p.stage && stages.includes(p.stage) ? p.stage : stages[0];
+                return effective === stage;
+              });
               return (
                 <div
                   key={stage}

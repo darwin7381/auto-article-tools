@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import { PlacementsPanel, parseSchedule } from '../Placements'
+
+// 元件會把狀態寫進 localStorage,測試間清乾淨避免互相污染
+afterEach(() => localStorage.clear())
 
 describe('parseSchedule 檔期字串解析', () => {
   test('空字串回傳 null', () => {
@@ -139,5 +142,33 @@ describe('PlacementsPanel 廣告版位', () => {
     fireEvent.click(manageBtn)
     expect(screen.getByText('自訂看板狀態欄位 (自左至右順序)')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('輸入新狀態欄名稱...')).toBeInTheDocument()
+  })
+
+  test('看板對損壞的 localStorage 與孤兒卡片有防護', () => {
+    // 損壞的 stages(存成物件而非字串陣列)→ 應回退預設,不崩、欄位照常出現
+    localStorage.setItem('pref:placements-stages', JSON.stringify({ bad: true }))
+    // 一筆 stage 指向不存在欄位的版位 → 不可消失,要落到第一欄
+    localStorage.setItem('pref:placements-data', JSON.stringify([
+      {
+        id: 'orphan-1', surface: 'homepage', surfaceName: '首頁', name: '孤兒版位測試',
+        size: '1×1', format: 'x', maxKB: null, position: 'p', status: 'booked',
+        client: 'C', schedule: '', stage: '已被刪除的欄位', hasMaterial: false,
+      },
+    ]))
+
+    const { container } = render(
+      <MemoryRouter>
+        <PlacementsPanel subTab="board" />
+      </MemoryRouter>
+    )
+
+    // 回退到預設欄位(損壞值不會渲染空看板)
+    const colTitles = Array.from(
+      container.querySelectorAll('.kanban-column-header')
+    ).map((el) => el.textContent ?? '')
+    expect(colTitles.some((t) => t.includes('洽談中'))).toBe(true)
+
+    // 孤兒卡片仍然出現(沒有靜默消失)
+    expect(screen.getByText('孤兒版位測試')).toBeInTheDocument()
   })
 })
