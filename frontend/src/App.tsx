@@ -13,9 +13,11 @@ import {
   type Job, type Workflow,
 } from './api'
 import { DesignSystemPanel } from './DesignSystem'
+import { PlacementsPanel } from './Placements'
 
 type Tab = '/kanban' | '/' | '/history' | '/settings' | '/status'
   | '/status/modules' | '/status/article' | '/status/board' | '/status/docs' | '/design'
+  | '/placements' | '/placements/specs' | '/placements/schedule'
 type NavChild = { key: Tab; label: string }
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
@@ -70,6 +72,15 @@ const NAV: { key: Tab; label: string; sub: string; icon: ReactNode; children?: N
   {
     key: '/kanban', label: '部門看板', sub: '工作管理 · 全流程進度',
     icon: <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="5" height="15" rx="1.2" stroke="currentColor" strokeWidth="1.6" /><rect x="9.5" y="4.5" width="5" height="10" rx="1.2" stroke="currentColor" strokeWidth="1.6" /><rect x="15.5" y="4.5" width="5" height="13" rx="1.2" stroke="currentColor" strokeWidth="1.6" /></svg>,
+  },
+  {
+    key: '/placements', label: '廣告版位', sub: '版位地圖 / 規格 / 檔期',
+    icon: <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M21 9H3M21 15H3M12 9v12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+    children: [
+      { key: '/placements', label: '版位地圖' },
+      { key: '/placements/specs', label: '規格' },
+      { key: '/placements/schedule', label: '檔期' }
+    ]
   },
   {
     key: '/', label: '處理稿件', sub: '進稿 → AI 流程 → 上稿',
@@ -205,6 +216,9 @@ export default function App() {
             <RunPanel openJobId={openJobId} onOpened={() => { if (sp.has('job')) { sp.delete('job'); setSp(sp, { replace: true }) } }} />
           </div>
           {path0 === '/kanban' && <BoardPanel onOpenJob={(id) => navigate(`/?job=${id}`)} />}
+          {path0 === '/placements' && <PlacementsPanel subTab="map" />}
+          {path0 === '/placements/specs' && <PlacementsPanel subTab="specs" />}
+          {path0 === '/placements/schedule' && <PlacementsPanel subTab="schedule" />}
           {path0 === '/history' && <JobsPanel onOpen={(id) => navigate(`/?job=${id}`)} />}
           {path0 === '/settings' && <ConfigPanel />}
           {path0 === '/status' && <StatusOverview />}
