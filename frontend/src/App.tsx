@@ -216,9 +216,12 @@ export default function App() {
             <RunPanel openJobId={openJobId} onOpened={() => { if (sp.has('job')) { sp.delete('job'); setSp(sp, { replace: true }) } }} />
           </div>
           {path0 === '/kanban' && <BoardPanel onOpenJob={(id) => navigate(`/?job=${id}`)} />}
-          {path0 === '/placements' && <PlacementsPanel subTab="map" />}
-          {path0 === '/placements/specs' && <PlacementsPanel subTab="specs" />}
-          {path0 === '/placements/schedule' && <PlacementsPanel subTab="schedule" />}
+          {path0.startsWith('/placements') && (
+            <PlacementsPanel
+              subTab={path0 === '/placements/specs' ? 'specs' : path0 === '/placements/schedule' ? 'schedule' : 'map'}
+              onNavigate={(p) => navigate(p)}
+            />
+          )}
           {path0 === '/history' && <JobsPanel onOpen={(id) => navigate(`/?job=${id}`)} />}
           {path0 === '/settings' && <ConfigPanel />}
           {path0 === '/status' && <StatusOverview />}

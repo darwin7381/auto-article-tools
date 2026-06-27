@@ -260,9 +260,10 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
 
 interface PlacementsPanelProps {
   subTab: 'map' | 'specs' | 'schedule';
+  onNavigate?: (path: string) => void;
 }
 
-export function PlacementsPanel({ subTab }: PlacementsPanelProps) {
+export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
   // Persistence state
   const [placements, setPlacements] = useState<PlacementSlot[]>(() => {
     try {
@@ -1642,11 +1643,11 @@ export function PlacementsPanel({ subTab }: PlacementsPanelProps) {
                             <button
                               className="schedule-quick-edit-btn"
                               onClick={() => {
-                                // Jump back to Map tab and select this slot for editing
-                                handleSurfaceChange(slot.surface);
+                                // Select this slot, then switch to the Map subtab where the edit form lives.
+                                setSelectedSurface(slot.surface);
                                 setSelectedSlotId(slot.id);
-                                // Force scroll to map area if needed
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
+                                onNavigate?.('/placements');
                               }}
                               title="到地圖中編輯此版位檔期"
                             >
