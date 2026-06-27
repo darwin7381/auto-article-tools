@@ -202,6 +202,27 @@ describe('PlacementsPanel 廣告版位', () => {
     expect(screen.getByText('孤兒版位測試')).toBeInTheDocument()
   })
 
+  test('當日預覽對「不含預設 id」的持久化資料不崩(預覽頁寫死多個 slot id)', () => {
+    // 持久化資料完全沒有 hp-leaderboard 等預覽頁寫死的 id
+    localStorage.setItem('pref:placements-data', JSON.stringify([
+      {
+        id: 'custom-only', surface: 'homepage', surfaceName: '首頁', name: '自訂版位',
+        size: '1×1', format: 'x', maxKB: null, position: 'p', status: 'available',
+        client: '', schedule: '', hasMaterial: false,
+      },
+    ]))
+
+    expect(() =>
+      render(
+        <MemoryRouter>
+          <PlacementsPanel subTab="preview" />
+        </MemoryRouter>
+      )
+    ).not.toThrow()
+
+    expect(screen.getByText(/選擇預覽日期/)).toBeInTheDocument()
+  })
+
   test('規格頁面對缺欄位的損壞版位資料不崩(下游有 .toLowerCase 等呼叫)', () => {
     // 只有 id、其餘欄位全缺 —— 正規化前會讓 slot.name.toLowerCase() 等爆炸
     localStorage.setItem('pref:placements-data', JSON.stringify([
