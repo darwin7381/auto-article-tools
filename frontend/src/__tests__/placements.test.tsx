@@ -58,4 +58,19 @@ describe('PlacementsPanel 廣告版位', () => {
     expect(screen.getByText('Line@ 載體檔期')).toBeInTheDocument()
     expect(screen.getByText('社群 載體檔期')).toBeInTheDocument()
   })
+
+  test('檔期頁的「編輯」按鈕會導向地圖頁以開啟編輯表單', () => {
+    const visited: string[] = []
+    render(
+      <MemoryRouter>
+        <PlacementsPanel subTab="schedule" onNavigate={(p) => visited.push(p)} />
+      </MemoryRouter>
+    )
+
+    // 檔期頁本身沒有編輯表單,編輯按鈕必須跳回地圖頁才能編輯
+    const editButtons = screen.getAllByRole('button', { name: '編輯' })
+    expect(editButtons.length).toBeGreaterThan(0)
+    fireEvent.click(editButtons[0])
+    expect(visited).toContain('/placements')
+  })
 })
