@@ -556,6 +556,11 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
   // Find currently selected slot details
   const selectedSlot = placements.find(p => p.id === selectedSlotId);
 
+  // Safe lookup for the preview tab's hardcoded slot ids: if persisted data is
+  // missing that id (custom/malformed set), return an empty "available" placeholder
+  // instead of crashing on a non-null assertion.
+  const slotById = (id: string): PlacementSlot => placements.find(p => p.id === id) ?? normalizeSlot({ id })!;
+
   // Stats calculation
   const totalSlotsCount = placements.length;
   const availableCount = placements.filter(p => p.status === 'available').length;
@@ -3085,7 +3090,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   {/* Leaderboard slot */}
                   <div style={{ height: '56px' }}>
                     {(() => {
-                      const slot = placements.find(p => p.id === 'hp-leaderboard')!;
+                      const slot = slotById('hp-leaderboard');
                       const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                       return occupied ? (
                         slot.hasMaterial ? (
@@ -3128,7 +3133,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                       {/* Content ad slot */}
                       <div style={{ height: '48px' }}>
                         {(() => {
-                          const slot = placements.find(p => p.id === 'hp-content-1')!;
+                          const slot = slotById('hp-content-1');
                           const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                           return occupied ? (
                             slot.hasMaterial ? (
@@ -3163,7 +3168,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                       {/* B+ square */}
                       <div style={{ height: '70px' }}>
                         {(() => {
-                          const slot = placements.find(p => p.id === 'hp-sidebar-1')!;
+                          const slot = slotById('hp-sidebar-1');
                           const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                           return occupied ? (
                             slot.hasMaterial ? (
@@ -3187,7 +3192,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                       {/* B square */}
                       <div style={{ height: '70px' }}>
                         {(() => {
-                          const slot = placements.find(p => p.id === 'hp-sidebar-2')!;
+                          const slot = slotById('hp-sidebar-2');
                           const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                           return occupied ? (
                             slot.hasMaterial ? (
@@ -3211,7 +3216,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                       {/* C square */}
                       <div style={{ height: '70px' }}>
                         {(() => {
-                          const slot = placements.find(p => p.id === 'hp-sidebar-3')!;
+                          const slot = slotById('hp-sidebar-3');
                           const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                           return occupied ? (
                             slot.hasMaterial ? (
@@ -3237,7 +3242,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   {/* Area E */}
                   <div style={{ height: '48px' }}>
                     {(() => {
-                      const slot = placements.find(p => p.id === 'hp-footer-1')!;
+                      const slot = slotById('hp-footer-1');
                       const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                       return occupied ? (
                         slot.hasMaterial ? (
@@ -3261,7 +3266,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   {/* Footer banner */}
                   <div style={{ height: '42px' }}>
                     {(() => {
-                      const slot = placements.find(p => p.id === 'hp-footer-banner')!;
+                      const slot = slotById('hp-footer-banner');
                       const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                       return occupied ? (
                         slot.hasMaterial ? (
@@ -3291,7 +3296,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   {/* nl header slot */}
                   <div style={{ height: '56px' }}>
                     {(() => {
-                      const slot = placements.find(p => p.id === 'nl-header')!;
+                      const slot = slotById('nl-header');
                       const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                       return occupied ? (
                         slot.hasMaterial ? (
@@ -3323,7 +3328,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   <div className="wf-nl-body-squares">
                     <div style={{ height: '90px' }}>
                       {(() => {
-                        const slot = placements.find(p => p.id === 'nl-body-1')!;
+                        const slot = slotById('nl-body-1');
                         const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                         return occupied ? (
                           slot.hasMaterial ? (
@@ -3346,7 +3351,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
 
                     <div style={{ height: '90px' }}>
                       {(() => {
-                        const slot = placements.find(p => p.id === 'nl-body-2')!;
+                        const slot = slotById('nl-body-2');
                         const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                         return occupied ? (
                           slot.hasMaterial ? (
@@ -3371,7 +3376,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   {/* Inline banner */}
                   <div style={{ height: '48px' }}>
                     {(() => {
-                      const slot = placements.find(p => p.id === 'nl-inline-1')!;
+                      const slot = slotById('nl-inline-1');
                       const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                       return occupied ? (
                         slot.hasMaterial ? (
@@ -3408,7 +3413,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                     {/* Line Push ad */}
                     <div style={{ height: '60px', width: '80%', alignSelf: 'flex-start' }}>
                       {(() => {
-                        const slot = placements.find(p => p.id === 'line-push')!;
+                        const slot = slotById('line-push');
                         const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                         return occupied ? (
                           slot.hasMaterial ? (
@@ -3432,7 +3437,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                     {/* Line Post ad */}
                     <div style={{ height: '60px', width: '80%', alignSelf: 'flex-start' }}>
                       {(() => {
-                        const slot = placements.find(p => p.id === 'line-post')!;
+                        const slot = slotById('line-post');
                         const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                         return occupied ? (
                           slot.hasMaterial ? (
@@ -3457,7 +3462,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   {/* Rich menu slot */}
                   <div style={{ height: '80px' }}>
                     {(() => {
-                      const slot = placements.find(p => p.id === 'line-menu')!;
+                      const slot = slotById('line-menu');
                       const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                       return occupied ? (
                         slot.hasMaterial ? (
@@ -3485,7 +3490,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   {/* FB Cover */}
                   <div className="wf-soc-cover-container" style={{ height: '110px' }}>
                     {(() => {
-                      const slot = placements.find(p => p.id === 'soc-fb-cover')!;
+                      const slot = slotById('soc-fb-cover');
                       const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                       return occupied ? (
                         slot.hasMaterial ? (
@@ -3519,7 +3524,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                         <div className="wf-hp-line" style={{ width: '90%' }} />
                         <div style={{ height: '70px' }}>
                           {(() => {
-                            const slot = placements.find(p => p.id === 'soc-fb-post')!;
+                            const slot = slotById('soc-fb-post');
                             const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                             return occupied ? (
                               slot.hasMaterial ? (
@@ -3551,7 +3556,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                         </div>
                         <div style={{ height: '48px' }}>
                           {(() => {
-                            const slot = placements.find(p => p.id === 'soc-tg-post')!;
+                            const slot = slotById('soc-tg-post');
                             const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                             return occupied ? (
                               slot.hasMaterial ? (
@@ -3577,7 +3582,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                       <div className="wf-soc-card" style={{ padding: '8px' }}>
                         <div style={{ height: '40px' }}>
                           {(() => {
-                            const slot = placements.find(p => p.id === 'soc-art-footer')!;
+                            const slot = slotById('soc-art-footer');
                             const occupied = slot.status !== 'available' && isDateWithinPlacement(previewDate, slot);
                             return occupied ? (
                               slot.hasMaterial ? (
