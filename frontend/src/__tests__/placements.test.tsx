@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test } from 'vitest'
-import { PlacementsPanel, parseSchedule } from '../Placements'
+import { PlacementsPanel, parseSchedule, normalizeSlot } from '../Placements'
 
 // 元件會把狀態寫進 localStorage,測試間清乾淨避免互相污染
 afterEach(() => localStorage.clear())
@@ -31,6 +31,36 @@ describe('parseSchedule 檔期字串解析', () => {
 
   test('無法解析的字串回傳 null', () => {
     expect(parseSchedule('待定')).toBeNull()
+  })
+})
+
+describe('normalizeSlot 持久化資料正規化', () => {
+  test('沒有 id 回傳 null', () => {
+    expect(normalizeSlot({})).toBeNull()
+    expect(normalizeSlot(null)).toBeNull()
+    expect(normalizeSlot({ id: '' })).toBeNull()
+    expect(normalizeSlot('not-an-object')).toBeNull()
+  })
+
+  test('缺欄位 / 型別錯的欄位會補成安全預設(字串欄位不為 undefined)', () => {
+    const r = normalizeSlot({ id: 'x1' })!
+    expect(r).not.toBeNull()
+    // 下游會對這些欄位呼叫 .toLowerCase()/.split(),必須是字串
+    expect(typeof r.name).toBe('string')
+    expect(typeof r.client).toBe('string')
+    expect(typeof r.position).toBe('string')
+    expect(typeof r.schedule).toBe('string')
+    // 非法 surface/status 回退到合法列舉值
+    expect(r.surface).toBe('homepage')
+    expect(r.status).toBe('available')
+    expect(r.hasMaterial).toBe(false)
+  })
+
+  test('型別錯的數值欄位(maxKB 為字串)→ null', () => {
+    const r = normalizeSlot({ id: 'x1', maxKB: '300', surface: 'bogus', status: 'bogus' })!
+    expect(r.maxKB).toBeNull()
+    expect(r.surface).toBe('homepage')
+    expect(r.status).toBe('available')
   })
 })
 
@@ -170,5 +200,24 @@ describe('PlacementsPanel 廣告版位', () => {
 
     // 孤兒卡片仍然出現(沒有靜默消失)
     expect(screen.getByText('孤兒版位測試')).toBeInTheDocument()
+  })
+
+  test('規格頁面對缺欄位的損壞版位資料不崩(下游有 .toLowerCase 等呼叫)', () => {
+    // 只有 id、其餘欄位全缺 —— 正規化前會讓 slot.name.toLowerCase() 等爆炸
+    localStorage.setItem('pref:placements-data', JSON.stringify([
+      { id: 'broken-1' },
+      { id: 'broken-2', name: 123, client: null, position: undefined, schedule: 999 },
+    ]))
+
+    // 規格頁的篩選器會對 name/position/client 呼叫 .toLowerCase();若沒正規化會 throw
+    expect(() =>
+      render(
+        <MemoryRouter>
+          <PlacementsPanel subTab="specs" />
+        </MemoryRouter>
+      )
+    ).not.toThrow()
+
+    expect(screen.getByPlaceholderText('搜尋名稱、說明、客戶...')).toBeInTheDocument()
   })
 })
