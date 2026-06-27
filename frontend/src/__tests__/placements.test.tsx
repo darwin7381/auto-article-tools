@@ -1,7 +1,35 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test } from 'vitest'
-import { PlacementsPanel } from '../Placements'
+import { PlacementsPanel, parseSchedule } from '../Placements'
+
+describe('parseSchedule 檔期字串解析', () => {
+  test('空字串回傳 null', () => {
+    expect(parseSchedule('')).toBeNull()
+  })
+
+  test('同年同字串短格式 YYYY/MM/DD–MM/DD', () => {
+    const r = parseSchedule('2026/07/01–07/31')
+    expect(r).not.toBeNull()
+    expect(r!.start.getFullYear()).toBe(2026)
+    expect(r!.start.getMonth()).toBe(6) // July = 6
+    expect(r!.start.getDate()).toBe(1)
+    expect(r!.end.getMonth()).toBe(6)
+    expect(r!.end.getDate()).toBe(31)
+  })
+
+  test('完整起訖年月日 YYYY/MM/DD–YYYY/MM/DD', () => {
+    const r = parseSchedule('2026/07/28–2026/08/04')
+    expect(r).not.toBeNull()
+    expect(r!.start.getMonth()).toBe(6)
+    expect(r!.end.getMonth()).toBe(7) // August
+    expect(r!.end.getDate()).toBe(4)
+  })
+
+  test('無法解析的字串回傳 null', () => {
+    expect(parseSchedule('待定')).toBeNull()
+  })
+})
 
 describe('PlacementsPanel 廣告版位', () => {
   test('渲染 KPI 看板', () => {
