@@ -1513,6 +1513,20 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
           border-radius: 8px;
           background: var(--panel-2);
         }
+        
+        .gantt-scroll-wrapper::-webkit-scrollbar {
+          height: 6px;
+        }
+        .gantt-scroll-wrapper::-webkit-scrollbar-track {
+          background: var(--panel-2);
+        }
+        .gantt-scroll-wrapper::-webkit-scrollbar-thumb {
+          background: var(--border-soft);
+          border-radius: 3px;
+        }
+        .gantt-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+          background: var(--muted);
+        }
 
         .gantt-table {
           border-collapse: collapse;
@@ -1531,14 +1545,15 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
           padding: 10px 14px !important;
           text-align: left !important;
           font-weight: 600;
-          font-size: 12px;
+          font-size: 11.5px;
           background: var(--panel);
           color: var(--text);
           position: sticky;
           left: 0;
-          z-index: 10;
-          box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-          border-right: 1px solid var(--border) !important;
+          z-index: 15;
+          box-shadow: 2px 0 8px rgba(0, 0, 0, 0.12);
+          border-right: 2px solid var(--border) !important;
+          transition: background var(--transition-fast);
         }
 
         .gantt-surface-row {
@@ -1591,34 +1606,46 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
         }
 
         .gantt-day-cell.is-weekend {
-          background: rgba(255, 255, 255, 0.015);
+          background: repeating-linear-gradient(
+            -45deg,
+            rgba(255, 255, 255, 0.012),
+            rgba(255, 255, 255, 0.012) 6px,
+            rgba(255, 255, 255, 0.02) 6px,
+            rgba(255, 255, 255, 0.02) 12px
+          );
         }
 
         :root.light .gantt-day-cell.is-weekend {
-          background: rgba(0, 0, 0, 0.015);
+          background: repeating-linear-gradient(
+            -45deg,
+            rgba(0, 0, 0, 0.012),
+            rgba(0, 0, 0, 0.012) 6px,
+            rgba(0, 0, 0, 0.02) 6px,
+            rgba(0, 0, 0, 0.02) 12px
+          );
         }
 
-        .gantt-day-cell.is-today::after {
-          content: '';
+        .gantt-row {
+          transition: background var(--transition-fast) ease;
+        }
+        .gantt-row:hover {
+          background: color-mix(in srgb, var(--accent) 1.5%, transparent) !important;
+        }
+        .gantt-row:hover .gantt-label-col {
+          background: color-mix(in srgb, var(--accent) 3.5%, var(--panel)) !important;
+        }
+
+        .gantt-today-indicator {
           position: absolute;
           top: 0;
           bottom: 0;
           left: 50%;
-          width: 1px;
+          width: 2px;
           background: var(--err);
-          opacity: 0.5;
+          box-shadow: 0 0 6px var(--err);
+          opacity: 0.8;
           pointer-events: none;
-        }
-
-        .gantt-bar-segment {
-          position: absolute;
-          top: 6px;
-          bottom: 6px;
-          left: 0;
-          right: -1px;
-          z-index: 5;
-          transition: var(--transition-fast);
-          opacity: 0.85;
+          z-index: 6;
         }
 
         .gantt-bar-segment:hover {
@@ -2790,7 +2817,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                           </tr>
                           {surfSlots.map((slot) => {
                             return (
-                              <tr key={slot.id}>
+                              <tr key={slot.id} className="gantt-row">
                                 <td
                                   className="gantt-label-col"
                                   style={{ cursor: 'pointer' }}
@@ -2834,19 +2861,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                           onClick={() => setSelectedDateFilter(cellDate)}
                                         >
                                           {isToday && (
-                                            <div
-                                              style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                bottom: 0,
-                                                left: '50%',
-                                                width: '1px',
-                                                background: 'var(--err)',
-                                                opacity: 0.5,
-                                                pointerEvents: 'none',
-                                                zIndex: 6
-                                              }}
-                                            />
+                                            <div className="gantt-today-indicator" />
                                           )}
                                         </div>
                                       );
@@ -2861,6 +2876,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                     const totalDays = daysInMonth;
                                     const leftPercent = ((barRange.startDay - 1) / totalDays) * 100;
                                     const widthPercent = ((barRange.endDay - barRange.startDay + 1) / totalDays) * 100;
+                                    const duration = barRange.endDay - barRange.startDay + 1;
 
                                     const barStyle: React.CSSProperties = {
                                       position: 'absolute',
@@ -2869,11 +2885,18 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                       left: `${leftPercent}%`,
                                       width: `${widthPercent}%`,
                                       zIndex: 10,
-                                      backgroundColor: barRange.color,
+                                      backgroundColor: barRange.hasMaterial
+                                        ? barRange.color
+                                        : `color-mix(in srgb, ${barRange.color} 18%, var(--panel-2))`,
+                                      backgroundImage: barRange.hasMaterial
+                                        ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(0, 0, 0, 0.08) 100%)'
+                                        : 'none',
                                       border: barRange.hasMaterial
                                         ? `1px solid rgba(0, 0, 0, 0.15)`
-                                        : `2px dashed rgba(255, 255, 255, 0.65)`,
-                                      opacity: barRange.hasMaterial ? 0.9 : 0.55,
+                                        : `1.5px dashed ${barRange.color}`,
+                                      boxShadow: barRange.hasMaterial
+                                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.12)'
+                                        : 'none',
                                       borderLeft: barRange.isStartCap ? undefined : 'none',
                                       borderRight: barRange.isEndCap ? undefined : 'none',
                                       borderTopLeftRadius: barRange.isStartCap ? '4px' : '0',
@@ -2905,19 +2928,21 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                         }}
                                         title={`${slot.name} - ${pitchMode ? (slot.status === 'booked' ? '已預訂' : '洽談中') : slot.client || '無客戶'} (${slot.schedule}) - ${slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}`}
                                       >
-                                        {!barRange.hasMaterial && (
+                                        {!barRange.hasMaterial && duration >= 3 && (
                                           <div style={{
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             height: '100%',
-                                            fontSize: '10px',
-                                            color: '#fff',
-                                            textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                                            fontSize: '8px',
+                                            fontWeight: 'bold',
+                                            letterSpacing: '0.08em',
+                                            color: `color-mix(in srgb, ${barRange.color} 90%, var(--text))`,
                                             userSelect: 'none',
-                                            pointerEvents: 'none'
+                                            pointerEvents: 'none',
+                                            opacity: 0.85
                                           }}>
-                                            ⏳
+                                            PENDING
                                           </div>
                                         )}
                                       </div>
@@ -2937,16 +2962,23 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                {/* Gantt Legend */}
               <div className="gantt-legend">
                 <div className="gantt-legend-item">
-                  <div className="gantt-legend-color" style={{ background: 'var(--accent-2)' }} />
-                  <span>已預訂 / 安排中 (依客戶品牌色區分)</span>
+                  <div className="gantt-legend-color" style={{
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0.08) 100%), var(--accent-2)',
+                    border: '1px solid rgba(0, 0, 0, 0.15)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.12)'
+                  }} />
+                  <span>已售出 / 安排中 (素材已就緒)</span>
                 </div>
                 <div className="gantt-legend-item">
                   <div className="gantt-legend-color" style={{ background: 'var(--warn)' }} />
                   <span>洽談中檔期</span>
                 </div>
                 <div className="gantt-legend-item">
-                  <div className="gantt-legend-color" style={{ border: '2px dashed rgba(255, 255, 255, 0.65)', background: 'var(--accent-2)', opacity: 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#fff' }}>⏳</div>
-                  <span>⏳ 待補素材 (半透明 + 虛線外框 + ⏳ 標記)</span>
+                  <div className="gantt-legend-color" style={{
+                    border: '1.5px dashed var(--accent-2)',
+                    background: 'color-mix(in srgb, var(--accent-2) 18%, var(--panel-2))'
+                  }} />
+                  <span>待補素材 (虛線邊框 + 客戶品牌淡色洗滌)</span>
                 </div>
                 <div className="gantt-legend-item">
                   <div className="gantt-legend-color" style={{ border: '1px dashed var(--border)', background: 'transparent' }} />
