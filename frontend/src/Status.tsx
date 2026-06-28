@@ -28,7 +28,7 @@ const SUPERIOR = [
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 139 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 61',
+  '自動化測試 pytest 139 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 65',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -293,7 +293,7 @@ const MAIN_MODULES: MainMod[] = [
 ]
 const UNIT_TESTS: Row[] = [
   ['後端自動化測試 pytest', 'uv run pytest', '139 通過 / 1 skip(OCR extra)', true],
-  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '61 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl/廣告版位地圖/檔期解析/狀態看板)', true],
+  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '65 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl/廣告版位地圖/檔期解析/狀態看板)', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -325,7 +325,7 @@ function AuditsPanel() {
       <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
       <p className="hint" style={{ marginTop: 0 }}>
         獨立 Claude subagent(<code>module-capability-auditor</code>)讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴。
-        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→139 + 前端 61 vitest</b> → 稽核分全面回升至 78–88。
+        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→139 + 前端 65 vitest</b> → 稽核分全面回升至 78–88。
         欄位:稽核①=補測前、稽核③=最終。<b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
       </p>
       <div className="table-wrap"><table>
@@ -373,7 +373,7 @@ function StatCards() {
       <Stat label="Jobs 總數" value={String(live.jobs)} />
       <Stat label="完成 Jobs" value={String(live.done)} />
       <Stat label="後端測試" value="139 ✓" ok />
-      <Stat label="前端測試" value="61 ✓" ok />
+      <Stat label="前端測試" value="65 ✓" ok />
     </div>
   )
 }
