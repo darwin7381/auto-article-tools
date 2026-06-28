@@ -2884,8 +2884,18 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                         style={barStyle}
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          const cellDate = new Date(currentYear, currentMonth, barRange.startDay);
-                                          setSelectedDateFilter(cellDate);
+                                          // Map the click X position to the actual day under the cursor,
+                                          // so clicking mid-booking selects that day — not the booking start.
+                                          const td = e.currentTarget.parentElement;
+                                          let day = barRange.startDay;
+                                          if (td) {
+                                            const rect = td.getBoundingClientRect();
+                                            if (rect.width > 0) {
+                                              const ratio = (e.clientX - rect.left) / rect.width;
+                                              day = Math.min(daysInMonth, Math.max(1, Math.floor(ratio * daysInMonth) + 1));
+                                            }
+                                          }
+                                          setSelectedDateFilter(new Date(currentYear, currentMonth, day));
                                         }}
                                         title={`${slot.name} - ${pitchMode ? (slot.status === 'booked' ? '已預訂' : '洽談中') : slot.client || '無客戶'} (${slot.schedule}) - ${slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}`}
                                       />
