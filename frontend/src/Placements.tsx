@@ -362,6 +362,14 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
 
+export function getBookingLength(scheduleStr: string): number | null {
+  const range = parseSchedule(scheduleStr);
+  if (!range) return null;
+  const diffTime = Math.abs(range.end.getTime() - range.start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  return diffDays;
+}
+
 export function parseSchedule(scheduleStr: string): { start: Date; end: Date } | null {
   if (!scheduleStr) return null;
   const cleaned = scheduleStr.trim();
@@ -2726,33 +2734,117 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
             </div>
 
             {scheduleViewMode === 'calendar' && (
-              <div className="seg view-seg">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <button
-                  className={selectedMonthStr === '2026/06' ? 'on' : ''}
+                  className="preview-btn"
+                  style={{ minWidth: '40px', padding: '6px 12px' }}
                   onClick={() => {
-                    setSelectedMonthStr('2026/06');
-                    setSelectedDateFilter(new Date(2026, 5, 10));
+                    const [y, m] = selectedMonthStr.split('/').map(Number);
+                    let ny = y;
+                    let nm = m - 1;
+                    if (nm === 0) {
+                      nm = 12;
+                      ny = y - 1;
+                    }
+                    const newMonthStr = `${ny}/${String(nm).padStart(2, '0')}`;
+                    setSelectedMonthStr(newMonthStr);
+                    setSelectedDateFilter(new Date(ny, nm - 1, 1));
                   }}
+                  title="上一個月"
                 >
-                  2026年6月
+                  ‹
                 </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--panel-2)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--border-soft)' }}>
+                  <select
+                    value={selectedMonthStr.split('/')[0]}
+                    onChange={(e) => {
+                      const newYear = e.target.value;
+                      const month = selectedMonthStr.split('/')[1];
+                      setSelectedMonthStr(`${newYear}/${month}`);
+                      setSelectedDateFilter(new Date(parseInt(newYear, 10), parseInt(month, 10) - 1, 1));
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      padding: '4px 0'
+                    }}
+                  >
+                    {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i).map(yr => (
+                      <option key={yr} value={yr} style={{ background: 'var(--panel-2)' }}>{yr}年</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedMonthStr.split('/')[1]}
+                    onChange={(e) => {
+                      const year = selectedMonthStr.split('/')[0];
+                      const newMonth = e.target.value;
+                      setSelectedMonthStr(`${year}/${newMonth}`);
+                      setSelectedDateFilter(new Date(parseInt(year, 10), parseInt(newMonth, 10) - 1, 1));
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      padding: '4px 0'
+                    }}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(mon => (
+                      <option key={mon} value={mon} style={{ background: 'var(--panel-2)' }}>{parseInt(mon, 10)}月</option>
+                    ))}
+                  </select>
+                </div>
+
                 <button
-                  className={selectedMonthStr === '2026/07' ? 'on' : ''}
+                  className="preview-btn"
+                  style={{ minWidth: '40px', padding: '6px 12px' }}
                   onClick={() => {
-                    setSelectedMonthStr('2026/07');
-                    setSelectedDateFilter(new Date(2026, 6, 10));
+                    const [y, m] = selectedMonthStr.split('/').map(Number);
+                    let ny = y;
+                    let nm = m + 1;
+                    if (nm === 13) {
+                      nm = 1;
+                      ny = y + 1;
+                    }
+                    const newMonthStr = `${ny}/${String(nm).padStart(2, '0')}`;
+                    setSelectedMonthStr(newMonthStr);
+                    setSelectedDateFilter(new Date(ny, nm - 1, 1));
                   }}
+                  title="下一個月"
                 >
-                  2026年7月
+                  ›
                 </button>
+
                 <button
-                  className={selectedMonthStr === '2026/08' ? 'on' : ''}
+                  className="preview-btn"
+                  style={{
+                    borderColor: 'var(--accent)',
+                    color: 'var(--accent)',
+                    fontWeight: '600',
+                    padding: '6px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
                   onClick={() => {
-                    setSelectedMonthStr('2026/08');
-                    setSelectedDateFilter(new Date(2026, 7, 10));
+                    const today = new Date();
+                    const y = today.getFullYear();
+                    const m = String(today.getMonth() + 1).padStart(2, '0');
+                    setSelectedMonthStr(`${y}/${m}`);
+                    setSelectedDateFilter(today);
                   }}
                 >
-                  2026年8月
+                  📅 回到今天
                 </button>
               </div>
             )}
@@ -3133,51 +3225,80 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                     <div className="schedule-surface-title">{surfName} 載體檔期</div>
                     
                     <div className="schedule-slots-grid">
-                      {surfSlots.map((slot) => (
-                        <div key={slot.id} className="schedule-slot-row">
-                          <div className="schedule-slot-info">
-                            <span className="schedule-slot-name">{slot.name}</span>
-                            <div className="schedule-slot-specs">
-                              <span>尺寸: {slot.size}</span>
-                              <span>•</span>
-                              <span>格式: {slot.format}</span>
+                      {surfSlots.map((slot) => {
+                        const duration = getBookingLength(slot.schedule);
+                        return (
+                          <div key={slot.id} className="schedule-slot-row">
+                            <div className="schedule-slot-info">
+                              <span className="schedule-slot-name">{slot.name}</span>
+                              <div className="schedule-slot-specs">
+                                <span>尺寸: {slot.size}</span>
+                                <span>•</span>
+                                <span>格式: {slot.format}</span>
+                              </div>
+                            </div>
+
+                            <div className="schedule-booking-info" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+                              <span className={`status-badge ${slot.status}`}>
+                                {statusLabelMap[slot.status]}
+                              </span>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left', minWidth: '150px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span className="schedule-client-name" style={{ fontWeight: '600', color: 'var(--text)' }}>
+                                    {slot.status === 'available' ? '開放銷售' : (pitchMode ? '🔒 已預訂' : slot.client)}
+                                  </span>
+                                  {slot.status !== 'available' && duration && (
+                                    <span style={{
+                                      fontSize: '9.5px',
+                                      padding: '1px 5px',
+                                      background: 'var(--panel-2)',
+                                      borderRadius: '4px',
+                                      color: 'var(--muted)',
+                                      fontFamily: 'var(--mono)',
+                                      border: '1px solid var(--border-soft)'
+                                    }}>
+                                      {duration} 天
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="schedule-dates" style={{ color: 'var(--muted)', fontSize: '11px', fontFamily: 'var(--mono)' }}>
+                                  檔期: {slot.status === 'available' ? '無' : slot.schedule}
+                                </div>
+                              </div>
+
+                              {slot.status !== 'available' && (
+                                <span className={`material-badge ${slot.hasMaterial ? 'ready' : 'pending'}`} style={{
+                                  fontSize: '11px',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontWeight: '500',
+                                  background: slot.hasMaterial ? 'rgba(46, 187, 119, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                                  color: slot.hasMaterial ? 'var(--accent)' : 'var(--warn)',
+                                  border: slot.hasMaterial ? '1px solid rgba(46, 187, 119, 0.2)' : '1px solid rgba(245, 158, 11, 0.2)'
+                                }}>
+                                  {slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}
+                                </span>
+                              )}
+
+                              {!pitchMode && (
+                                <button
+                                  className="schedule-quick-edit-btn"
+                                  onClick={() => {
+                                    handleSurfaceChange(slot.surface);
+                                    setSelectedSlotId(slot.id);
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    onNavigate?.('/placements');
+                                  }}
+                                  title="到地圖中編輯此版位檔期"
+                                >
+                                  編輯
+                                </button>
+                              )}
                             </div>
                           </div>
-
-                          <div className="schedule-booking-info">
-                            <span className={`status-badge ${slot.status}`}>
-                              {statusLabelMap[slot.status]}
-                            </span>
-
-                            {slot.status !== 'available' && !pitchMode && (
-                              <>
-                                <span className="schedule-client-name">{slot.client}</span>
-                                <span className="schedule-dates">{slot.schedule}</span>
-                              </>
-                            )}
-
-                            {slot.status === 'available' && !pitchMode && (
-                              <span className="muted" style={{ fontSize: '12px' }}>開放銷售中</span>
-                            )}
-
-                            {!pitchMode && (
-                              <button
-                                className="schedule-quick-edit-btn"
-                                onClick={() => {
-                                  // Jump back to Map tab and select this slot for editing
-                                  handleSurfaceChange(slot.surface);
-                                  setSelectedSlotId(slot.id);
-                                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                                  onNavigate?.('/placements');
-                                }}
-                                title="到地圖中編輯此版位檔期"
-                              >
-                                編輯
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );

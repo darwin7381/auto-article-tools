@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test } from 'vitest'
-import { PlacementsPanel, parseSchedule, normalizeSlot, PLACEMENTS_SEED_VERSION } from '../Placements'
+import { PlacementsPanel, parseSchedule, normalizeSlot, getBookingLength, PLACEMENTS_SEED_VERSION } from '../Placements'
 
 // 元件會把狀態寫進 localStorage,測試間清乾淨避免互相污染
 afterEach(() => localStorage.clear())
@@ -64,6 +64,19 @@ describe('normalizeSlot 持久化資料正規化', () => {
   })
 })
 
+describe('getBookingLength 檔期天數', () => {
+  test('整月 07/01–07/31 = 31 天(含頭尾)', () => {
+    expect(getBookingLength('2026/07/01–07/31')).toBe(31)
+  })
+  test('單日 = 1 天', () => {
+    expect(getBookingLength('2026/07/10–07/10')).toBe(1)
+  })
+  test('空 / 無法解析 → null', () => {
+    expect(getBookingLength('')).toBeNull()
+    expect(getBookingLength('待定')).toBeNull()
+  })
+})
+
 describe('PlacementsPanel 廣告版位', () => {
   test('渲染 KPI 看板', () => {
     render(
@@ -118,6 +131,21 @@ describe('PlacementsPanel 廣告版位', () => {
     expect(screen.getByText('電子報 載體檔期')).toBeInTheDocument()
     expect(screen.getByText('Line@ 載體檔期')).toBeInTheDocument()
     expect(screen.getByText('社群 載體檔期')).toBeInTheDocument()
+  })
+
+  test('檔期頁有「回到今天」導覽,且列表檢視顯示檔期日期區間', () => {
+    render(
+      <MemoryRouter>
+        <PlacementsPanel subTab="schedule" />
+      </MemoryRouter>
+    )
+
+    // 時間軸導覽不再是寫死三顆月份,要有「回到今天」
+    expect(screen.getByText(/回到今天/)).toBeInTheDocument()
+
+    // 列表檢視是甘特同資料的另一視圖 —— 必須看得到檔期日期區間
+    // (示範資料含 Binance 整月 2026/07/01–07/31)
+    expect(screen.getAllByText(/2026\/07\/01.*07\/31/).length).toBeGreaterThan(0)
   })
 
   test('檔期頁的「編輯」按鈕會導向地圖頁以開啟編輯表單', () => {
