@@ -80,7 +80,7 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     position: '首頁右側欄最上層方塊廣告',
     status: 'negotiating',
     client: 'OKX',
-    schedule: '2026/07/05–07/12',
+    schedule: '2026/07/05–07/15',
     stage: '洽談中',
     hasMaterial: false,
     materialColor: '#EB6A1B',
@@ -95,11 +95,13 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     format: '圖片 / GIF',
     maxKB: 300,
     position: '首頁右側欄第二層方塊廣告',
-    status: 'available',
-    client: '',
-    schedule: '',
-    stage: '可售 / 待洽談',
-    hasMaterial: false
+    status: 'booked',
+    client: 'Bybit',
+    schedule: '2026/07/10–07/25',
+    stage: '已安排',
+    hasMaterial: true,
+    materialColor: '#F0A818',
+    materialText: 'Bybit'
   },
   {
     id: 'hp-sidebar-3',
@@ -125,11 +127,13 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     format: '圖片 / GIF',
     maxKB: 300,
     position: '首頁最新文章列表之中橫幅廣告',
-    status: 'available',
-    client: '',
-    schedule: '',
-    stage: '可售 / 待洽談',
-    hasMaterial: false
+    status: 'booked',
+    client: 'Crypto.com',
+    schedule: '2026/07/08–07/18',
+    stage: '已上架',
+    hasMaterial: false,
+    materialColor: '#103F91',
+    materialText: 'Crypto'
   },
   {
     id: 'hp-footer-1',
@@ -173,12 +177,12 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     maxKB: 300,
     position: '動區電子報信件最上方 Header 下橫幅',
     status: 'booked',
-    client: 'Bybit',
-    schedule: '2026/07/01–07/15',
+    client: 'Arbitrum',
+    schedule: '2026/07/01–07/12',
     stage: '已安排',
-    hasMaterial: false,
-    materialColor: '#F0A818',
-    materialText: 'Bybit'
+    hasMaterial: true,
+    materialColor: '#28A0F0',
+    materialText: 'Arbitrum'
   },
   {
     id: 'nl-body-1',
@@ -189,11 +193,13 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     format: '圖片 / GIF',
     maxKB: 300,
     position: '電子報左側或中段精選方塊廣告',
-    status: 'available',
-    client: '',
-    schedule: '',
-    stage: '可售 / 待洽談',
-    hasMaterial: false
+    status: 'negotiating',
+    client: 'Polygon',
+    schedule: '2026/07/15–07/28',
+    stage: '洽談中',
+    hasMaterial: false,
+    materialColor: '#8247E5',
+    materialText: 'Polygon'
   },
   {
     id: 'nl-body-2',
@@ -251,13 +257,13 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     format: '—',
     maxKB: null,
     position: 'Line 群發訊息文字推播置入',
-    status: 'negotiating',
-    client: 'Crypto.com',
+    status: 'booked',
+    client: 'USDT/Tether',
     schedule: '2026/07/10',
-    stage: '洽談中',
-    hasMaterial: false,
-    materialColor: '#103F91',
-    materialText: 'Crypto.com'
+    stage: '進行中',
+    hasMaterial: true,
+    materialColor: '#00C087',
+    materialText: 'USDT'
   },
   {
     id: 'line-post',
@@ -268,13 +274,11 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     format: '—',
     maxKB: null,
     position: 'Line 官方號貼文牆 (VOOM) 置入帖文',
-    status: 'booked',
-    client: 'Arbitrum',
-    schedule: '2026/07/12–07/18',
-    stage: '已安排',
-    hasMaterial: true,
-    materialColor: '#28A0F0',
-    materialText: 'Arbitrum'
+    status: 'available',
+    client: '',
+    schedule: '',
+    stage: '可售 / 待洽談',
+    hasMaterial: false
   },
 
   // Social & Distribution
@@ -302,11 +306,13 @@ const DEFAULT_PLACEMENTS: PlacementSlot[] = [
     format: '—',
     maxKB: null,
     position: 'Facebook 每日重點新聞貼文贊助標記與置入',
-    status: 'available',
-    client: '',
-    schedule: '',
-    stage: '可售 / 待洽談',
-    hasMaterial: false
+    status: 'booked',
+    client: 'Avalanche',
+    schedule: '2026/07/12–07/20',
+    stage: '已安排',
+    hasMaterial: false,
+    materialColor: '#E84142',
+    materialText: 'AVAX'
   },
   {
     id: 'soc-tg-post',
@@ -2854,10 +2860,11 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                       left: `${leftPercent}%`,
                                       width: `${widthPercent}%`,
                                       zIndex: 10,
-                                      backgroundColor: barRange.hasMaterial ? barRange.color : 'var(--panel-2)',
+                                      backgroundColor: barRange.color,
                                       border: barRange.hasMaterial
-                                        ? `1px solid ${barRange.color}`
-                                        : `2px dashed ${barRange.color}`,
+                                        ? `1px solid rgba(0, 0, 0, 0.15)`
+                                        : `2px dashed rgba(255, 255, 255, 0.65)`,
+                                      opacity: barRange.hasMaterial ? 0.9 : 0.55,
                                       borderLeft: barRange.isStartCap ? undefined : 'none',
                                       borderRight: barRange.isEndCap ? undefined : 'none',
                                       borderTopLeftRadius: barRange.isStartCap ? '4px' : '0',
@@ -2868,16 +2875,6 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                       cursor: 'pointer',
                                       boxSizing: 'border-box'
                                     };
-
-                                    if (!barRange.hasMaterial) {
-                                      barStyle.backgroundImage = `repeating-linear-gradient(
-                                        45deg,
-                                        transparent,
-                                        transparent 8px,
-                                        color-mix(in srgb, ${barRange.color} 15%, transparent) 8px,
-                                        color-mix(in srgb, ${barRange.color} 15%, transparent) 16px
-                                      )`;
-                                    }
 
                                     return (
                                       <div
@@ -2898,7 +2895,23 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                           setSelectedDateFilter(new Date(currentYear, currentMonth, day));
                                         }}
                                         title={`${slot.name} - ${pitchMode ? (slot.status === 'booked' ? '已預訂' : '洽談中') : slot.client || '無客戶'} (${slot.schedule}) - ${slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}`}
-                                      />
+                                      >
+                                        {!barRange.hasMaterial && (
+                                          <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            height: '100%',
+                                            fontSize: '10px',
+                                            color: '#fff',
+                                            textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                                            userSelect: 'none',
+                                            pointerEvents: 'none'
+                                          }}>
+                                            ⏳
+                                          </div>
+                                        )}
+                                      </div>
                                     );
                                   })()}
                                 </td>
@@ -2923,8 +2936,8 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   <span>洽談中檔期</span>
                 </div>
                 <div className="gantt-legend-item">
-                  <div className="gantt-legend-color" style={{ border: '2px dashed var(--warn)', background: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(245, 158, 11, 0.15) 4px, rgba(245, 158, 11, 0.15) 8px)' }} />
-                  <span>⏳ 待補素材 (斜紋與虛線外框)</span>
+                  <div className="gantt-legend-color" style={{ border: '2px dashed rgba(255, 255, 255, 0.65)', background: 'var(--accent-2)', opacity: 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#fff' }}>⏳</div>
+                  <span>⏳ 待補素材 (半透明 + 虛線外框 + ⏳ 標記)</span>
                 </div>
                 <div className="gantt-legend-item">
                   <div className="gantt-legend-color" style={{ border: '1px dashed var(--border)', background: 'transparent' }} />
