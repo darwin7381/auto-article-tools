@@ -484,6 +484,10 @@ function getVisibleBookingRange(slot: PlacementSlot, year: number, month: number
   };
 }
 
+// Bump this whenever DEFAULT_PLACEMENTS changes meaningfully so existing users
+// (who already have older data in localStorage) get re-seeded with the new demo.
+export const PLACEMENTS_SEED_VERSION = '2026-06-28-colorful';
+
 interface PlacementsPanelProps {
   subTab: 'map' | 'specs' | 'schedule' | 'preview' | 'board';
   onNavigate?: (path: string) => void;
@@ -495,6 +499,10 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
   // otherwise fall back to defaults so a corrupted value can't break the page.
   const [placements, setPlacements] = useState<PlacementSlot[]>(() => {
     try {
+      // If the shipped demo seed is newer than what's stored, ignore the old saved
+      // data and re-seed — otherwise existing users never see updated sample data.
+      const seedVer = localStorage.getItem('pref:placements-seed-version');
+      if (seedVer !== PLACEMENTS_SEED_VERSION) return DEFAULT_PLACEMENTS;
       const saved = localStorage.getItem('pref:placements-data');
       if (!saved) return DEFAULT_PLACEMENTS;
       const parsed = JSON.parse(saved);
@@ -509,6 +517,7 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
 
   useEffect(() => {
     localStorage.setItem('pref:placements-data', JSON.stringify(placements));
+    localStorage.setItem('pref:placements-seed-version', PLACEMENTS_SEED_VERSION);
   }, [placements]);
 
   // Persistence state for custom stages (Kanban lifecycles).

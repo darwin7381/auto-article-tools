@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test } from 'vitest'
-import { PlacementsPanel, parseSchedule, normalizeSlot } from '../Placements'
+import { PlacementsPanel, parseSchedule, normalizeSlot, PLACEMENTS_SEED_VERSION } from '../Placements'
 
 // 元件會把狀態寫進 localStorage,測試間清乾淨避免互相污染
 afterEach(() => localStorage.clear())
@@ -175,6 +175,8 @@ describe('PlacementsPanel 廣告版位', () => {
   })
 
   test('看板對損壞的 localStorage 與孤兒卡片有防護', () => {
+    // 設成目前 seed 版本,讓下方手動塞的資料會被讀取(而非被重新播種覆蓋)
+    localStorage.setItem('pref:placements-seed-version', PLACEMENTS_SEED_VERSION)
     // 損壞的 stages(存成物件而非字串陣列)→ 應回退預設,不崩、欄位照常出現
     localStorage.setItem('pref:placements-stages', JSON.stringify({ bad: true }))
     // 一筆 stage 指向不存在欄位的版位 → 不可消失,要落到第一欄
@@ -203,6 +205,7 @@ describe('PlacementsPanel 廣告版位', () => {
   })
 
   test('當日預覽對「不含預設 id」的持久化資料不崩(預覽頁寫死多個 slot id)', () => {
+    localStorage.setItem('pref:placements-seed-version', PLACEMENTS_SEED_VERSION)
     // 持久化資料完全沒有 hp-leaderboard 等預覽頁寫死的 id
     localStorage.setItem('pref:placements-data', JSON.stringify([
       {
@@ -224,6 +227,7 @@ describe('PlacementsPanel 廣告版位', () => {
   })
 
   test('規格頁面對缺欄位的損壞版位資料不崩(下游有 .toLowerCase 等呼叫)', () => {
+    localStorage.setItem('pref:placements-seed-version', PLACEMENTS_SEED_VERSION)
     // 只有 id、其餘欄位全缺 —— 正規化前會讓 slot.name.toLowerCase() 等爆炸
     localStorage.setItem('pref:placements-data', JSON.stringify([
       { id: 'broken-1' },
@@ -240,5 +244,27 @@ describe('PlacementsPanel 廣告版位', () => {
     ).not.toThrow()
 
     expect(screen.getByPlaceholderText('搜尋名稱、說明、客戶...')).toBeInTheDocument()
+  })
+
+  test('seed 版本過舊時,既有使用者會被重新播種成新示範資料', () => {
+    // 模擬既有使用者:舊版本 + 只剩一筆與新示範完全不同的舊資料
+    localStorage.setItem('pref:placements-seed-version', '舊版本')
+    localStorage.setItem('pref:placements-data', JSON.stringify([
+      {
+        id: 'hp-leaderboard', surface: 'homepage', surfaceName: '首頁', name: '舊版位',
+        size: '1×1', format: 'x', maxKB: null, position: 'p', status: 'available',
+        client: '舊客戶不該出現', schedule: '', hasMaterial: false,
+      },
+    ]))
+
+    render(
+      <MemoryRouter>
+        <PlacementsPanel subTab="specs" />
+      </MemoryRouter>
+    )
+
+    // 版本不符 → 重新播種:舊客戶消失,新示範資料(品牌客戶)出現
+    expect(screen.queryByText('舊客戶不該出現')).toBeNull()
+    expect(screen.getAllByText(/Binance|OKX|Bybit/).length).toBeGreaterThan(0)
   })
 })
