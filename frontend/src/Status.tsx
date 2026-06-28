@@ -425,7 +425,7 @@ export function StatusModules() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 139 通過 / 1 skip;前端 <code>pnpm test</code> 43 通過,並以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 139 通過 / 1 skip;前端 <code>pnpm test</code> 65 通過,並以隔離瀏覽器經 tunnel 實測。</p>
       </div>
     </div>
   )
@@ -749,7 +749,7 @@ cd frontend && pnpm build
 
 # 全套測試
 cd backend && uv run pytest -q          # 後端 139 通過 / 1 skip
-cd frontend && pnpm test -- --run       # 前端 43 通過
+cd frontend && pnpm test -- --run       # 前端 65 通過
 
 # 跑服務(本機)
 cd backend && uv run uvicorn app.main:app --port 8000
