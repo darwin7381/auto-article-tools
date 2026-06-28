@@ -444,6 +444,40 @@ function getMaterialText(slot: PlacementSlot): string {
   return slot.client.split(' ')[0].toUpperCase();
 }
 
+function getVisibleBookingRange(slot: PlacementSlot, year: number, month: number) {
+  const range = parseSchedule(slot.schedule);
+  if (!range || slot.status === 'available') return null;
+
+  const monthStart = new Date(year, month, 1, 0, 0, 0, 0);
+  const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+  if (range.end < monthStart || range.start > monthEnd) {
+    return null;
+  }
+
+  const start = range.start < monthStart ? monthStart : range.start;
+  const end = range.end > monthEnd ? monthEnd : range.end;
+
+  const startDay = start.getDate();
+  const endDay = end.getDate();
+
+  const isStartCap = range.start >= monthStart;
+  const isEndCap = range.end <= monthEnd;
+
+  return {
+    startDay,
+    endDay,
+    isStartCap,
+    isEndCap,
+    client: slot.client,
+    schedule: slot.schedule,
+    hasMaterial: slot.hasMaterial,
+    status: slot.status,
+    color: getMaterialColor(slot),
+    text: getMaterialText(slot)
+  };
+}
+
 interface PlacementsPanelProps {
   subTab: 'map' | 'specs' | 'schedule' | 'preview' | 'board';
   onNavigate?: (path: string) => void;
@@ -2757,62 +2791,107 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                                     {slot.size}
                                   </div>
                                 </td>
-                                {daysArray.map((d) => {
-                                  const cellDate = new Date(currentYear, currentMonth, d);
-                                  const dayOfWeek = cellDate.getDay();
-                                  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                                  const today = new Date();
-                                  const isToday = currentYear === today.getFullYear() && currentMonth === today.getMonth() && d === today.getDate();
-                                  const isSelected = selectedDateFilter.getFullYear() === currentYear &&
-                                    selectedDateFilter.getMonth() === currentMonth &&
-                                    selectedDateFilter.getDate() === d;
+                                <td colSpan={daysInMonth} style={{ position: 'relative', height: '40px', padding: 0 }}>
+                                  {/* Grid background */}
+                                  <div style={{ display: 'flex', width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
+                                    {daysArray.map((d) => {
+                                      const cellDate = new Date(currentYear, currentMonth, d);
+                                      const dayOfWeek = cellDate.getDay();
+                                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                                      const today = new Date();
+                                      const isToday = currentYear === today.getFullYear() && currentMonth === today.getMonth() && d === today.getDate();
+                                      const isSelected = selectedDateFilter.getFullYear() === currentYear &&
+                                        selectedDateFilter.getMonth() === currentMonth &&
+                                        selectedDateFilter.getDate() === d;
 
-                                  const range = parseSchedule(slot.schedule);
-                                  const inRange = range && startOfDay(cellDate) >= startOfDay(range.start) && startOfDay(cellDate) <= startOfDay(range.end);
-                                  const isAvailable = slot.status === 'available';
-
-                                  const isStart = range && startOfDay(cellDate).getTime() === startOfDay(range.start).getTime();
-                                  const isEnd = range && startOfDay(cellDate).getTime() === startOfDay(range.end).getTime();
-
-                                  return (
-                                    <td
-                                      key={d}
-                                      className={`gantt-day-cell ${isWeekend ? 'is-weekend' : ''}`}
-                                      style={{
-                                        background: isSelected ? 'rgba(46, 187, 119, 0.05)' : '',
-                                        border: isSelected ? '1px solid rgba(46, 187, 119, 0.2)' : ''
-                                      }}
-                                      onClick={() => setSelectedDateFilter(cellDate)}
-                                    >
-                                      {inRange && !isAvailable && (
+                                      return (
                                         <div
-                                          className={`gantt-bar-segment ${slot.status} ${isStart ? 'start-cap' : ''} ${isEnd ? 'end-cap' : ''}`}
+                                          key={d}
                                           style={{
-                                            // Task 2: Subtle indicator on timeline bar if material is ready vs waiting
-                                            borderStyle: slot.hasMaterial ? 'solid' : 'dashed',
-                                            opacity: slot.hasMaterial ? 0.9 : 0.65
+                                            flex: '1 0 0',
+                                            height: '100%',
+                                            position: 'relative',
+                                            borderRight: '1px solid var(--border-soft)',
+                                            background: isSelected ? 'rgba(46, 187, 119, 0.05)' : isWeekend ? 'rgba(255, 255, 255, 0.015)' : 'transparent',
+                                            cursor: 'pointer',
+                                            boxSizing: 'border-box'
                                           }}
-                                          title={`${slot.name} - ${pitchMode ? (slot.status === 'booked' ? '已預訂' : '洽談中') : slot.client || '無客戶'} (${slot.schedule}) - ${slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}`}
-                                        />
-                                      )}
-                                      {isToday && (
-                                        <div
-                                          style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            bottom: 0,
-                                            left: '50%',
-                                            width: '1px',
-                                            background: 'var(--err)',
-                                            opacity: 0.5,
-                                            pointerEvents: 'none',
-                                            zIndex: 6
-                                          }}
-                                        />
-                                      )}
-                                    </td>
-                                  );
-                                })}
+                                          onClick={() => setSelectedDateFilter(cellDate)}
+                                        >
+                                          {isToday && (
+                                            <div
+                                              style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                bottom: 0,
+                                                left: '50%',
+                                                width: '1px',
+                                                background: 'var(--err)',
+                                                opacity: 0.5,
+                                                pointerEvents: 'none',
+                                                zIndex: 6
+                                              }}
+                                            />
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Single contiguous booking bar overlay */}
+                                  {(() => {
+                                    const barRange = getVisibleBookingRange(slot, currentYear, currentMonth);
+                                    if (!barRange) return null;
+
+                                    const totalDays = daysInMonth;
+                                    const leftPercent = ((barRange.startDay - 1) / totalDays) * 100;
+                                    const widthPercent = ((barRange.endDay - barRange.startDay + 1) / totalDays) * 100;
+
+                                    const barStyle: React.CSSProperties = {
+                                      position: 'absolute',
+                                      top: '6px',
+                                      bottom: '6px',
+                                      left: `${leftPercent}%`,
+                                      width: `${widthPercent}%`,
+                                      zIndex: 10,
+                                      backgroundColor: barRange.hasMaterial ? barRange.color : 'var(--panel-2)',
+                                      border: barRange.hasMaterial
+                                        ? `1px solid ${barRange.color}`
+                                        : `2px dashed ${barRange.color}`,
+                                      borderLeft: barRange.isStartCap ? undefined : 'none',
+                                      borderRight: barRange.isEndCap ? undefined : 'none',
+                                      borderTopLeftRadius: barRange.isStartCap ? '4px' : '0',
+                                      borderBottomLeftRadius: barRange.isStartCap ? '4px' : '0',
+                                      borderTopRightRadius: barRange.isEndCap ? '4px' : '0',
+                                      borderBottomRightRadius: barRange.isEndCap ? '4px' : '0',
+                                      transition: 'var(--transition-fast)',
+                                      cursor: 'pointer',
+                                      boxSizing: 'border-box'
+                                    };
+
+                                    if (!barRange.hasMaterial) {
+                                      barStyle.backgroundImage = `repeating-linear-gradient(
+                                        45deg,
+                                        transparent,
+                                        transparent 8px,
+                                        color-mix(in srgb, ${barRange.color} 15%, transparent) 8px,
+                                        color-mix(in srgb, ${barRange.color} 15%, transparent) 16px
+                                      )`;
+                                    }
+
+                                    return (
+                                      <div
+                                        style={barStyle}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const cellDate = new Date(currentYear, currentMonth, barRange.startDay);
+                                          setSelectedDateFilter(cellDate);
+                                        }}
+                                        title={`${slot.name} - ${pitchMode ? (slot.status === 'booked' ? '已預訂' : '洽談中') : slot.client || '無客戶'} (${slot.schedule}) - ${slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}`}
+                                      />
+                                    );
+                                  })()}
+                                </td>
                               </tr>
                             );
                           })}
@@ -2823,23 +2902,23 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                 </table>
               </div>
 
-              {/* Gantt Legend */}
+               {/* Gantt Legend */}
               <div className="gantt-legend">
                 <div className="gantt-legend-item">
-                  <div className="gantt-legend-color booked" />
-                  <span>已售出</span>
+                  <div className="gantt-legend-color" style={{ background: 'var(--accent-2)' }} />
+                  <span>已預訂 / 安排中 (依客戶品牌色區分)</span>
                 </div>
                 <div className="gantt-legend-item">
-                  <div className="gantt-legend-color negotiating" />
-                  <span>洽談中</span>
+                  <div className="gantt-legend-color" style={{ background: 'var(--warn)' }} />
+                  <span>洽談中檔期</span>
+                </div>
+                <div className="gantt-legend-item">
+                  <div className="gantt-legend-color" style={{ border: '2px dashed var(--warn)', background: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(245, 158, 11, 0.15) 4px, rgba(245, 158, 11, 0.15) 8px)' }} />
+                  <span>⏳ 待補素材 (斜紋與虛線外框)</span>
                 </div>
                 <div className="gantt-legend-item">
                   <div className="gantt-legend-color" style={{ border: '1px dashed var(--border)', background: 'transparent' }} />
-                  <span>開放銷售 (Open Inventory)</span>
-                </div>
-                <div className="gantt-legend-item">
-                  <span style={{ fontSize: '13px', display: 'inline-block', borderBottom: '1px dashed var(--muted)', width: '15px', height: '2px', verticalAlign: 'middle', marginRight: '4px' }} />
-                  <span>邊框虛線代表「等待素材」</span>
+                  <span>開放銷售 (空欄)</span>
                 </div>
               </div>
             </div>
