@@ -202,6 +202,24 @@ describe('PlacementsPanel 廣告版位', () => {
     expect(screen.getByPlaceholderText('輸入新狀態欄名稱...')).toBeInTheDocument()
   })
 
+  test('狀態看板「卡片欄位設定」齒輪會開啟欄位選擇彈窗', () => {
+    render(
+      <MemoryRouter>
+        <PlacementsPanel subTab="board" />
+      </MemoryRouter>
+    )
+
+    // 彈窗預設關閉
+    expect(screen.queryByText('⚙️ 看板卡片顯示設定')).toBeNull()
+
+    // 點齒輪開彈窗,出現可勾選的欄位清單
+    fireEvent.click(screen.getByText(/卡片欄位設定/))
+    expect(screen.getByText('⚙️ 看板卡片顯示設定')).toBeInTheDocument()
+    expect(screen.getByText(/客戶名稱/)).toBeInTheDocument()
+    expect(screen.getByText(/檔期日期區間/)).toBeInTheDocument()
+    expect(screen.getByText(/素材就緒狀態/)).toBeInTheDocument()
+  })
+
   test('看板對損壞的 localStorage 與孤兒卡片有防護', () => {
     // 設成目前 seed 版本,讓下方手動塞的資料會被讀取(而非被重新播種覆蓋)
     localStorage.setItem('pref:placements-seed-version', PLACEMENTS_SEED_VERSION)

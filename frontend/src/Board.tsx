@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import {
   addTaskComment, createColumn, createContract, createTask, deleteContract, deleteTask,
   getBoard, getTask, notifyBd, runTask, setTaskUrls, streamBoard, streamJob, updateTask,
@@ -110,6 +110,8 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
   const [creating, setCreating] = useState<{ column_id?: number } | null>(null)
   const [showContracts, setShowContracts] = useState(false)
   const dragRef = useRef<Task | null>(null)
+  const [dropIndicator, setDropIndicator] = useState<{ columnKey: string; taskId: number | 'empty' | 'bottom'; position: 'top' | 'bottom'; index?: number } | null>(null)
+
 
   const load = () => getBoard().then(setBoard).catch((e) => toast.err(errMsg(e)))
   useEffect(() => { load() }, [])
@@ -186,11 +188,13 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
   function applyLocal(taskId: number, patch: Partial<Task>) {
     setBoard((b) => b ? { ...b, tasks: b.tasks.map((t) => t.id === taskId ? { ...t, ...patch } : t) } : b)
   }
-  function dropInGroup(grp: typeof groupDefs[number]) {
+  function dropInGroup(grp: typeof groupDefs[number], targetPos?: number) {
     const t = dragRef.current; dragRef.current = null
+    setDropIndicator(null)
     if (!t || !grp.draggable) return
-    const bottom = Math.max(0, ...filtered.filter(grp.match).map((x) => x.position)) + 1
-    const patch = grp.patch(bottom)
+    const finalPos = targetPos !== undefined ? targetPos : (Math.max(0, ...filtered.filter(grp.match).map((x) => x.position)) + 1)
+    const basePatch = grp.patch(finalPos)
+    const patch = { ...basePatch, position: finalPos }
     if (!Object.keys(patch).length) return
     applyLocal(t.id, patch)
     updateTask(t.id, { ...patch, actor: me }).catch((e) => { toast.err(errMsg(e)); load() })
@@ -222,21 +226,123 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
 
       {view === 'board' && (
         <div className="board-cols">
+          <style>{`
+            .drop-indicator {
+              height: 4px;
+              background: var(--accent);
+              border-radius: 2px;
+              margin: 6px 0;
+              box-shadow: 0 0 8px var(--accent);
+              transition: all 0.15s ease;
+            }
+            .board-col.drag-over {
+              border-color: var(--accent-2);
+              background: color-mix(in srgb, var(--accent) 2.5%, var(--panel-2));
+            }
+          `}</style>
           {groupDefs.map((grp) => {
             const items = filtered.filter(grp.match).sort(sortByPos)
             const wip = grp.col?.wip_limit
+            const isColDragOver = dropIndicator?.columnKey === grp.key
+
             return (
-              <div key={grp.key} className={`board-col kind-${grp.col?.kind ?? 'custom'}`}
-                onDragOver={(e) => { if (grp.draggable) e.preventDefault() }}
-                onDrop={() => dropInGroup(grp)}>
+              <div key={grp.key} className={`board-col kind-${grp.col?.kind ?? 'custom'} ${isColDragOver ? 'drag-over' : ''}`}
+                onDragOver={(e) => {
+                  if (!grp.draggable) return
+                  e.preventDefault()
+                  if (items.length === 0) {
+                    setDropIndicator({ columnKey: grp.key, taskId: 'empty', position: 'bottom', index: 0 })
+                  }
+                }}
+                onDragLeave={() => {
+                  // Only clear if leaving to outside
+                }}
+                onDrop={() => {
+                  if (!grp.draggable) return
+                  const dragTask = dragRef.current
+                  if (!dragTask) return
+
+                  if (dropIndicator && dropIndicator.columnKey === grp.key) {
+                    if (dropIndicator.taskId === 'empty') {
+                      dropInGroup(grp, 1.0)
+                    } else if (dropIndicator.taskId === 'bottom' || dropIndicator.index === undefined) {
+                      dropInGroup(grp)
+                    } else {
+                      const targetIdx = dropIndicator.index
+                      const columnItems = filtered.filter(grp.match).sort(sortByPos)
+                      
+                      let newPos = 1.0
+                      if (dropIndicator.position === 'top') {
+                        if (targetIdx === 0) {
+                          newPos = columnItems[0].position - 1
+                        } else {
+                          const prevTask = columnItems[targetIdx - 1]
+                          const currTask = columnItems[targetIdx]
+                          newPos = (prevTask.position + currTask.position) / 2
+                        }
+                      } else {
+                        if (targetIdx === columnItems.length - 1) {
+                          newPos = columnItems[columnItems.length - 1].position + 1
+                        } else {
+                          const currTask = columnItems[targetIdx]
+                          const nextTask = columnItems[targetIdx + 1]
+                          newPos = (currTask.position + nextTask.position) / 2
+                        }
+                      }
+                      dropInGroup(grp, newPos)
+                    }
+                  } else {
+                    dropInGroup(grp)
+                  }
+                  setDropIndicator(null)
+                }}>
                 <div className="col-head">
                   <span className="col-dot" /><span className="col-name">{grp.label}</span>
                   <span className={`col-count ${wip != null && items.length > wip ? 'over' : ''}`}>{items.length}{wip != null ? `/${wip}` : ''}</span>
                 </div>
-                <div className="col-body">
-                  {items.map((t) => (
-                    <TaskCard key={t.id} task={t} onOpen={() => setOpenTaskId(t.id)}
-                      draggable={grp.draggable} onDragStart={() => { dragRef.current = t }} />
+                <div className="col-body"
+                  onDragOver={(e) => {
+                    if (!grp.draggable) return
+                    e.preventDefault()
+                  }}
+                  onDragLeave={() => {
+                    // Let onDragEnd handle indicator cleanup
+                  }}
+                >
+                  {items.length === 0 && dropIndicator?.columnKey === grp.key && dropIndicator?.taskId === 'empty' && (
+                    <div className="drop-indicator" />
+                  )}
+                  {items.map((t, idx) => (
+                    <Fragment key={t.id}>
+                      {dropIndicator?.columnKey === grp.key && dropIndicator?.taskId === t.id && dropIndicator?.position === 'top' && (
+                        <div className="drop-indicator" />
+                      )}
+                      <div
+                        onDragOver={(e) => {
+                          if (!grp.draggable) return
+                          e.preventDefault()
+                          e.stopPropagation()
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          const relativeY = e.clientY - rect.top
+                          const isTop = relativeY < rect.height / 2
+                          setDropIndicator({
+                            columnKey: grp.key,
+                            taskId: t.id,
+                            position: isTop ? 'top' : 'bottom',
+                            index: idx
+                          })
+                        }}
+                      >
+                        <TaskCard task={t} onOpen={() => setOpenTaskId(t.id)}
+                          draggable={grp.draggable}
+                          onDragStart={() => { dragRef.current = t }}
+                          onDragEnd={() => setDropIndicator(null)}
+                        />
+                      </div>
+                      {dropIndicator?.columnKey === grp.key && dropIndicator?.taskId === t.id && dropIndicator?.position === 'bottom' && (
+                        <div className="drop-indicator" />
+                      )}
+                    </Fragment>
                   ))}
                   {groupBy === 'stage' && grp.col && <button className="add-card-btn" onClick={() => setCreating({ column_id: grp.col!.id })}>＋ 新增</button>}
                 </div>
@@ -295,12 +401,14 @@ function FilterBar({ board, clients, filters, setFilters, count, total }: {
 }
 
 // ──────────────────────── 卡片 ────────────────────────
-function TaskCard({ task, onOpen, draggable, onDragStart }: { task: Task; onOpen: () => void; draggable: boolean; onDragStart: () => void }) {
+function TaskCard({ task, onOpen, draggable, onDragStart, onDragEnd }: { task: Task; onOpen: () => void; draggable: boolean; onDragStart: () => void; onDragEnd?: () => void }) {
   const p = PRIORITY[task.priority] ?? PRIORITY.normal
   const due = dueLabel(dueOf(task))
   return (
     <div className="task-card" draggable={draggable}
-      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }} onClick={onOpen}>
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
+      onDragEnd={onDragEnd}
+      onClick={onOpen}>
       <div className="tc-top">
         {task.client && <span className="tc-client">{task.client}</span>}
         {task.item_type && <span className={`tc-type ${task.pipeline === 'A' ? 'article' : ''}`}>{task.item_type}</span>}
