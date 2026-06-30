@@ -665,7 +665,14 @@ export function StatusDocs() {
           <ul className="tick">
             <li><b>版位地圖(/placements)</b>:各載體的版位示意圖,點任一版位看右側詳情 —— 尺寸 / 格式 / 檔案上限 / 曝光位置、目前客戶與檔期(含單一版位迷你時間軸)、素材狀態。非展示模式可直接改狀態 / 客戶 / 檔期 / 素材。</li>
             <li><b>規格(/placements/specs)</b>:全版位規格表,可依狀態 / 載體篩選、搜尋名稱 / 說明 / 客戶。</li>
-            <li><b>檔期(/placements/schedule)</b>:檔期總覽,日曆甘特圖(橫軸日期、今日線、依狀態上色)/ 列表兩種檢視;點任一日看該日整體狀況(已售 / 洽談 / 可售與佔用客戶)。</li>
+            <li><b>檔期(/placements/schedule)</b>:檔期總覽,日曆甘特圖 / 列表兩種檢視。
+              <ul className="tick">
+                <li>甘特圖:連續長條(同檔期無縫、依客戶品牌色區分),發光今日線、週末紋理;時間軸可用年 / 月下拉跳任意月份、‹ › 連續往前後切月、一鍵「回到今天」。</li>
+                <li>素材狀態視覺:已就緒=實色高光長條;待補素材=同色 hollow 虛線框 +「PENDING」標。</li>
+                <li>點長條會選到「實際點到的那一天」,下方顯示該日整體狀況(已售 / 洽談 / 可售與佔用客戶)。</li>
+                <li>列表檢視=甘特同資料另一視圖:顯示檔期日期區間、天數、狀態、素材狀態與編輯捷徑。</li>
+              </ul>
+            </li>
             <li><b>當日預覽(/placements/preview)</b>:選任一日期(可上 / 下一天、回今天),所見即所得預覽各載體當天版位樣貌 —— 有素材顯示實際 creative,沒素材顯示虛線示意 +「等待素材」,未預定顯示開放銷售。</li>
             <li><b>狀態看板(/placements/board)</b>:依業務生命週期管理版位卡片(預設 洽談中 / 安排中 / 已安排 / 已上架 / 進行中 / 結案準備 / 已結案 + 可售 backlog)。欄位可自訂(新增 / 刪除 / 重命名 / 重設,存 <code>pref:placements-stages</code>);卡片可拖拉或下拉換欄。</li>
           </ul>
@@ -673,7 +680,7 @@ export function StatusDocs() {
             <b>展示模式(Pitch Mode)</b>
             <p className="muted" style={{ margin: '4px 0 0' }}>地圖頁可開「展示簡報模式」,遮去客戶名等內部資訊、保留檔期與版位視覺,適合對外 pitch。</p>
           </div>
-          <p className="muted">註:廣告版位目前為前端 localStorage 管理(尚未接後端 API),資料存在各自瀏覽器。</p>
+          <p className="muted">註:廣告版位目前為前端 localStorage 管理(尚未接後端 API),資料存各自瀏覽器,並對損壞 / 缺欄位的資料做正規化防護。示範資料帶 seed 版本,更新版本時既有使用者會自動重新播種看到新示範。</p>
         </Doc>
 
         <Doc id="cli" title="CLI 用法">
