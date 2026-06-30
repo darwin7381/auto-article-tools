@@ -600,6 +600,36 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
   const [editingStageIndex, setEditingStageIndex] = useState<number | null>(null);
   const [editingStageName, setEditingStageName] = useState('');
   const [showStageSettings, setShowStageSettings] = useState(false);
+  
+  // Placement Kanban states
+  const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
+  const [placementDropIndicator, setPlacementDropIndicator] = useState<{
+    stage: string;
+    slotId: string | 'empty' | 'bottom';
+    position: 'before' | 'after';
+    index?: number;
+  } | null>(null);
+  const [showCardSettingsModal, setShowCardSettingsModal] = useState(false);
+  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('pref:placements-card-fields');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      surface: true,
+      status: true,
+      client: true,
+      schedule: true,
+      material: true,
+      size: true
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pref:placements-card-fields', JSON.stringify(visibleFields));
+  }, [visibleFields]);
 
   // Quick select slot of new surface when surface changes
   const handleSurfaceChange = (surf: 'homepage' | 'newsletter' | 'line' | 'social') => {
@@ -631,42 +661,84 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
     );
   };
 
-  // Move card to a different stage (synced with status/client/schedule if appropriate)
-  const handleMoveCard = (slotId: string, newStage: string) => {
-    setPlacements(prev =>
-      prev.map(slot => {
-        if (slot.id !== slotId) return slot;
-        
-        let status = slot.status;
-        let client = slot.client;
-        let schedule = slot.schedule;
-        let hasMaterial = slot.hasMaterial;
-        
-        if (newStage === '可售 / 待洽談') {
-          status = 'available';
-          client = '';
-          schedule = '';
-          hasMaterial = false;
-        } else if (newStage === '洽談中') {
-          status = 'negotiating';
-          if (!client) client = '洽談中客戶';
-          if (!schedule) schedule = '2026/07/10';
-        } else {
-          status = 'booked';
-          if (!client) client = '預定客戶';
-          if (!schedule) schedule = '2026/07/01–07/31';
+  // Move card to a different stage (synced with status/client/schedule if appropriate, and supports reordering/insertion)
+  const handleMoveCard = (slotId: string, newStage: string, targetSlotId?: string, insertPosition?: 'before' | 'after') => {
+    setPlacements(prev => {
+      const draggedSlot = prev.find(p => p.id === slotId);
+      if (!draggedSlot) return prev;
+
+      let status = draggedSlot.status;
+      let client = draggedSlot.client;
+      let schedule = draggedSlot.schedule;
+      let hasMaterial = draggedSlot.hasMaterial;
+      
+      if (newStage === '可售 / 待洽談') {
+        status = 'available';
+        client = '';
+        schedule = '';
+        hasMaterial = false;
+      } else if (newStage === '洽談中') {
+        status = 'negotiating';
+        if (!client) client = '洽談中客戶';
+        if (!schedule) schedule = '2026/07/10';
+      } else {
+        status = 'booked';
+        if (!client) client = '預定客戶';
+        if (!schedule) schedule = '2026/07/01–07/31';
+      }
+
+      const updatedSlot = {
+        ...draggedSlot,
+        stage: newStage,
+        status,
+        client,
+        schedule,
+        hasMaterial
+      };
+
+      const rest = prev.filter(p => p.id !== slotId);
+
+      if (targetSlotId) {
+        const targetIdx = rest.findIndex(p => p.id === targetSlotId);
+        if (targetIdx !== -1) {
+          const result = [...rest];
+          if (insertPosition === 'before') {
+            result.splice(targetIdx, 0, updatedSlot);
+          } else {
+            result.splice(targetIdx + 1, 0, updatedSlot);
+          }
+          return result;
         }
-        
-        return {
-          ...slot,
-          stage: newStage,
-          status,
-          client,
-          schedule,
-          hasMaterial
-        };
-      })
-    );
+      }
+
+      return [...rest, updatedSlot];
+    });
+  };
+
+  const handlePlacementDragOver = (e: React.DragEvent, colStage: string, targetSlot: PlacementSlot, idx: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    const isTop = relativeY < rect.height / 2;
+    setPlacementDropIndicator({
+      stage: colStage,
+      slotId: targetSlot.id,
+      position: isTop ? 'before' : 'after',
+      index: idx
+    });
+  };
+
+  const handleColDragOver = (e: React.DragEvent, colStage: string, count: number) => {
+    e.preventDefault();
+    if (count === 0) {
+      setPlacementDropIndicator({
+        stage: colStage,
+        slotId: 'empty',
+        position: 'before',
+        index: 0
+      });
+    }
   };
 
   // Add a new stage to lifecycle list
@@ -769,6 +841,20 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
           display: flex;
           flex-direction: column;
           gap: 24px;
+        }
+        
+        .kanban-drop-indicator {
+          height: 4px;
+          background: var(--accent);
+          border-radius: 2px;
+          margin: 6px 0;
+          box-shadow: 0 0 8px var(--accent);
+          transition: all 0.15s ease;
+        }
+        
+        .kanban-column.drag-over {
+          border-color: var(--accent-2);
+          background: color-mix(in srgb, var(--accent) 1.5%, var(--panel-2));
         }
         
         .placements-header-actions {
@@ -3971,11 +4057,14 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
           {/* Kanban settings topbar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>
-              💡 支援拖移卡片更變生命週期狀態，編輯即時自動同步排期系統。
+              💡 支援拖移卡片更變生命週期狀態與排序，編輯即時自動同步排期系統。
             </span>
             <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="preview-btn" onClick={() => setShowCardSettingsModal(true)}>
+                ⚙️ 卡片欄位設定
+              </button>
               <button className="preview-btn" onClick={() => setShowStageSettings(!showStageSettings)}>
-                ⚙️ {showStageSettings ? '隱藏狀態欄設定' : '管理狀態欄位'}
+                📋 {showStageSettings ? '隱藏狀態欄設定' : '管理狀態欄位'}
               </button>
               <button className="preview-btn" onClick={handleResetStages}>
                 🔄 重設預設狀態
@@ -4044,22 +4133,38 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
           {/* Kanban drag-and-drop board grid */}
           <div className="kanban-board">
             {stages.map((stage) => {
-              // Resolve each slot to an existing column; any slot whose stage was
-              // deleted/renamed/corrupted falls into the first column instead of vanishing.
               const stageSlots = placements.filter(p => {
                 const effective = p.stage && stages.includes(p.stage) ? p.stage : stages[0];
                 return effective === stage;
               });
+              const isColDragOver = placementDropIndicator?.stage === stage;
+
               return (
                 <div
                   key={stage}
-                  className="kanban-column"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    const slotId = e.dataTransfer.getData('text/plain');
-                    if (slotId) {
-                      handleMoveCard(slotId, stage);
+                  className={`kanban-column ${isColDragOver ? 'drag-over' : ''}`}
+                  onDragOver={(e) => {
+                    if (stageSlots.length === 0) {
+                      handleColDragOver(e, stage, 0);
+                    } else {
+                      e.preventDefault();
                     }
+                  }}
+                  onDrop={() => {
+                    const slotId = draggedSlotId;
+                    if (slotId) {
+                      if (placementDropIndicator && placementDropIndicator.stage === stage) {
+                        if (placementDropIndicator.slotId === 'empty') {
+                          handleMoveCard(slotId, stage);
+                        } else {
+                          handleMoveCard(slotId, stage, placementDropIndicator.slotId, placementDropIndicator.position);
+                        }
+                      } else {
+                        handleMoveCard(slotId, stage);
+                      }
+                    }
+                    setPlacementDropIndicator(null);
+                    setDraggedSlotId(null);
                   }}
                 >
                   <div className="kanban-column-header">
@@ -4068,73 +4173,102 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, overflowY: 'auto' }}>
-                    {stageSlots.map((slot) => {
+                    {stageSlots.length === 0 && placementDropIndicator?.stage === stage && placementDropIndicator?.slotId === 'empty' && (
+                      <div className="kanban-drop-indicator" />
+                    )}
+                    
+                    {stageSlots.map((slot, idx) => {
                       return (
-                        <div
-                          key={slot.id}
-                          className="kanban-card"
-                          draggable={true}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData('text/plain', slot.id);
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
-                            <span className="kanban-card-title">{slot.name}</span>
-                          </div>
-                          
-                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                            <span className="meta-badge" style={{ fontSize: '9px', padding: '1px 5px' }}>
-                              {slot.surfaceName}
-                            </span>
-                            <span className={`status-badge ${slot.status}`} style={{ fontSize: '9px', padding: '1px 5px' }}>
-                              {statusLabelMap[slot.status]}
-                            </span>
-                          </div>
-
-                          {slot.status !== 'available' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11.5px', borderTop: '1px dashed var(--border-soft)', paddingTop: '6px', marginTop: '2px' }}>
-                              <div>
-                                <span className="muted">客戶:</span>{' '}
-                                <span style={{ fontWeight: 600 }}>{pitchMode ? '🔒 已預訂' : slot.client}</span>
-                              </div>
-                              {slot.schedule && (
-                                <div style={{ fontSize: '10px', color: 'var(--muted)', fontFamily: 'var(--mono)' }}>
-                                  {slot.schedule}
-                                </div>
-                              )}
-                              <div style={{ marginTop: '2px' }}>
-                                <span className={`material-badge ${slot.hasMaterial ? 'ready' : 'pending'}`}>
-                                  {slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}
-                                </span>
-                              </div>
-                            </div>
+                        <Fragment key={slot.id}>
+                          {placementDropIndicator?.stage === stage && placementDropIndicator?.slotId === slot.id && placementDropIndicator?.position === 'before' && (
+                            <div className="kanban-drop-indicator" />
                           )}
+                          <div
+                            draggable={true}
+                            onDragStart={() => {
+                              setDraggedSlotId(slot.id);
+                            }}
+                            onDragEnd={() => {
+                              setPlacementDropIndicator(null);
+                              setDraggedSlotId(null);
+                            }}
+                            onDragOver={(e) => {
+                              handlePlacementDragOver(e, stage, slot, idx);
+                            }}
+                            className="kanban-card"
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
+                              <span className="kanban-card-title">{slot.name}</span>
+                              {visibleFields.size && slot.size && (
+                                <span style={{ fontSize: '9px', opacity: 0.7, fontFamily: 'var(--mono)', color: 'var(--muted)' }}>{slot.size}</span>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                              {visibleFields.surface && (
+                                <span className="meta-badge" style={{ fontSize: '9px', padding: '1px 5px' }}>
+                                  {slot.surfaceName}
+                                </span>
+                              )}
+                              {visibleFields.status && (
+                                <span className={`status-badge ${slot.status}`} style={{ fontSize: '9px', padding: '1px 5px' }}>
+                                  {statusLabelMap[slot.status]}
+                                </span>
+                              )}
+                            </div>
 
-                          {/* Action drop-down for touch-fallback or manual shift */}
-                          <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '9px', color: 'var(--muted)' }}>搬移階段</span>
-                            <select
-                              value={stage}
-                              onChange={(e) => handleMoveCard(slot.id, e.target.value)}
-                              style={{
-                                width: 'auto',
-                                padding: '2px 4px',
-                                fontSize: '10px',
-                                background: 'var(--panel)',
-                                border: '1px solid var(--border-soft)',
-                                borderRadius: '4px',
-                                color: 'var(--text)'
-                              }}
-                            >
-                              {stages.map(st => (
-                                <option key={st} value={st}>{st}</option>
-                              ))}
-                            </select>
+                            {slot.status !== 'available' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11.5px', borderTop: '1px dashed var(--border-soft)', paddingTop: '6px', marginTop: '6px' }}>
+                                {visibleFields.client && (
+                                  <div>
+                                    <span className="muted">客戶:</span>{' '}
+                                    <span style={{ fontWeight: 600 }}>{pitchMode ? '🔒 已預訂' : slot.client}</span>
+                                  </div>
+                                )}
+                                {visibleFields.schedule && slot.schedule && (
+                                  <div style={{ fontSize: '10px', color: 'var(--muted)', fontFamily: 'var(--mono)' }}>
+                                    {slot.schedule}
+                                  </div>
+                                )}
+                                {visibleFields.material && (
+                                  <div style={{ marginTop: '2px' }}>
+                                    <span className={`material-badge ${slot.hasMaterial ? 'ready' : 'pending'}`}>
+                                      {slot.hasMaterial ? '✅ 素材已就緒' : '⏳ 待素材'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Action drop-down for touch-fallback or manual shift */}
+                            <div style={{ marginTop: '6px', borderTop: '1px solid var(--border-soft)', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '9px', color: 'var(--muted)' }}>搬移階段</span>
+                              <select
+                                value={stage}
+                                onChange={(e) => handleMoveCard(slot.id, e.target.value)}
+                                style={{
+                                  width: 'auto',
+                                  padding: '2px 4px',
+                                  fontSize: '10px',
+                                  background: 'var(--panel)',
+                                  border: '1px solid var(--border-soft)',
+                                  borderRadius: '4px',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                {stages.map(st => (
+                                  <option key={st} value={st}>{st}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
-                        </div>
+                          {placementDropIndicator?.stage === stage && placementDropIndicator?.slotId === slot.id && placementDropIndicator?.position === 'after' && (
+                            <div className="kanban-drop-indicator" />
+                          )}
+                        </Fragment>
                       );
                     })}
-                    {stageSlots.length === 0 && (
+                    {stageSlots.length === 0 && !isColDragOver && (
                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--border-soft)', borderRadius: '8px', minHeight: '80px', color: 'var(--muted)', fontSize: '11.5px' }}>
                         空欄位
                       </div>
@@ -4144,6 +4278,72 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
               );
             })}
           </div>
+
+          {/* Card Configurable Fields modal dialog */}
+          {showCardSettingsModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}>
+              <div className="panel" style={{
+                width: '400px',
+                padding: '24px',
+                background: 'var(--panel)',
+                border: '1px solid var(--border-soft)',
+                borderRadius: '12px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-soft)', paddingBottom: '12px' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>⚙️ 看板卡片顯示設定</h3>
+                  <button onClick={() => setShowCardSettingsModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <p style={{ fontSize: '12.5px', color: 'var(--muted)', margin: 0 }}>請勾選要在看板卡片上顯示的資訊欄位：</p>
+                  
+                  {[
+                    { key: 'surface', label: '版位載體名稱 (如：首頁、電子報)' },
+                    { key: 'status', label: '銷售狀態標籤 (可用、洽談中、已售)' },
+                    { key: 'client', label: '客戶名稱 (預訂客戶、洽談客戶)' },
+                    { key: 'schedule', label: '檔期日期區間 (如：2026/07/01–07/31)' },
+                    { key: 'material', label: '素材就緒狀態 (已就緒、待素材)' },
+                    { key: 'size', label: '尺寸規格 (如：728×90)' }
+                  ].map((field) => (
+                    <label key={field.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={visibleFields[field.key]}
+                        onChange={(e) => {
+                          setVisibleFields(prev => ({
+                            ...prev,
+                            [field.key]: e.target.checked
+                          }));
+                        }}
+                      />
+                      <span>{field.label}</span>
+                    </label>
+                  ))}
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px', borderTop: '1px solid var(--border-soft)', paddingTop: '12px' }}>
+                  <button className="preview-btn" style={{ borderColor: 'var(--accent)', color: 'var(--accent)', padding: '6px 12px' }} onClick={() => setShowCardSettingsModal(false)}>
+                    完成設定
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
