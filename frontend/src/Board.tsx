@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
+import { useEffect, useMemo, useRef, useState, Fragment, type DragEvent } from 'react'
 import {
   addTaskComment, createColumn, createContract, createTask, deleteContract, deleteTask,
   getBoard, getTask, notifyBd, runTask, setTaskUrls, streamBoard, streamJob, updateTask,
@@ -317,7 +317,10 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
                       {dropIndicator?.columnKey === grp.key && dropIndicator?.taskId === t.id && dropIndicator?.position === 'top' && (
                         <div className="drop-indicator" />
                       )}
-                      <div
+                      <TaskCard task={t} onOpen={() => setOpenTaskId(t.id)}
+                        draggable={grp.draggable}
+                        onDragStart={() => { dragRef.current = t }}
+                        onDragEnd={() => setDropIndicator(null)}
                         onDragOver={(e) => {
                           if (!grp.draggable) return
                           e.preventDefault()
@@ -332,13 +335,7 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
                             index: idx
                           })
                         }}
-                      >
-                        <TaskCard task={t} onOpen={() => setOpenTaskId(t.id)}
-                          draggable={grp.draggable}
-                          onDragStart={() => { dragRef.current = t }}
-                          onDragEnd={() => setDropIndicator(null)}
-                        />
-                      </div>
+                      />
                       {dropIndicator?.columnKey === grp.key && dropIndicator?.taskId === t.id && dropIndicator?.position === 'bottom' && (
                         <div className="drop-indicator" />
                       )}
@@ -401,13 +398,14 @@ function FilterBar({ board, clients, filters, setFilters, count, total }: {
 }
 
 // ──────────────────────── 卡片 ────────────────────────
-function TaskCard({ task, onOpen, draggable, onDragStart, onDragEnd }: { task: Task; onOpen: () => void; draggable: boolean; onDragStart: () => void; onDragEnd?: () => void }) {
+function TaskCard({ task, onOpen, draggable, onDragStart, onDragEnd, onDragOver }: { task: Task; onOpen: () => void; draggable: boolean; onDragStart: () => void; onDragEnd?: () => void; onDragOver?: (e: DragEvent) => void }) {
   const p = PRIORITY[task.priority] ?? PRIORITY.normal
   const due = dueLabel(dueOf(task))
   return (
     <div className="task-card" draggable={draggable}
       onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
       onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
       onClick={onOpen}>
       <div className="tc-top">
         {task.client && <span className="tc-client">{task.client}</span>}

@@ -74,6 +74,39 @@ describe('Delivery 看板', () => {
     await waitFor(() => expect(screen.queryByText('JPEX 廣編稿')).not.toBeInTheDocument())
   })
 
+  test('看板拖曳:把 A 卡拖到 B 卡會 PATCH A 的新 position(可排序)', async () => {
+    const patched: Array<{ url: string; body: Record<string, unknown> }> = []
+    const TWO = {
+      ...BOARD,
+      tasks: [
+        mkTask({ id: 10, title: 'A 稿', column_id: 1, position: 1 }),
+        mkTask({ id: 11, title: 'B 稿', column_id: 1, position: 2 }),
+      ],
+    }
+    mockFetch((url, init) => {
+      if (url.endsWith('/board')) return TWO
+      if (url.includes('/board/tasks/') && init?.method === 'PATCH') {
+        patched.push({ url, body: JSON.parse(String(init.body)) })
+        return {}
+      }
+      return {}
+    })
+    render(<BoardPanel onOpenJob={() => {}} />)
+    await screen.findByText('A 稿')
+
+    const cardA = screen.getByText('A 稿').closest('.task-card') as HTMLElement
+    const cardB = screen.getByText('B 稿').closest('.task-card') as HTMLElement
+    const dt = { effectAllowed: '', setData: () => {}, getData: () => '' }
+
+    fireEvent.dragStart(cardA, { dataTransfer: dt })            // 拿起 A
+    fireEvent.dragOver(cardB, { clientY: 5, dataTransfer: dt }) // 拖到 B(onDragOver 現在直接在卡片上)
+    fireEvent.drop(cardB.closest('.board-col') as HTMLElement, { dataTransfer: dt })         // 放到該欄
+
+    await waitFor(() => expect(patched.some((p) => p.url.includes('/board/tasks/10'))).toBe(true))
+    const p = patched.find((x) => x.url.includes('/board/tasks/10'))!
+    expect(typeof p.body.position).toBe('number')
+  })
+
   test('新增稿件 modal 送出會 POST /board/tasks', async () => {
     const posted: unknown[] = []
     mockFetch((url, init) => {
