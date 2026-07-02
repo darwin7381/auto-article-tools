@@ -237,7 +237,8 @@ export type BoardNotification = { id: number; task_id: number; channel: string; 
 export type Contract = {
   id: number; client: string; name: string; mode: string
   quota: Record<string, number>; usage: Record<string, QuotaUsage>
-  channels: string; notes: string; sheet_ref: string; start_date: string | null; end_date: string | null; created_at: string
+  channels: string; notes: string; sheet_ref: string; amount: number
+  start_date: string | null; end_date: string | null; created_at: string
 }
 export type ItemTypeMeta = { pipeline: string; quota: string; billable: boolean }
 export type StatusMeta = { key: string; label: string; kind: string }
@@ -291,6 +292,22 @@ export const runTaskDraft = (id: number, actor = '') => jpost<Task>(`/board/task
 /** C 線 Banner:素材規格 vs 綁定版位的驗證。 */
 export type BannerCheck = { ok: boolean; slot: string | null; slot_size?: string; slot_max_kb?: number | null; issues: string[] }
 export const bannerCheck = (id: number) => jget<BannerCheck>(`/board/tasks/${id}/banner-check`)
+
+/** 經營總覽:營收認列 / 在途 / 洽談 pipeline / 客戶貢獻 / 續約雷達 / 團隊負載。 */
+export type Revenue = {
+  generated_at: string; currency: string
+  month_now: number; quarter: number; ytd: number
+  inflight_total: number; inflight_count: number
+  presale_total: number; presale_count: number
+  book_value: number; contracts_count: number
+  months: { month: string; total: number }[]
+  clients_rank: { client: string; recognized: number; inflight: number; count: number }[]
+  by_item: { item_type: string; total: number }[]
+  renewal_radar: { id: number; client: string; name: string; end_date: string; days_left: number; value: number; quota_total: number; quota_used: number; utilization: number | null }[]
+  team_load: { role: string; name: string; open: number; waiting: number }[]
+  prices: Record<string, number>
+}
+export const getRevenue = () => jget<Revenue>('/board/revenue')
 
 /** 客戶 360 聚合。 */
 export type ClientOverview = {

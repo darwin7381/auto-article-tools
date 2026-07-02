@@ -313,3 +313,70 @@ def test_seed_demo_idempotent_and_rich():
         # 晨報要因 demo 資料而「活」:有逾期、有待人動作
         d = c.get("/board/digest").json()
         assert d["overdue"] and d["human_action"]
+
+
+# ──────────────────────────── 營收認列引擎(經營總覽) ────────────────────────────
+
+def test_revenue_overview_shape_and_recognition():
+    with TestClient(app) as c:
+        ct = c.post("/board/contracts", json={"client": "RevCo", "quota": {"廣編": 5}, "amount": 300000}).json()
+        assert ct["amount"] == 300000
+        t = c.post("/board/tasks", json={"title": "RevCo 廣編一", "item_type": "廣編稿",
+                                         "client": "RevCo", "contract_id": ct["id"]}).json()
+        c.patch(f"/board/tasks/{t['id']}", json={"status": "closed"})
+        r = c.get("/board/revenue").json()
+        for key in ("month_now", "quarter", "ytd", "inflight_total", "presale_total",
+                    "months", "clients_rank", "by_item", "renewal_radar", "team_load", "prices"):
+            assert key in r
+        assert len(r["months"]) == 12
+        # 廣編刊例 60000,本月剛結案 → 認列進本月與 YTD
+        assert r["month_now"] >= 60000
+        assert r["ytd"] >= 60000
+        assert any(x["client"] == "RevCo" and x["recognized"] >= 60000 for x in r["clients_rank"])
+
+
+def test_revenue_inflight_and_presale_split():
+    with TestClient(app) as c:
+        a = c.post("/board/tasks", json={"title": "在途廣編", "item_type": "廣編稿", "client": "FlightCo"}).json()
+        c.patch(f"/board/tasks/{a['id']}", json={"status": "awaiting_upload"})   # 在途
+        b = c.post("/board/tasks", json={"title": "洽談專訪", "item_type": "專訪", "client": "PreCo"}).json()
+        c.patch(f"/board/tasks/{b['id']}", json={"status": "intake"})            # 售前
+        r = c.get("/board/revenue").json()
+        assert r["inflight_total"] >= 60000    # 在途含廣編 60000
+        assert r["presale_total"] >= 80000     # 售前含專訪 80000
+
+
+def test_contract_value_fallback_to_quota_times_price():
+    from app.models import Contract
+    from app.services.revenue import contract_value
+
+    c = Contract(client="X", quota_json='{"廣編": 2, "專訪": 1}')  # 無 amount
+    assert contract_value(c) == 2 * 60000 + 1 * 80000
+    c2 = Contract(client="Y", amount=999999, quota_json='{"廣編": 2}')
+    assert contract_value(c2) == 999999
+
+
+def test_renewal_radar_lists_expiring_contract():
+    from datetime import datetime, timedelta, timezone
+
+    with TestClient(app) as c:
+        end = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        c.post("/board/contracts", json={"client": "RenewCo", "name": "季約",
+                                         "quota": {"廣編": 4}, "end_date": end}).json()
+        r = c.get("/board/revenue").json()
+        item = next((x for x in r["renewal_radar"] if x["client"] == "RenewCo"), None)
+        assert item is not None
+        assert 0 <= item["days_left"] <= 31
+        assert item["value"] == 4 * 60000  # 額度×刊例估算
+
+
+def test_seed_demo_generates_revenue_history():
+    with TestClient(app) as c:
+        c.post("/board/seed-demo")
+        r = c.get("/board/revenue").json()
+        # 歷史結案鋪了近 10 個月 → 至少 6 個月份有營收
+        nonzero = [m for m in r["months"] if m["total"] > 0]
+        assert len(nonzero) >= 6, r["months"]
+        assert r["ytd"] > 0
+        assert r["clients_rank"] and r["clients_rank"][0]["recognized"] > 0
+        assert r["team_load"], "團隊負載不可為空"

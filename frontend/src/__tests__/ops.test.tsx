@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { CalendarPanel, ClientsPanel, CommandPanel } from '../Ops'
+import { CalendarPanel, ClientsPanel, CommandPanel, RevenuePanel } from '../Ops'
 
 const COLS = [
   { id: 1, name: '需求進線', kind: 'backlog', position: 0, wip_limit: null },
@@ -51,10 +51,24 @@ const CLIENTS = [
   },
 ]
 
+const REVENUE = {
+  generated_at: '2026-07-02T01:00:00Z', currency: 'TWD',
+  month_now: 140000, quarter: 380000, ytd: 1240000,
+  inflight_total: 260000, inflight_count: 5, presale_total: 140000, presale_count: 2,
+  book_value: 2140000, contracts_count: 4,
+  months: Array.from({ length: 12 }, (_, i) => ({ month: `2025-${String(i + 1).padStart(2, '0')}`, total: (i + 1) * 20000 })),
+  clients_rank: [{ client: 'Binance 幣安', recognized: 480000, inflight: 120000, count: 8 }],
+  by_item: [{ item_type: '廣編稿', total: 600000 }],
+  renewal_radar: [{ id: 1, client: 'Nexo', name: 'Q3 檔期', end_date: '2026-07-12T00:00:00Z', days_left: 10, value: 280000, quota_total: 5, quota_used: 2, utilization: 40 }],
+  team_load: [{ role: 'editor', name: 'Joe', open: 6, waiting: 2 }],
+  prices: { 廣編稿: 60000 },
+}
+
 function mockFetch() {
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
-    const data = url.includes('/board/digest') ? DIGEST
+    const data = url.includes('/board/revenue') ? REVENUE
+      : url.includes('/board/digest') ? DIGEST
       : url.includes('/board/activity') ? ACTS
       : url.includes('/board/stream') ? null
       : url.endsWith('/board') ? BOARD
@@ -94,6 +108,28 @@ describe('營運指揮(新版展示層)', () => {
     expect(screen.getByText('3/12')).toBeInTheDocument()  // 額度 used/total
     expect(screen.getByText('Binance 待結案廣編')).toBeInTheDocument()
     expect(screen.getByText(/Area A 頂部橫幅/)).toBeInTheDocument()
+  })
+
+  test('經營總覽:營收 KPI / 月趨勢 / 客戶貢獻 / 續約雷達 / 團隊負載', async () => {
+    render(<MemoryRouter><RevenuePanel /></MemoryRouter>)
+    expect(await screen.findByText('📈 經營總覽')).toBeInTheDocument()
+    expect(screen.getByText('本月認列')).toBeInTheDocument()
+    expect(screen.getAllByText('NT$ 14 萬').length).toBeGreaterThan(0) // month_now 140000(與 presale 同額)
+    expect(screen.getByText('NT$ 124 萬')).toBeInTheDocument()         // ytd
+    expect(screen.getByText('📊 月營收趨勢(近 12 個月)')).toBeInTheDocument()
+    expect(screen.getByText('🏆 客戶貢獻排行')).toBeInTheDocument()
+    expect(screen.getByText('Binance 幣安')).toBeInTheDocument()
+    expect(screen.getByText('🔄 續約雷達(90 天內到期)')).toBeInTheDocument()
+    expect(screen.getByText('10 天')).toBeInTheDocument()
+    expect(screen.getByText(/40%/)).toBeInTheDocument()                // 額度使用率
+    expect(screen.getByText('👥 團隊負載(進行中)')).toBeInTheDocument()
+  })
+
+  test('指揮中心:顯示錢的一列(本月認列/在途/洽談 pipeline)', async () => {
+    render(<MemoryRouter><CommandPanel /></MemoryRouter>)
+    expect(await screen.findByText('本月認列營收')).toBeInTheDocument()
+    expect(screen.getByText('在途(已簽未交付)')).toBeInTheDocument()
+    expect(screen.getByText('洽談 pipeline')).toBeInTheDocument()
   })
 
   test('發佈行事曆:月曆渲染 + 回到今天', async () => {

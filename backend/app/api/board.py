@@ -130,6 +130,7 @@ class ContractReq(BaseModel):
     channels: str = ""
     notes: str = ""
     sheet_ref: str = ""
+    amount: float = 0
     start_date: datetime | None = None
     end_date: datetime | None = None
 
@@ -281,6 +282,14 @@ async def seed_demo() -> dict:
     from app.services.seed_demo import seed_demo as _seed
 
     return _seed()
+
+
+@router.get("/revenue")
+async def revenue() -> dict:
+    """經營總覽:月營收趨勢 / 本月/季/YTD / 在途 / 洽談 pipeline / 客戶貢獻 / 續約雷達 / 團隊負載。"""
+    from app.services.revenue import revenue_overview
+
+    return revenue_overview()
 
 
 # ──────────────────────────── 每日晨報 / 主動彙報 ────────────────────────────
