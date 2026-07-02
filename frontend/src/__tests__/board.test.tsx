@@ -74,6 +74,18 @@ describe('Delivery 看板', () => {
     await waitFor(() => expect(screen.queryByText('JPEX 廣編稿')).not.toBeInTheDocument())
   })
 
+  test('卡片顯示細狀態標籤(狀態機 G1)', async () => {
+    const WITH_STATUS = {
+      ...BOARD,
+      tasks: [mkTask({ status: 'scheduled', status_label: '已排程發佈' })],
+      meta: { ...BOARD.meta, statuses: [{ key: 'scheduled', label: '已排程發佈', kind: 'publish' }] },
+    }
+    mockFetch((url) => (url.endsWith('/board') ? WITH_STATUS : {}))
+    render(<BoardPanel onOpenJob={() => {}} />)
+    await screen.findByText('JPEX 廣編稿')
+    expect(screen.getByText(/◉ 已排程發佈/)).toBeInTheDocument()
+  })
+
   test('看板拖曳:把 A 卡拖到 B 卡會 PATCH A 的新 position(可排序)', async () => {
     const patched: Array<{ url: string; body: Record<string, unknown> }> = []
     const TWO = {

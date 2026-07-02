@@ -292,6 +292,37 @@ describe('PlacementsPanel 廣告版位', () => {
     expect(screen.getByPlaceholderText('搜尋名稱、說明、客戶...')).toBeInTheDocument()
   })
 
+  test('後端有共享版位資料時,以伺服器為準(取代 localStorage 孤島)', async () => {
+    const serverRows = [
+      {
+        id: 'srv-1', surface: 'homepage', surfaceName: '首頁', name: '伺服器版位',
+        size: '728×90', format: '圖片', maxKB: 300, position: 'p', status: 'booked',
+        client: '伺服器客戶Z', schedule: '2026/07/01–07/31', hasMaterial: true,
+      },
+    ]
+    const origFetch = globalThis.fetch
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/placements') && (!init?.method || init.method === 'GET')) {
+        return { ok: true, json: async () => serverRows } as Response
+      }
+      return { ok: true, json: async () => ({}) } as Response
+    }) as typeof fetch
+
+    try {
+      render(
+        <MemoryRouter>
+          <PlacementsPanel subTab="specs" />
+        </MemoryRouter>
+      )
+      // 初始是本地示範資料,GET 回來後切換成伺服器資料
+      await screen.findByText('伺服器客戶Z')
+      expect(screen.getByText('伺服器版位')).toBeInTheDocument()
+    } finally {
+      globalThis.fetch = origFetch
+    }
+  })
+
   test('seed 版本過舊時,既有使用者會被重新播種成新示範資料', () => {
     // 模擬既有使用者:舊版本 + 只剩一筆與新示範完全不同的舊資料
     localStorage.setItem('pref:placements-seed-version', '舊版本')

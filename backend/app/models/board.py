@@ -55,6 +55,76 @@ class TaskType(str, enum.Enum):
     general = "general"   # 軟文撰稿 / Banner / 純人工
 
 
+class TaskStatus(str, enum.Enum):
+    """細粒度業務狀態 —— Notion A 線 12 態 + B 線 16 態 + C 線的全集。
+
+    與 column_id 並存:「看板視圖粗(8 欄)、狀態機細(自動化/通知照這裡觸發)」。
+    對照 docs/DELIVERY-BOARD-GAPS.md §2。空字串 = 舊卡未設定(相容)。
+    """
+
+    intake = "intake"                        # 需求進線 / 登錄
+    quota_check = "quota_check"              # 確認額度中
+    awaiting_accept = "awaiting_accept"      # 待接收任務(B 線撰稿)
+    writing = "writing"                      # 撰寫中(B)
+    draft_done = "draft_done"                # 已完成初稿(B)
+    ai_processing = "ai_processing"          # AI 轉稿中(A)
+    awaiting_upload = "awaiting_upload"      # 等待上稿(轉稿完成 → WP)
+    site_pending = "site_pending"            # 已上稿(未發官網)
+    site_live = "site_live"                  # 已上稿(已發官網)
+    client_review = "client_review"          # 客戶潤稿中(B)
+    client_approved = "client_approved"      # 客戶確認可發佈
+    awaiting_schedule = "awaiting_schedule"  # 待排程 / 等待發佈
+    scheduled = "scheduled"                  # 已排程發佈
+    awaiting_social = "awaiting_social"      # 待填社群連結
+    social_posted = "social_posted"          # 已發佈社群
+    awaiting_line = "awaiting_line"          # 待 LINE 發佈(晚間檔)
+    line_posted = "line_posted"              # 已發佈 LINE
+    banner_live = "banner_live"              # Banner 已上架(C)
+    banner_down = "banner_down"              # Banner 已下架(C)
+    awaiting_bd_close = "awaiting_bd_close"  # 等待 BD 結案(回傳客戶)
+    closed = "closed"                        # 結案
+    archived = "archived"                    # 封存
+
+
+# 狀態 → {中文標籤, 所屬看板欄 kind}。狀態被設定時卡片自動移到對應欄。
+STATUS_META: dict[str, dict] = {
+    TaskStatus.intake.value: {"label": "需求進線", "kind": "backlog"},
+    TaskStatus.quota_check.value: {"label": "確認額度中", "kind": "ready"},
+    TaskStatus.awaiting_accept.value: {"label": "待接收任務", "kind": "processing"},
+    TaskStatus.writing.value: {"label": "撰寫中", "kind": "processing"},
+    TaskStatus.draft_done.value: {"label": "已完成初稿", "kind": "processing"},
+    TaskStatus.ai_processing.value: {"label": "AI 轉稿中", "kind": "processing"},
+    TaskStatus.awaiting_upload.value: {"label": "等待上稿", "kind": "publish"},
+    TaskStatus.site_pending.value: {"label": "已上稿(未發官網)", "kind": "publish"},
+    TaskStatus.site_live.value: {"label": "已上稿(已發官網)", "kind": "publish"},
+    TaskStatus.client_review.value: {"label": "客戶潤稿中", "kind": "client_review"},
+    TaskStatus.client_approved.value: {"label": "客戶確認可發佈", "kind": "client_review"},
+    TaskStatus.awaiting_schedule.value: {"label": "待排程 / 等待發佈", "kind": "publish"},
+    TaskStatus.scheduled.value: {"label": "已排程發佈", "kind": "publish"},
+    TaskStatus.awaiting_social.value: {"label": "待填社群連結", "kind": "distribution"},
+    TaskStatus.social_posted.value: {"label": "已發佈社群", "kind": "distribution"},
+    TaskStatus.awaiting_line.value: {"label": "待 LINE 發佈", "kind": "distribution"},
+    TaskStatus.line_posted.value: {"label": "已發佈 LINE", "kind": "distribution"},
+    TaskStatus.banner_live.value: {"label": "Banner 已上架", "kind": "distribution"},
+    TaskStatus.banner_down.value: {"label": "Banner 已下架", "kind": "distribution"},
+    TaskStatus.awaiting_bd_close.value: {"label": "等待 BD 結案", "kind": "done"},
+    TaskStatus.closed.value: {"label": "結案", "kind": "done"},
+    TaskStatus.archived.value: {"label": "封存", "kind": "archive"},
+}
+
+# 拖進某欄(kind)時,若卡片現有狀態不屬於該欄 → 給的預設細狀態。
+COLUMN_DEFAULT_STATUS: dict[str, str] = {
+    "backlog": TaskStatus.intake.value,
+    "ready": TaskStatus.quota_check.value,
+    "processing": TaskStatus.writing.value,       # A 線由 run_task_pipeline 設 ai_processing
+    "client_review": TaskStatus.client_review.value,
+    "publish": TaskStatus.awaiting_schedule.value,
+    "distribution": TaskStatus.awaiting_social.value,
+    "done": TaskStatus.closed.value,              # 手動拖進已結案 = 結案(billing 語意不變)
+    "archive": TaskStatus.archived.value,
+}
+
+
 class Priority(str, enum.Enum):
     low = "low"
     normal = "normal"
@@ -90,6 +160,7 @@ class Contract(SQLModel, table=True):
     end_date: Optional[datetime] = None
     channels: str = ""         # 合約對應發布渠道(csv)
     notes: str = ""
+    sheet_ref: str = ""        # 指回 Google Sheet(財務真相)Entry-合約列的參照
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -119,6 +190,19 @@ class Task(SQLModel, table=True):
     draft_deadline: Optional[datetime] = None    # 初稿 Deadline(軟文)
     publish_deadline: Optional[datetime] = None  # 發佈 Deadline
     published_urls: str = "{}"       # {"website":..,"tg":..,"fb":..,"x":..,"line":..}
+
+    # ── 細粒度狀態機 + Notion 對齊補欄(G1/G2,見 docs/DELIVERY-BOARD-GAPS.md)──
+    status: str = ""                             # TaskStatus 值;空 = 舊卡未設定
+    scheduled_publish_at: Optional[datetime] = None  # 指定發佈時刻(排程,≠ 死線)
+    line_proof_url: str = ""                     # LINE 發佈截圖 / 存證連結
+    draft_doc_url: str = ""                      # 初稿 Google Doc 連結(B 線)
+    site_published: bool = False                 # 官網已發旗標(急件先發官網分支)
+
+    # ── C 線 Banner + Sheet 參照(G3)──
+    takedown_date: Optional[datetime] = None     # Banner 下架日
+    banner_spec: str = "{}"                      # {"slot":.., "size":.., "max_kb":..}
+    placement_slot_id: str = ""                  # 連到廣告版位(placementslot.id)
+    exec_sheet_ref: str = ""                     # 指回 Sheet Entry-執行列的參照
 
     # 向後相容 / 一般卡欄位
     assignee: str = ""
@@ -158,11 +242,47 @@ class TaskActivity(SQLModel, table=True):
 
 
 class Notification(SQLModel, table=True):
-    """通知雙線(取代 Slack 通知編輯 / TG 通知 BD)。先寫 log,留接口日後接真 channel。"""
+    """通知雙線(取代 Slack 通知編輯 / TG 通知 BD)。寫 log + 若設定了 Telegram 即真送出。"""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     task_id: int = Field(index=True, foreign_key="task.id")
     channel: str = ""   # editor(Slack 等價) | bd(TG 等價)
     target: str = ""    # 通知對象(名字)
     body: str = ""
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class PlacementSlot(SQLModel, table=True):
+    """廣告版位(banner inventory)—— 前端 /placements 的共享真相(取代 per-瀏覽器 localStorage)。
+
+    id 沿用前端字串 id(hp-leaderboard 等);C 線 Task 以 placement_slot_id 連回來。
+    """
+
+    id: str = Field(primary_key=True)
+    surface: str = ""        # homepage | newsletter | line | social
+    surface_name: str = ""
+    name: str = ""
+    size: str = ""
+    format: str = ""
+    max_kb: Optional[int] = None
+    position_desc: str = ""  # 曝光位置說明
+    status: str = "available"  # available | negotiating | booked
+    client: str = ""
+    schedule: str = ""       # 'YYYY/MM/DD–MM/DD'
+    stage: str = ""          # 生命週期看板欄
+    has_material: bool = False
+    material_color: str = ""
+    material_text: str = ""
+    sort_order: float = 0.0
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class AutomationEvent(SQLModel, table=True):
+    """排程引擎的防重複表:每個自動化動作(催稿/預警/晨報)以唯一 key 記錄,已觸發不再觸發。"""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    key: str = Field(index=True, unique=True)   # 例 draft_overdue:12 / digest:2026-07-02
+    kind: str = ""
+    task_id: Optional[int] = None
+    detail: str = ""
     created_at: datetime = Field(default_factory=_utcnow)

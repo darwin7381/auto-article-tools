@@ -1,4 +1,5 @@
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
+import { listPlacements, syncPlacements } from './api'
 
 export interface PlacementSlot {
   id: string;
@@ -523,9 +524,29 @@ export function PlacementsPanel({ subTab, onNavigate }: PlacementsPanelProps) {
     }
   });
 
+  // Shared backend persistence: server is the cross-user source of truth; localStorage
+  // is the offline/test fallback. Guard: never PUT until the initial GET settles, so a
+  // stale local copy can't overwrite fresher server data from another user.
+  const serverSyncedRef = useRef(false);
+  useEffect(() => {
+    listPlacements()
+      .then((rows) => {
+        if (Array.isArray(rows) && rows.length > 0) {
+          const valid = rows.map(normalizeSlot).filter((s): s is PlacementSlot => s !== null);
+          if (valid.length > 0) setPlacements(valid);
+        }
+      })
+      .catch(() => {})  // 離線 / 測試環境 → 維持 localStorage 行為
+      .finally(() => { serverSyncedRef.current = true; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('pref:placements-data', JSON.stringify(placements));
     localStorage.setItem('pref:placements-seed-version', PLACEMENTS_SEED_VERSION);
+    if (!serverSyncedRef.current) return;
+    const id = setTimeout(() => { syncPlacements(placements).catch(() => {}); }, 800);
+    return () => clearTimeout(id);
   }, [placements]);
 
   // Persistence state for custom stages (Kanban lifecycles).

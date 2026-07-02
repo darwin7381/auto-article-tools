@@ -9,3 +9,5 @@ _tmp = tempfile.mkdtemp(prefix="bdtest-")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
 os.environ["DATA_DIR"] = _tmp
 os.environ.setdefault("MAX_CONCURRENT_JOBS", "4")
+# 排程心跳在測試裡不自動跑(改由測試直接呼叫 run_once / 各 check,確保決定論)
+os.environ.setdefault("SCHEDULER_ENABLED", "false")

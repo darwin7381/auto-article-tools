@@ -14,6 +14,7 @@ from app.api import (
     files,
     health,
     jobs,
+    placements,
     publish,
     templates,
     uploads,
@@ -24,6 +25,7 @@ from app.models.job import init_db
 from app.services.board import migrate_board, seed_default_board
 from app.settings import settings
 from app.worker.jobrunner import start_worker
+from app.worker.scheduler import start_scheduler
 
 _FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -33,7 +35,8 @@ async def lifespan(app: FastAPI):
     init_db()
     migrate_board()       # 舊版看板(含已移除的 kind)→ Delivery 設計(冪等,防 ORM 崩潰)
     seed_default_board()  # 全新 DB 時建 Delivery 預設板(冪等)
-    await start_worker()  # durable job worker（asyncio queue + semaphore）
+    await start_worker()     # durable job worker（asyncio queue + semaphore）
+    await start_scheduler()  # 排程心跳引擎（催稿 / 預警 / 排程發佈 / 晨報）
     yield
 
 
@@ -51,6 +54,7 @@ app.include_router(agents.router)
 app.include_router(workflows.router)
 app.include_router(jobs.router)
 app.include_router(board.router)
+app.include_router(placements.router)
 app.include_router(uploads.router)
 app.include_router(files.router)
 app.include_router(publish.router)

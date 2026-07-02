@@ -18,8 +18,10 @@ from sqlmodel import Session, select
 
 from app.core.eventbus import board_bus
 from app.models import (
+    COLUMN_DEFAULT_STATUS,
     ITEM_TYPES,
     QUOTA_CATEGORIES,
+    STATUS_META,
     Board,
     Column,
     ColumnKind,
@@ -30,9 +32,11 @@ from app.models import (
     Task,
     TaskActivity,
     TaskComment,
+    TaskStatus,
     TaskType,
     get_session,
 )
+from app.services import notify as notify_svc
 
 DEFAULT_BOARD_NAME = "Delivery 業務稿處理"
 # 跨三條 pipeline 的統一階段(見 docs/DELIVERY-BOARD.md §3)。
@@ -170,7 +174,7 @@ def _contract_dict(s: Session, c: Contract) -> dict:
     return {
         "id": c.id, "client": c.client, "name": c.name, "mode": c.mode,
         "quota": _quota(c), "usage": contract_usage(s, c.id),
-        "channels": c.channels, "notes": c.notes,
+        "channels": c.channels, "notes": c.notes, "sheet_ref": c.sheet_ref,
         "start_date": c.start_date, "end_date": c.end_date, "created_at": c.created_at,
     }
 
@@ -231,6 +235,13 @@ def task_dict(s: Session, task: Task) -> dict:
         "notes": task.notes,
         "draft_deadline": task.draft_deadline, "publish_deadline": task.publish_deadline,
         "published_urls": urls,
+        "status": task.status or "",
+        "status_label": STATUS_META.get(task.status or "", {}).get("label", ""),
+        "scheduled_publish_at": task.scheduled_publish_at,
+        "line_proof_url": task.line_proof_url, "draft_doc_url": task.draft_doc_url,
+        "site_published": bool(task.site_published),
+        "takedown_date": task.takedown_date, "banner_spec": task.banner_spec,
+        "placement_slot_id": task.placement_slot_id, "exec_sheet_ref": task.exec_sheet_ref,
         "assignee": task.assignee, "creator": task.creator, "due_date": task.due_date,
         "source_url": task.source_url, "source_file": task.source_file,
         "article_type": task.article_type, "supplier": task.supplier,
@@ -268,7 +279,8 @@ def board_snapshot(board_id: int) -> dict:
             "tasks": [task_dict(s, t) for t in tasks],
             "contracts": [_contract_dict(s, c) for c in contracts],
             "meta": {"item_types": ITEM_TYPES, "quota_categories": QUOTA_CATEGORIES,
-                     "roles": {"bd": ["Alex", "Jessica"], "dm": ["Meg", "Kessy"], "editor": ["Joe", "Luci", "胖丁"]}},
+                     "roles": {"bd": ["Alex", "Jessica"], "dm": ["Meg", "Kessy"], "editor": ["Joe", "Luci", "胖丁"]},
+                     "statuses": [{"key": k, **v} for k, v in STATUS_META.items()]},
         }
 
 
@@ -316,9 +328,60 @@ def _apply_item_type(task: Task, item_type: str) -> None:
 # ──────────────────────────── 通知雙線 ────────────────────────────
 
 def _notify(s: Session, task: Task, channel: str, target: str, body: str) -> None:
-    """寫通知 log + activity(取代 Slack/TG)。接口可日後接真 channel。"""
+    """寫通知 log + activity,並外送真通道(Telegram,有設定才送)。"""
     s.add(Notification(task_id=task.id, channel=channel, target=target, body=body))
     _log(s, task.id, "system", "notified", f"通知{'編輯' if channel == 'editor' else 'BD'} {target}:{body[:40]}")
+    notify_svc.send_external(channel, target, body)
+
+
+# ──────────────────────────── 細粒度狀態機 ────────────────────────────
+
+# 進入某狀態時要發的通知:status → (channel, body 模板;{name} 會帶入客戶或標題)。
+NOTIFY_ON_STATUS: dict[str, tuple[str, str]] = {
+    TaskStatus.awaiting_upload.value: ("editor", "【{name}】轉稿完成,請審稿 + 上稿"),
+    TaskStatus.draft_done.value: ("editor", "【{name}】初稿完成,請主審"),
+    TaskStatus.client_review.value: ("bd", "【{name}】請交客戶過稿"),
+    TaskStatus.awaiting_line.value: ("editor", "【{name}】今晚 LINE 檔待發佈"),
+    TaskStatus.awaiting_bd_close.value: ("bd", "【{name}】已完成,請回傳客戶並結案"),
+}
+
+
+def _status_target(s: Session, task: Task, channel: str) -> str:
+    return (task.editor or "編輯") if channel == "editor" else (task.bd_owner or "BD")
+
+
+def _set_status(s: Session, task: Task, status: str, actor: str = "", notify: bool = True) -> None:
+    """設細粒度狀態:驗證 → 記錄 → 卡片自動移到對應欄 → 觸發該狀態的通知。
+
+    看板欄(粗)與 status(細)雙向連動的「細 → 粗」方向;「粗 → 細」在 update_task
+    的移欄邏輯(拖曳時套 COLUMN_DEFAULT_STATUS)。
+    """
+    if status == (task.status or ""):
+        return
+    if status and status not in STATUS_META:
+        raise ValueError(f"未知狀態: {status}")
+    old_label = STATUS_META.get(task.status or "", {}).get("label", task.status or "(未設定)")
+    task.status = status
+    meta = STATUS_META.get(status, {})
+    _log(s, task.id, actor, "status", f"{old_label} → {meta.get('label', status or '(清除)')}")
+    # 官網已發旗標連動
+    if status == TaskStatus.site_live.value:
+        task.site_published = True
+    # 卡片移到狀態所屬欄
+    kind = meta.get("kind")
+    if kind:
+        col = _column_by_kind(s, task.board_id, ColumnKind(kind))
+        if col is not None and task.column_id != col.id:
+            from_name = _col_name(s, task.column_id)
+            task.column_id = col.id
+            task.position = _bottom_position(s, col.id)
+            _log(s, task.id, "system", "moved", f"{from_name} → {col.name}(隨狀態)")
+    # 狀態通知
+    hook = NOTIFY_ON_STATUS.get(status) if notify else None
+    if hook:
+        channel, template = hook
+        _notify(s, task, channel, _status_target(s, task, channel),
+                template.format(name=task.client or task.title))
 
 
 def notify_bd(task_id: int, actor: str = "") -> dict:
@@ -331,6 +394,8 @@ def notify_bd(task_id: int, actor: str = "") -> dict:
         links = "、".join(f"{k}:{v}" for k, v in urls.items() if v) or "(連結待補)"
         body = f"【{task.client or task.title}】已發佈,請回傳客戶 — {links}"
         _notify(s, task, "bd", task.bd_owner or "BD", body)
+        # 進入「等待 BD 結案」細狀態(通知已客製附連結,關掉 hook 避免重複)
+        _set_status(s, task, TaskStatus.awaiting_bd_close.value, actor, notify=False)
         s.commit()
         board_id = task.board_id
         d = task_dict(s, task)
@@ -347,6 +412,9 @@ _EDITABLE = {
     "assignee", "due_date",
     "source_url", "source_file", "article_type", "supplier",
     "header_disclaimer", "footer_disclaimer",
+    # G1/G2/G3 補欄(status 另走 _set_status,不在此)
+    "scheduled_publish_at", "line_proof_url", "draft_doc_url", "site_published",
+    "takedown_date", "banner_spec", "placement_slot_id", "exec_sheet_ref",
 }
 
 
@@ -405,8 +473,26 @@ def update_task(task_id: int, patch: dict, actor: str = "") -> dict:
             _log(s, task.id, actor, "moved", f"{from_name} → {new_col.name if new_col else '?'}")
             if new_col is not None and new_col.kind == ColumnKind.done:
                 moved_to_done = True
+            # 粗 → 細:拖進新欄後,若現有細狀態不屬於這欄,套該欄預設細狀態(不再回頭移欄)
+            if new_col is not None and "status" not in patch:
+                kind_val = new_col.kind.value if isinstance(new_col.kind, ColumnKind) else new_col.kind
+                cur_kind = STATUS_META.get(task.status or "", {}).get("kind")
+                default = COLUMN_DEFAULT_STATUS.get(kind_val)
+                if default and cur_kind != kind_val:
+                    old_label = STATUS_META.get(task.status or "", {}).get("label", "(未設定)")
+                    task.status = default
+                    _log(s, task.id, "system", "status",
+                         f"{old_label} → {STATUS_META[default]['label']}(隨欄位)")
         elif "position" in patch:
             task.position = patch["position"]
+        # 細 → 粗:明確設狀態 → 移欄 + 觸發通知
+        if "status" in patch:
+            before_col = _col(s, task.column_id)
+            was_done = before_col is not None and before_col.kind == ColumnKind.done
+            _set_status(s, task, patch["status"] or "", actor)
+            after_col = _col(s, task.column_id)
+            if not was_done and after_col is not None and after_col.kind == ColumnKind.done:
+                moved_to_done = True
         for k in _EDITABLE:
             if k not in patch:
                 continue
@@ -554,6 +640,7 @@ def create_contract(fields: dict) -> dict:
             client=fields.get("client", ""), name=fields.get("name", ""), mode=fields.get("mode", ""),
             quota_json=json.dumps(fields.get("quota", {}), ensure_ascii=False),
             channels=fields.get("channels", ""), notes=fields.get("notes", ""),
+            sheet_ref=fields.get("sheet_ref", ""),
             start_date=fields.get("start_date"), end_date=fields.get("end_date"),
         )
         s.add(c)
@@ -570,7 +657,7 @@ def update_contract(contract_id: int, patch: dict) -> dict:
         c = s.get(Contract, contract_id)
         if c is None:
             raise ValueError(f"找不到合約: {contract_id}")
-        for k in ("client", "name", "mode", "channels", "notes", "start_date", "end_date"):
+        for k in ("client", "name", "mode", "channels", "notes", "sheet_ref", "start_date", "end_date"):
             if k in patch:
                 setattr(c, k, patch[k])
         if "quota" in patch:
@@ -646,6 +733,7 @@ def run_task_pipeline(task_id: int, actor: str = "") -> dict:
             task.column_id = proc.id
             task.position = _bottom_position(s, proc.id)
             _log(s, task_id, actor, "moved", f"{from_name} → {proc.name}")
+        _set_status(s, task, TaskStatus.ai_processing.value, actor)
         task.updated_at = _now()
         s.add(task)
         job = s.get(Job, job_id)
@@ -683,7 +771,9 @@ def sync_task_for_job(job_id: int) -> None:
                 s.add(task)
         if status == "done":
             _log(s, task.id, "system", "job_done", f"AI 轉稿完成(job #{job_id}),待編輯審稿")
-            _notify(s, task, "editor", task.editor or "編輯", f"【{task.client or task.title}】已轉稿完成,請審稿+發布")
+            _set_status(s, task, TaskStatus.awaiting_upload.value)  # 狀態機 hook 會通知編輯
+        elif status == "running":
+            _set_status(s, task, TaskStatus.ai_processing.value)
         elif status == "error":
             _log(s, task.id, "system", "job_error", f"AI 轉稿失敗:{(job.error or '')[:80]}")
         s.commit()

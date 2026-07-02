@@ -82,6 +82,16 @@ class UpdateTaskReq(BaseModel):
     supplier: str | None = None
     header_disclaimer: str | None = None
     footer_disclaimer: str | None = None
+    # 細粒度狀態機 + Notion 對齊補欄(G1/G2/G3)
+    status: str | None = None
+    scheduled_publish_at: datetime | None = None
+    line_proof_url: str | None = None
+    draft_doc_url: str | None = None
+    site_published: bool | None = None
+    takedown_date: datetime | None = None
+    banner_spec: str | None = None
+    placement_slot_id: str | None = None
+    exec_sheet_ref: str | None = None
     actor: str = ""
 
 
@@ -119,6 +129,7 @@ class ContractReq(BaseModel):
     quota: dict[str, int] = {}
     channels: str = ""
     notes: str = ""
+    sheet_ref: str = ""
     start_date: datetime | None = None
     end_date: datetime | None = None
 
@@ -238,6 +249,18 @@ async def update_contract(contract_id: int, body: ContractReq) -> dict:
 async def delete_contract(contract_id: int) -> dict:
     svc.delete_contract(contract_id)
     return {"ok": True}
+
+
+# ──────────────────────────── 每日晨報 / 主動彙報 ────────────────────────────
+
+@router.get("/digest")
+async def get_digest() -> dict:
+    """AI 主理人晨報:待人動作 / 今日截止 / 逾期 / 今日排程 / Banner 到期 / 合約預警。"""
+    from app.services.digest import build_digest, digest_text
+
+    d = build_digest()
+    d["text"] = digest_text(d)
+    return d
 
 
 # ──────────────────────────── 即時 SSE ────────────────────────────

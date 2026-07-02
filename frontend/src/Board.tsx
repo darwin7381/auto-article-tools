@@ -417,6 +417,7 @@ function TaskCard({ task, onOpen, draggable, onDragStart, onDragEnd, onDragOver 
       <JobBadge task={task} />
       <div className="tc-foot">
         <span className="tc-roles">
+          {task.status_label && <span title="細狀態" style={{ color: 'var(--accent)', fontWeight: 600 }}>◉ {task.status_label}</span>}
           {task.dm_owner && <span title="DM">DM:{task.dm_owner}</span>}
           {task.editor && <span title="主審">主審:{task.editor}</span>}
           {!task.dm_owner && !task.editor && task.bd_owner && <span title="BD">BD:{task.bd_owner}</span>}
@@ -697,10 +698,15 @@ function TaskDrawer({ taskId, me, board, onClose, onChanged, onOpenJob }: {
         <div className="dr-chips">
           {t.pipeline && <span className="chip-pipe">{PIPELINE_LABEL[t.pipeline] ?? t.pipeline}</span>}
           <span className="chip-stage">{colName(t.column_id)}</span>
+          {t.status_label && <span className="chip-stage" title="細狀態(自動化/通知依此觸發)">◉ {t.status_label}</span>}
           {t.contract?.category_usage && <span className={`quota-pill ${t.contract.category_usage.remaining <= 0 ? 'low' : ''}`}>{t.contract.category} 餘 {t.contract.category_usage.remaining}/{t.contract.category_usage.total}</span>}
         </div>
 
         <div className="dr-meta">
+          <label>細狀態<select value={t.status || ''} onChange={(e) => patch({ status: e.target.value })} title="設定後卡片自動移到對應欄位,並觸發對應通知">
+            <option value="">—(未設定)</option>
+            {(board.meta.statuses ?? []).map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select></label>
           <label>客戶<input value={t.client} onChange={(e) => setT({ ...t, client: e.target.value })} onBlur={() => patch({ client: t.client })} /></label>
           <label>品項<select value={t.item_type} onChange={(e) => patch({ item_type: e.target.value })}><option value="">—</option>{ITEM_TYPES.map((it) => <option key={it}>{it}</option>)}</select></label>
           <label>合約<select value={t.contract_id ? String(t.contract_id) : ''} onChange={(e) => patch({ contract_id: e.target.value ? Number(e.target.value) : null })}><option value="">未綁約</option>{board.contracts.map((c) => <option key={c.id} value={String(c.id)}>{c.client} · {c.name || '合約'}</option>)}</select></label>
@@ -709,6 +715,7 @@ function TaskDrawer({ taskId, me, board, onClose, onChanged, onOpenJob }: {
           <label>DM<select value={t.dm_owner} onChange={(e) => patch({ dm_owner: e.target.value })}><option value="">—</option>{ROLES.dm.map((r) => <option key={r}>{r}</option>)}</select></label>
           <label>主審<select value={t.editor} onChange={(e) => patch({ editor: e.target.value })}><option value="">—</option>{ROLES.editor.map((r) => <option key={r}>{r}</option>)}</select></label>
           <label>發佈到期<input type="date" value={t.publish_deadline ? t.publish_deadline.slice(0, 10) : ''} onChange={(e) => patch({ publish_deadline: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
+          <label>排定發佈時刻<input type="datetime-local" value={t.scheduled_publish_at ? t.scheduled_publish_at.slice(0, 16) : ''} onChange={(e) => patch({ scheduled_publish_at: e.target.value ? new Date(e.target.value).toISOString() : null })} title="到點時心跳引擎會提醒執行發佈(≠ 死線)" /></label>
         </div>
 
         <label className="dr-block">特別提醒 / 描述<textarea value={t.notes || t.description} onChange={(e) => setT({ ...t, notes: e.target.value })} onBlur={() => patch({ notes: t.notes })} placeholder="敏感字、客戶要求、排程備註…" /></label>
