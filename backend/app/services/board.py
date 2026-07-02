@@ -174,7 +174,7 @@ def _contract_dict(s: Session, c: Contract) -> dict:
     return {
         "id": c.id, "client": c.client, "name": c.name, "mode": c.mode,
         "quota": _quota(c), "usage": contract_usage(s, c.id),
-        "channels": c.channels, "notes": c.notes, "sheet_ref": c.sheet_ref,
+        "channels": c.channels, "notes": c.notes, "sheet_ref": c.sheet_ref, "amount": c.amount,
         "start_date": c.start_date, "end_date": c.end_date, "created_at": c.created_at,
     }
 
@@ -641,7 +641,7 @@ def create_contract(fields: dict) -> dict:
             client=fields.get("client", ""), name=fields.get("name", ""), mode=fields.get("mode", ""),
             quota_json=json.dumps(fields.get("quota", {}), ensure_ascii=False),
             channels=fields.get("channels", ""), notes=fields.get("notes", ""),
-            sheet_ref=fields.get("sheet_ref", ""),
+            sheet_ref=fields.get("sheet_ref", ""), amount=float(fields.get("amount") or 0),
             start_date=fields.get("start_date"), end_date=fields.get("end_date"),
         )
         s.add(c)
@@ -658,7 +658,7 @@ def update_contract(contract_id: int, patch: dict) -> dict:
         c = s.get(Contract, contract_id)
         if c is None:
             raise ValueError(f"找不到合約: {contract_id}")
-        for k in ("client", "name", "mode", "channels", "notes", "sheet_ref", "start_date", "end_date"):
+        for k in ("client", "name", "mode", "channels", "notes", "sheet_ref", "amount", "start_date", "end_date"):
             if k in patch:
                 setattr(c, k, patch[k])
         if "quota" in patch:

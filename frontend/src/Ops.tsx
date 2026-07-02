@@ -7,9 +7,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  getActivity, getBoard, getDigest, listClients, seedDemo, streamBoard,
+  getActivity, getBoard, getDigest, getRevenue, listClients, seedDemo, streamBoard,
   HUMAN_QUEUES,
-  type Board, type ClientOverview, type Digest, type GlobalActivity, type Task,
+  type Board, type ClientOverview, type Digest, type GlobalActivity, type Revenue, type Task,
 } from './api'
 import { toast } from './toast'
 
@@ -21,6 +21,15 @@ function relTime(iso: string): string {
   return `${Math.floor(s / 86400)} 天前`
 }
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+/** NT$ 金額:>= 1 萬顯示「N 萬」,取整;小額原樣。 */
+const fmtNT = (n: number): string => {
+  if (!n) return 'NT$ 0'
+  if (Math.abs(n) >= 10000) {
+    const w = n / 10000
+    return `NT$ ${w >= 100 ? Math.round(w).toLocaleString() : w.toFixed(w % 1 ? 1 : 0)} 萬`
+  }
+  return `NT$ ${n.toLocaleString()}`
+}
 const fmtDT = (iso: string | null | undefined): string => {
   if (!iso) return ''
   const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'))
@@ -95,6 +104,35 @@ const OPS_CSS = `
   border-radius: 4px; padding: 1px 4px; background: var(--panel-2); }
 .ops-cal-item.deadline { color: var(--warn); }
 .ops-cal-item.overdue-mark { color: var(--err); }
+.rev-hero { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+@media (max-width: 1100px) { .rev-hero { grid-template-columns: repeat(3, 1fr); } }
+.rev-card { background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--r); padding: 14px 16px; position: relative; overflow: hidden; }
+.rev-card::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent); opacity: .7; }
+.rev-card.money::before { background: var(--warn); }
+.rev-card .k { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.rev-card .v { font-size: 21px; font-weight: 800; font-family: var(--mono); margin-top: 4px; letter-spacing: -0.02em; }
+.rev-card .s { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.rev-chart { display: flex; gap: 6px; align-items: flex-end; height: 190px; padding-top: 26px; }
+.rev-chart .m { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; min-width: 0; }
+.rev-chart .bar { width: 72%; border-radius: 6px 6px 2px 2px; background: color-mix(in srgb, var(--accent) 45%, var(--panel-2)); position: relative; transition: var(--transition-smooth); min-height: 2px; }
+.rev-chart .m:hover .bar { background: var(--accent); }
+.rev-chart .m.now .bar { background: var(--accent); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent); }
+.rev-chart .val { font-size: 9.5px; font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+.rev-chart .m.now .val { color: var(--accent); font-weight: 700; }
+.rev-chart .lb { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.rev-rank .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 12.5px; }
+.rev-rank .nm { width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rev-rank .trk { flex: 1; height: 14px; border-radius: 7px; background: var(--panel-2); overflow: hidden; display: flex; }
+.rev-rank .rec { height: 100%; background: var(--accent); }
+.rev-rank .inf { height: 100%; background: color-mix(in srgb, var(--warn) 65%, transparent); }
+.rev-renew td, .rev-renew th { font-size: 12.5px; }
+.rev-days { display: inline-block; min-width: 52px; text-align: center; padding: 2px 8px; border-radius: 10px; font-family: var(--mono); font-size: 11px; font-weight: 700; }
+.rev-days.hot { background: color-mix(in srgb, var(--err) 12%, transparent); color: var(--err); }
+.rev-days.warm { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+.rev-util { display: flex; align-items: center; gap: 8px; }
+.rev-util .t { width: 90px; height: 7px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
+.rev-util .f { height: 100%; background: var(--accent); }
+.rev-util .f.low { background: var(--warn); }
 `
 
 // ──────────────────────────── 指揮中心 ────────────────────────────
@@ -105,6 +143,7 @@ export function CommandPanel() {
   const navigate = useNavigate()
   const [board, setBoard] = useState<Board | null>(null)
   const [digest, setDigest] = useState<Digest | null>(null)
+  const [rev, setRev] = useState<Revenue | null>(null)
   const [acts, setActs] = useState<GlobalActivity[]>([])
   const [aiOnly, setAiOnly] = useState(true)
   const [seeding, setSeeding] = useState(false)
@@ -112,6 +151,7 @@ export function CommandPanel() {
   const load = () => {
     getBoard().then(setBoard).catch(() => {})
     getDigest().then(setDigest).catch(() => {})
+    getRevenue().then(setRev).catch(() => {})
   }
   const loadActs = (ai: boolean) => getActivity(80, ai ? 'system' : undefined).then(setActs).catch(() => {})
 
@@ -170,6 +210,16 @@ export function CommandPanel() {
         <div className="stat-card"><div className="stat-val">{(digest?.due_today.length ?? 0) + (digest?.scheduled_today.length ?? 0)}</div><div className="stat-label">今日截止+排程</div></div>
         <div className="stat-card"><div className="stat-val" style={{ color: (digest?.contract_alerts.length ?? 0) > 0 ? 'var(--warn)' : undefined }}>{digest?.contract_alerts.length ?? '—'}</div><div className="stat-label">合約預警</div></div>
       </div>
+
+      {/* 錢的一列(細節見 經營總覽) */}
+      {rev && (
+        <div className="rev-hero" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div className="rev-card money" style={{ cursor: 'pointer' }} onClick={() => navigate('/ops/revenue')}><div className="k">本月認列營收</div><div className="v">{fmtNT(rev.month_now)}</div><div className="s">YTD {fmtNT(rev.ytd)}</div></div>
+          <div className="rev-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/ops/revenue')}><div className="k">在途(已簽未交付)</div><div className="v">{fmtNT(rev.inflight_total)}</div><div className="s">{rev.inflight_count} 件</div></div>
+          <div className="rev-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/ops/revenue')}><div className="k">洽談 pipeline</div><div className="v">{fmtNT(rev.presale_total)}</div><div className="s">{rev.presale_count} 件售前</div></div>
+          <div className="rev-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/ops/revenue')}><div className="k">合約帳面</div><div className="v">{fmtNT(rev.book_value)}</div><div className="s">{rev.contracts_count} 份 → 經營總覽 ›</div></div>
+        </div>
+      )}
 
       <div className="ops-layout">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
@@ -498,6 +548,132 @@ export function CalendarPanel() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ──────────────────────────── 經營總覽(CEO 視角) ────────────────────────────
+
+export function RevenuePanel() {
+  const [rev, setRev] = useState<Revenue | null>(null)
+  useEffect(() => {
+    getRevenue().then(setRev).catch((e) => toast.err(errMsg(e)))
+    const t = setInterval(() => getRevenue().then(setRev).catch(() => {}), 60_000)
+    return () => clearInterval(t)
+  }, [])
+
+  if (!rev) return <div className="panel"><p className="muted">載入經營數據中…</p></div>
+
+  const maxMonth = Math.max(1, ...rev.months.map((m) => m.total))
+  const nowKey = rev.months[rev.months.length - 1]?.month
+  const maxClient = Math.max(1, ...rev.clients_rank.map((c) => c.recognized + c.inflight))
+  const itemTotal = Math.max(1, rev.by_item.reduce((s, x) => s + x.total, 0))
+
+  return (
+    <div className="status-page">
+      <style>{OPS_CSS}</style>
+      <div className="ops-head">
+        <div>
+          <h2 style={{ border: 'none', padding: 0 }}>📈 經營總覽</h2>
+          <p className="ops-sub">BD 是營收單位 —— 認列 / 在途 / 售前管線 / 客戶貢獻 / 續約雷達 / 團隊產能(刊例價示意,實收以 Sheet 為準)</p>
+        </div>
+      </div>
+
+      {/* 營收 KPI */}
+      <div className="rev-hero">
+        <div className="rev-card money"><div className="k">本月認列</div><div className="v">{fmtNT(rev.month_now)}</div><div className="s">結案即認列 × 刊例</div></div>
+        <div className="rev-card money"><div className="k">本季</div><div className="v">{fmtNT(rev.quarter)}</div><div className="s">Q 累計</div></div>
+        <div className="rev-card money"><div className="k">今年累計 YTD</div><div className="v">{fmtNT(rev.ytd)}</div><div className="s">認列營收</div></div>
+        <div className="rev-card"><div className="k">在途(已簽未交付)</div><div className="v">{fmtNT(rev.inflight_total)}</div><div className="s">{rev.inflight_count} 件進行中</div></div>
+        <div className="rev-card"><div className="k">洽談 pipeline</div><div className="v">{fmtNT(rev.presale_total)}</div><div className="s">{rev.presale_count} 件售前</div></div>
+        <div className="rev-card"><div className="k">合約帳面</div><div className="v">{fmtNT(rev.book_value)}</div><div className="s">{rev.contracts_count} 份合約</div></div>
+      </div>
+
+      {/* 月營收趨勢 */}
+      <div className="panel">
+        <h2>📊 月營收趨勢(近 12 個月)</h2>
+        <div className="rev-chart">
+          {rev.months.map((m) => (
+            <div key={m.month} className={`m ${m.month === nowKey ? 'now' : ''}`} title={`${m.month}:${fmtNT(m.total)}`}>
+              <span className="val">{m.total > 0 ? fmtNT(m.total).replace('NT$ ', '') : ''}</span>
+              <div className="bar" style={{ height: `${(m.total / maxMonth) * 130}px` }} />
+              <span className="lb">{m.month.slice(2).replace('-', '/')}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="ops-queues">
+        {/* 客戶貢獻 */}
+        <div className="panel rev-rank">
+          <h2>🏆 客戶貢獻排行</h2>
+          <p className="hint" style={{ margin: '0 0 8px' }}>實心 = 已認列;半透明 = 在途</p>
+          {rev.clients_rank.length === 0 && <p className="hint">還沒有營收資料 — 到指揮中心種示範資料</p>}
+          {rev.clients_rank.map((c, i) => (
+            <div className="row" key={c.client}>
+              <span style={{ width: 18, color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 11 }}>{i + 1}</span>
+              <span className="nm">{c.client}</span>
+              <div className="trk">
+                <div className="rec" style={{ width: `${(c.recognized / maxClient) * 100}%` }} />
+                <div className="inf" style={{ width: `${(c.inflight / maxClient) * 100}%` }} />
+              </div>
+              <span className="amt">{fmtNT(c.recognized + c.inflight)}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* 品項組成 */}
+        <div className="panel rev-rank">
+          <h2>🧩 品項營收組成</h2>
+          {rev.by_item.map((x) => (
+            <div className="row" key={x.item_type}>
+              <span className="nm">{x.item_type}</span>
+              <div className="trk"><div className="rec" style={{ width: `${(x.total / itemTotal) * 100}%` }} /></div>
+              <span className="amt">{fmtNT(x.total)}</span>
+            </div>
+          ))}
+          <p className="hint" style={{ marginTop: 10 }}>刊例:{Object.entries(rev.prices).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${fmtNT(v)}`).join(' · ')}</p>
+        </div>
+      </div>
+
+      {/* 續約雷達 */}
+      <div className="panel rev-renew">
+        <h2>🔄 續約雷達(90 天內到期)</h2>
+        <p className="hint" style={{ margin: '0 0 8px' }}>額度用不完 = 該衝刺交付;用完 = 續約 / 加購商機。到期未談 = 收入斷點。</p>
+        <div className="table-wrap"><table>
+          <thead><tr><th>客戶</th><th>合約</th><th>到期</th><th>帳面</th><th>額度使用率</th></tr></thead>
+          <tbody>
+            {rev.renewal_radar.length === 0 && <tr><td colSpan={5} className="hint">90 天內沒有到期合約</td></tr>}
+            {rev.renewal_radar.map((r) => (
+              <tr key={r.id}>
+                <td><b>{r.client}</b></td>
+                <td>{r.name || '合約'}</td>
+                <td><span className={`rev-days ${r.days_left <= 14 ? 'hot' : r.days_left <= 45 ? 'warm' : ''}`}>{r.days_left} 天</span></td>
+                <td className="mono">{fmtNT(r.value)}</td>
+                <td>
+                  <div className="rev-util">
+                    <div className="t"><div className={`f ${r.utilization != null && r.utilization < 70 ? 'low' : ''}`} style={{ width: `${Math.min(100, r.utilization ?? 0)}%` }} /></div>
+                    <span className="mono" style={{ fontSize: 11 }}>{r.utilization != null ? `${r.utilization}%(${r.quota_used}/${r.quota_total})` : '—'}</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      </div>
+
+      {/* 團隊負載 */}
+      <div className="panel rev-rank">
+        <h2>👥 團隊負載(進行中)</h2>
+        {rev.team_load.length === 0 && <p className="hint">沒有進行中的指派</p>}
+        {rev.team_load.map((m) => (
+          <div className="row" key={`${m.role}:${m.name}`}>
+            <span className="nm">{m.name}<span style={{ color: 'var(--muted)', fontSize: 10, marginLeft: 4 }}>{m.role === 'editor' ? '編輯' : 'BD'}</span></span>
+            <div className="trk"><div className="rec" style={{ width: `${Math.min(100, m.open * 12)}%` }} /></div>
+            <span className="amt">{m.open} 件{m.waiting ? ` · ${m.waiting} 待動作` : ''}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 from .agent_config import AgentConfig  # noqa: F401  匯入即註冊資料表
 from .board import (  # noqa: F401
     COLUMN_DEFAULT_STATUS,
+    ITEM_PRICES,
     ITEM_TYPES,
     QUOTA_CATEGORIES,
     STATUS_META,

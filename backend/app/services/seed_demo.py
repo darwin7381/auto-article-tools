@@ -52,19 +52,20 @@ def seed_demo() -> dict:
         s.commit()
 
         # ── 合約(涵蓋:健康 / 額度快用完 / 快到期)──
-        def contract(client: str, name: str, mode: str, quota: dict, end_days: int | None, sheet: str) -> Contract:
+        def contract(client: str, name: str, mode: str, quota: dict, end_days: int | None, sheet: str,
+                     amount: float = 0) -> Contract:
             c = Contract(client=client, name=name, mode=mode,
                          quota_json=json.dumps(quota, ensure_ascii=False),
-                         notes="[demo] 示範資料", sheet_ref=sheet,
-                         start_date=now - timedelta(days=90),
+                         notes="[demo] 示範資料", sheet_ref=sheet, amount=amount,
+                         start_date=now - timedelta(days=300),
                          end_date=(now + timedelta(days=end_days)) if end_days is not None else None)
             s.add(c)
             return c
 
-        c_binance = contract("Binance 幣安", "2026 年約", "年約", {"廣編": 12, "專訪": 2, "Banner": 4}, 240, "Entry-合約!B3")
-        c_okx = contract("OKX", "半年約", "半年約", {"廣編": 6, "常規": 4}, 80, "Entry-合約!B7")
-        c_nexo = contract("Nexo", "Q3 檔期", "3 個月", {"廣編": 3, "Banner": 2}, 10, "Entry-合約!B11")  # 10 天後到期
-        c_mexc = contract("MEXC", "新簽月結", "Agency 月結", {"官網快訊": 8, "深度": 1}, 150, "Entry-合約!B15")
+        c_binance = contract("Binance 幣安", "2026 年約", "年約", {"廣編": 12, "專訪": 2, "Banner": 4}, 240, "Entry-合約!B3", amount=1_080_000)
+        c_okx = contract("OKX", "半年約", "半年約", {"廣編": 6, "常規": 4}, 80, "Entry-合約!B7", amount=520_000)
+        c_nexo = contract("Nexo", "Q3 檔期", "3 個月", {"廣編": 3, "Banner": 2}, 10, "Entry-合約!B11", amount=280_000)  # 10 天後到期
+        c_mexc = contract("MEXC", "新簽月結", "Agency 月結", {"官網快訊": 8, "深度": 1}, 150, "Entry-合約!B15", amount=260_000)
         s.commit()
         for c in (c_binance, c_okx, c_nexo, c_mexc):
             s.refresh(c)
@@ -143,10 +144,31 @@ def seed_demo() -> dict:
             card("OKX 廣編:歐盟 MiCA 解讀", "OKX", "廣編稿", TaskStatus.closed.value, contract=c_okx),
             card("OKX 廣編:出入金指南", "OKX", "廣編稿", TaskStatus.closed.value, contract=c_okx),
             card("OKX 廣編:錢包安全月", "OKX", "廣編稿", TaskStatus.closed.value, contract=c_okx),
-            card("OKX 廣編:NFT 專區上線", "OKX", "廣編稿", TaskStatus.closed.value, contract=c_okx),
-            card("OKX 廣編:交易大賽回顧", "OKX", "廣編稿", TaskStatus.closed.value, contract=c_okx),
-            # → OKX 廣編 6 額度已用 5,額度預警會亮
+            # → OKX 廣編 6 額度:本頁 3 + 歷史 2 = 用 5,剩 1 → 額度預警會亮
         ]
+        # ── 歷史結案(近 10 個月,給月營收趨勢曲線;billed activity 補回當月日期)──
+        history_spec = [
+            # (幾個月前, 客戶, 品項, 件數, 合約)
+            (9, "Binance 幣安", "廣編稿", 1, c_binance), (9, "OKX", "常規", 1, c_okx),
+            (8, "Binance 幣安", "廣編稿", 1, c_binance), (8, "MEXC", "官網快訊", 2, c_mexc),
+            (7, "Binance 幣安", "專訪", 1, c_binance),
+            (6, "OKX", "廣編稿", 1, c_okx), (6, "MEXC", "官網快訊", 1, c_mexc),
+            (5, "Binance 幣安", "廣編稿", 2, c_binance), (5, "Nexo", "Banner", 1, c_nexo),
+            (4, "OKX", "常規", 1, c_okx), (4, "Binance 幣安", "Banner", 1, c_binance),
+            (3, "MEXC", "深度", 1, c_mexc), (3, "Binance 幣安", "廣編稿", 1, c_binance),
+            (2, "OKX", "廣編稿", 1, c_okx), (2, "Nexo", "廣編稿", 1, c_nexo),
+            (1, "Binance 幣安", "廣編稿", 2, c_binance), (1, "MEXC", "官網快訊", 2, c_mexc),
+            (0, "Binance 幣安", "專訪", 1, c_binance), (0, "OKX", "常規", 1, c_okx),
+        ]
+        hist_count = 0
+        for months_ago, client, item, n, ct in history_spec:
+            for j in range(n):
+                when = (now - timedelta(days=months_ago * 30 + 3 + j * 5))
+                t = card(f"{client} {item} 已結案 #{months_ago}-{j+1}", client, item,
+                         TaskStatus.closed.value, contract=ct)
+                s.add(TaskActivity(task_id=t.id, actor="system", kind="billed",
+                                   detail=f"結案,計入合約額度(示範歷史)", created_at=when))
+                hist_count += 1
         s.commit()
 
-    return {"ok": True, "removed_previous": removed, "contracts": 4, "tasks": len(cards)}
+    return {"ok": True, "removed_previous": removed, "contracts": 4, "tasks": len(cards) + hist_count}

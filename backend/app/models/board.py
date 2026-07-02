@@ -35,6 +35,18 @@ ITEM_TYPES: dict[str, dict] = {
     "Banner": {"pipeline": "C", "quota": "Banner", "billable": True},
 }
 
+# 刊例價(NT$/件;Banner 為每檔期)。營收認列引擎用:結案一件認列一件。
+# 之後可搬進設定頁調整;金額為示意刊例,實收以合約 amount / Sheet 為準。
+ITEM_PRICES: dict[str, int] = {
+    "廣編稿": 60_000,
+    "官網快訊": 20_000,
+    "新聞稿": 0,
+    "常規": 40_000,
+    "專訪": 80_000,
+    "深度": 100_000,
+    "Banner": 50_000,
+}
+
 
 class ColumnKind(str, enum.Enum):
     """階段語意 —— job 自動移欄、視覺分組靠 kind(名字可被改)。"""
@@ -161,6 +173,7 @@ class Contract(SQLModel, table=True):
     channels: str = ""         # 合約對應發布渠道(csv)
     notes: str = ""
     sheet_ref: str = ""        # 指回 Google Sheet(財務真相)Entry-合約列的參照
+    amount: float = 0.0        # 合約總額 NT$(手填;0 = 未填,顯示時退回額度×刊例估算)
     created_at: datetime = Field(default_factory=_utcnow)
 
 

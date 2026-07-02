@@ -14,12 +14,12 @@ import {
 } from './api'
 import { DesignSystemPanel } from './DesignSystem'
 import { PlacementsPanel } from './Placements'
-import { CalendarPanel, ClientsPanel, CommandPanel } from './Ops'
+import { CalendarPanel, ClientsPanel, CommandPanel, RevenuePanel } from './Ops'
 
 type Tab = '/kanban' | '/' | '/history' | '/settings' | '/status'
   | '/status/modules' | '/status/article' | '/status/board' | '/status/docs' | '/design'
   | '/placements' | '/placements/specs' | '/placements/schedule' | '/placements/preview' | '/placements/board'
-  | '/ops' | '/ops/clients' | '/ops/calendar'
+  | '/ops' | '/ops/clients' | '/ops/calendar' | '/ops/revenue'
 type NavChild = { key: Tab; label: string }
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
@@ -76,6 +76,7 @@ const NAV: { key: Tab; label: string; sub: string; icon: ReactNode; children?: N
     icon: <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" /><path d="M12 7.5v4.5l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M3.5 12h2M18.5 12h2M12 3.5v2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
     children: [
       { key: '/ops', label: '指揮中心' },
+      { key: '/ops/revenue', label: '經營總覽' },
       { key: '/ops/clients', label: '客戶 360' },
       { key: '/ops/calendar', label: '發佈行事曆' },
     ],
@@ -229,6 +230,7 @@ export default function App() {
             <RunPanel openJobId={openJobId} onOpened={() => { if (sp.has('job')) { sp.delete('job'); setSp(sp, { replace: true }) } }} />
           </div>
           {path0 === '/ops' && <CommandPanel />}
+          {path0 === '/ops/revenue' && <RevenuePanel />}
           {path0 === '/ops/clients' && <ClientsPanel />}
           {path0 === '/ops/calendar' && <CalendarPanel />}
           {path0 === '/kanban' && <BoardPanel onOpenJob={(id) => navigate(`/?job=${id}`)} />}
