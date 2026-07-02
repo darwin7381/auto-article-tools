@@ -251,6 +251,38 @@ async def delete_contract(contract_id: int) -> dict:
     return {"ok": True}
 
 
+@router.post("/tasks/{task_id}/draft")
+async def run_task_draft(task_id: int, body: RunReq) -> dict:
+    """B 線軟文:觸發 AI 初稿(brief = 卡片描述/特別提醒)。"""
+    try:
+        return svc.run_task_draft(task_id, actor=body.actor)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@router.get("/tasks/{task_id}/banner-check")
+async def banner_check(task_id: int) -> dict:
+    """C 線 Banner:素材規格 vs 綁定版位的驗證(尺寸 / KB / 下架日)。"""
+    try:
+        return svc.banner_check(task_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+
+
+@router.get("/activity")
+async def global_activity(limit: int = 80, actor: str | None = None) -> list[dict]:
+    """跨卡片活動流(指揮中心);actor=system 只看 AI/自動化動作。"""
+    return svc.global_activity(limit=limit, actor=actor)
+
+
+@router.post("/seed-demo")
+async def seed_demo() -> dict:
+    """種示範資料(可重複執行;只清/種 demo 標記資料,不碰真實卡片)。"""
+    from app.services.seed_demo import seed_demo as _seed
+
+    return _seed()
+
+
 # ──────────────────────────── 每日晨報 / 主動彙報 ────────────────────────────
 
 @router.get("/digest")

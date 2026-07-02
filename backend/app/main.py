@@ -11,6 +11,7 @@ import app.workflows  # noqa: F401  匯入即註冊所有 workflow
 from app.api import (
     agents,
     board,
+    clients,
     files,
     health,
     jobs,
@@ -54,6 +55,7 @@ app.include_router(agents.router)
 app.include_router(workflows.router)
 app.include_router(jobs.router)
 app.include_router(board.router)
+app.include_router(clients.router)
 app.include_router(placements.router)
 app.include_router(uploads.router)
 app.include_router(files.router)

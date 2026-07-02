@@ -506,6 +506,7 @@ def update_task(task_id: int, patch: dict, actor: str = "") -> dict:
                 _log(s, task.id, actor, "assigned", f"指派給 {val or '(未指派)'}")
             else:
                 setattr(task, k, val)
+        _sync_placement_for_task(s, task)
         task.updated_at = _now()
         s.add(task)
         if moved_to_done and task.contract_id and ITEM_TYPES.get(task.item_type or "", {}).get("billable"):
@@ -748,8 +749,45 @@ def run_task_pipeline(task_id: int, actor: str = "") -> dict:
     return d
 
 
+def run_task_draft(task_id: int, actor: str = "") -> dict:
+    """B 線軟文:從卡片觸發 AI 初稿(brief = 卡片描述/特別提醒)。"""
+    from app.worker.jobrunner import enqueue_job
+
+    with get_session() as s:
+        task = s.get(Task, task_id)
+        if task is None:
+            raise ValueError(f"找不到稿件: {task_id}")
+        brief = (task.description or "").strip() or (task.notes or "").strip()
+        if not brief:
+            raise ValueError("這張卡沒有需求 brief(先在描述/特別提醒寫下需求)")
+        board_id = task.board_id
+        inp = {"brief": brief, "client": task.client, "item_type": task.item_type}
+
+    job_id = enqueue_job("draft", inp)
+
+    with get_session() as s:
+        task = s.get(Task, task_id)
+        task.job_id = job_id
+        _set_status(s, task, TaskStatus.writing.value, actor)
+        task.updated_at = _now()
+        s.add(task)
+        job = s.get(Job, job_id)
+        if job is not None:
+            job.task_id = task_id
+            s.add(job)
+        _log(s, task_id, actor, "job_started", f"觸發 AI 初稿(job #{job_id})")
+        s.commit()
+        s.refresh(task)
+        d = task_dict(s, task)
+    _emit(board_id, "task.updated", d)
+    return d
+
+
 def sync_task_for_job(job_id: int) -> None:
-    """jobrunner 在 job 狀態變更時呼叫:running → 製作中;done → 待發佈 + 通知編輯審稿。"""
+    """jobrunner 在 job 狀態變更時呼叫。依 workflow 分流:
+    - article(A 線轉稿):running → AI 轉稿中;done → 等待上稿(通知編輯審稿)
+    - draft(B 線初稿):running → 撰寫中;done → 已完成初稿(通知主審)
+    """
     with get_session() as s:
         job = s.get(Job, job_id)
         if job is None or job.task_id is None:
@@ -759,24 +797,163 @@ def sync_task_for_job(job_id: int) -> None:
             return
         status = job.status.value if isinstance(job.status, JobStatus) else job.status
         board_id = task.board_id
-        target_kind = {"running": ColumnKind.processing, "done": ColumnKind.publish}.get(status)
-        if target_kind is not None:
-            col = _column_by_kind(s, board_id, target_kind)
-            if col is not None and task.column_id != col.id:
-                from_name = _col_name(s, task.column_id)
-                task.column_id = col.id
-                task.position = _bottom_position(s, col.id)
-                _log(s, task.id, "system", "moved", f"{from_name} → {col.name}(自動)")
-                task.updated_at = _now()
-                s.add(task)
+        is_draft = job.workflow == "draft"
         if status == "done":
-            _log(s, task.id, "system", "job_done", f"AI 轉稿完成(job #{job_id}),待編輯審稿")
-            _set_status(s, task, TaskStatus.awaiting_upload.value)  # 狀態機 hook 會通知編輯
+            if is_draft:
+                _log(s, task.id, "system", "job_done", f"AI 初稿完成(job #{job_id}),待主審精修")
+                _set_status(s, task, TaskStatus.draft_done.value)  # hook 通知主審
+            else:
+                _log(s, task.id, "system", "job_done", f"AI 轉稿完成(job #{job_id}),待編輯審稿")
+                _set_status(s, task, TaskStatus.awaiting_upload.value)  # hook 通知編輯
         elif status == "running":
-            _set_status(s, task, TaskStatus.ai_processing.value)
+            _set_status(s, task, TaskStatus.writing.value if is_draft else TaskStatus.ai_processing.value)
         elif status == "error":
-            _log(s, task.id, "system", "job_error", f"AI 轉稿失敗:{(job.error or '')[:80]}")
+            _log(s, task.id, "system", "job_error", f"AI {'初稿' if is_draft else '轉稿'}失敗:{(job.error or '')[:80]}")
+        _sync_placement_for_task(s, task)
+        task.updated_at = _now()
+        s.add(task)
         s.commit()
         s.refresh(task)
         d = task_dict(s, task)
     _emit(board_id, "task.updated", d)
+
+
+# ──────────────────── C 線:版位連動 + Banner 規格驗證 ────────────────────
+
+_NEGOTIATING_STATUSES = {TaskStatus.intake.value, TaskStatus.quota_check.value, TaskStatus.client_review.value}
+_RELEASE_STATUSES = {TaskStatus.closed.value, TaskStatus.archived.value}
+
+
+def _sync_placement_for_task(s: Session, task: Task) -> None:
+    """卡片 ↔ 廣告版位單向同步(卡片為業務真相):
+    洽談中狀態 → 版位 negotiating;進行中 → booked(上架後 stage=已上架);
+    結案/封存 → 版位釋出(available、清客戶與檔期)。"""
+    if not task.placement_slot_id:
+        return
+    from app.models import PlacementSlot
+
+    slot = s.get(PlacementSlot, task.placement_slot_id)
+    if slot is None:
+        return
+    st = task.status or ""
+    if st in _RELEASE_STATUSES:
+        slot.status = "available"
+        slot.client = ""
+        slot.schedule = ""
+        slot.stage = "可售 / 待洽談"
+        slot.has_material = False
+    else:
+        if task.client:
+            slot.client = task.client
+        if st in _NEGOTIATING_STATUSES:
+            slot.status = "negotiating"
+            slot.stage = "洽談中"
+        else:
+            slot.status = "booked"
+            slot.stage = "已上架" if st == TaskStatus.banner_live.value else "已安排"
+        start, end = task.scheduled_publish_at, task.takedown_date
+        if start and end:
+            slot.schedule = f"{start:%Y/%m/%d}–{end:%Y/%m/%d}"
+    slot.updated_at = _now()
+    s.add(slot)
+    _log(s, task.id, "system", "placement_sync", f"同步版位 {slot.id} → {slot.status}")
+
+
+def banner_check(task_id: int) -> dict:
+    """Banner 規格驗證:卡片 banner_spec vs 版位規格(尺寸 / 檔案大小 / 下架日)。"""
+    from app.models import PlacementSlot
+
+    with get_session() as s:
+        task = s.get(Task, task_id)
+        if task is None:
+            raise ValueError(f"找不到稿件: {task_id}")
+        issues: list[str] = []
+        if not task.placement_slot_id:
+            return {"ok": False, "slot": None, "issues": ["未綁定版位(placement_slot_id)"]}
+        slot = s.get(PlacementSlot, task.placement_slot_id)
+        if slot is None:
+            return {"ok": False, "slot": task.placement_slot_id, "issues": ["綁定的版位不存在"]}
+        try:
+            spec = json.loads(task.banner_spec or "{}")
+        except (ValueError, TypeError):
+            spec = {}
+            issues.append("banner_spec 不是合法 JSON")
+        size = str(spec.get("size") or "").replace("x", "×").replace("X", "×").strip()
+        if size and slot.size and size != slot.size:
+            issues.append(f"素材尺寸 {size} ≠ 版位規格 {slot.size}")
+        kb = spec.get("kb") or spec.get("max_kb")
+        if kb is not None and slot.max_kb:
+            try:
+                if float(kb) > float(slot.max_kb):
+                    issues.append(f"檔案 {kb}KB 超過版位上限 {slot.max_kb}KB")
+            except (TypeError, ValueError):
+                issues.append("banner_spec 的 kb 不是數字")
+        if task.takedown_date is None:
+            issues.append("未設定下架日(takedown_date)")
+        return {"ok": not issues, "slot": slot.id, "slot_size": slot.size,
+                "slot_max_kb": slot.max_kb, "issues": issues}
+
+
+# ──────────────────── 全板活動 feed / 客戶 360 聚合 ────────────────────
+
+def global_activity(limit: int = 80, actor: str | None = None) -> list[dict]:
+    """跨卡片的活動流(指揮中心用)。actor='system' 只看 AI/自動化動作。"""
+    with get_session() as s:
+        q = select(TaskActivity).order_by(TaskActivity.id.desc()).limit(min(int(limit), 300))  # type: ignore[attr-defined]
+        if actor:
+            q = q.where(TaskActivity.actor == actor)  # type: ignore[attr-defined]
+        rows = s.exec(q).all()
+        task_ids = {a.task_id for a in rows}
+        tasks = {t.id: t for t in s.exec(select(Task).where(Task.id.in_(task_ids))).all()} if task_ids else {}  # type: ignore[attr-defined]
+        out = []
+        for a in rows:
+            t = tasks.get(a.task_id)
+            out.append({**_activity_dict(a),
+                        "task_title": t.title if t else "",
+                        "task_client": t.client if t else ""})
+        return out
+
+
+def clients_overview() -> list[dict]:
+    """客戶 360:按客戶字串聚合合約(含額度)、稿件、發佈連結、版位檔期。"""
+    from app.models import PlacementSlot
+
+    with get_session() as s:
+        contracts = s.exec(select(Contract)).all()
+        tasks = s.exec(select(Task)).all()
+        slots = s.exec(select(PlacementSlot)).all()
+        done_col_ids = {c.id for c in s.exec(
+            select(Column).where(Column.kind.in_([ColumnKind.done, ColumnKind.archive]))  # type: ignore[attr-defined]
+        ).all()}
+        names = sorted({x.client.strip() for x in [*contracts, *tasks, *slots] if (x.client or "").strip()})
+        out = []
+        for name in names:
+            ctasks = [t for t in tasks if (t.client or "").strip() == name]
+            open_tasks, closed = [], 0
+            published: list[dict] = []
+            for t in ctasks:
+                if t.column_id in done_col_ids:
+                    closed += 1
+                else:
+                    open_tasks.append({"id": t.id, "title": t.title, "item_type": t.item_type,
+                                       "pipeline": _pipeline_of(t), "status": t.status or "",
+                                       "status_label": STATUS_META.get(t.status or "", {}).get("label", ""),
+                                       "publish_deadline": t.publish_deadline})
+                try:
+                    urls = json.loads(t.published_urls or "{}")
+                except (ValueError, TypeError):
+                    urls = {}
+                for ch, u in urls.items():
+                    if u:
+                        published.append({"task": t.title, "channel": ch, "url": u})
+            out.append({
+                "client": name,
+                "contracts": [_contract_dict(s, c) for c in contracts if (c.client or "").strip() == name],
+                "open_tasks": open_tasks,
+                "closed_count": closed,
+                "published": published[-12:],
+                "placements": [{"id": p.id, "name": p.name, "surface_name": p.surface_name,
+                                "schedule": p.schedule, "status": p.status}
+                               for p in slots if (p.client or "").strip() == name],
+            })
+        return out
