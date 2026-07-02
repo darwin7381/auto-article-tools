@@ -73,3 +73,7 @@ frontend/*.jpeg
 # 本機工具產物(playwright / firecrawl 暫存,勿進版控)
 .playwright-mcp/
 .firecrawl/
+
+# Google service account key(Sheets 整合,絕不進 git)
+.secrets/
+backend/.secrets/
