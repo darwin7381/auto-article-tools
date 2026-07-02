@@ -35,5 +35,15 @@ class Settings(BaseSettings):
     # URL 進稿 fallback（Firecrawl，選用）
     firecrawl_api_key: str = ""
 
+    # 通知通道（Telegram，選用；沒設 = 只寫 DB 通知 log 不外送）
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""      # 部門群 / 頻道 chat id
+
+    # 排程心跳引擎（催稿 / 預警 / 排程發佈提醒 / 晨報）
+    scheduler_enabled: bool = True
+    scheduler_interval_seconds: int = 60
+    digest_hour_local: int = 9      # 每日晨報整點（Asia/Taipei）
+    timezone_offset_hours: int = 8  # 業務時區 UTC+8
+
 
 settings = Settings()

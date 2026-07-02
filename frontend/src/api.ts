@@ -207,6 +207,16 @@ export type Task = {
   draft_deadline: string | null
   publish_deadline: string | null
   published_urls: Record<string, string>
+  status: string
+  status_label: string
+  scheduled_publish_at: string | null
+  line_proof_url: string
+  draft_doc_url: string
+  site_published: boolean
+  takedown_date: string | null
+  banner_spec: string
+  placement_slot_id: string
+  exec_sheet_ref: string
   assignee: string
   creator: string
   due_date: string | null
@@ -227,10 +237,11 @@ export type BoardNotification = { id: number; task_id: number; channel: string; 
 export type Contract = {
   id: number; client: string; name: string; mode: string
   quota: Record<string, number>; usage: Record<string, QuotaUsage>
-  channels: string; notes: string; start_date: string | null; end_date: string | null; created_at: string
+  channels: string; notes: string; sheet_ref: string; start_date: string | null; end_date: string | null; created_at: string
 }
 export type ItemTypeMeta = { pipeline: string; quota: string; billable: boolean }
-export type BoardMeta = { item_types: Record<string, ItemTypeMeta>; quota_categories: string[]; roles: Record<string, string[]> }
+export type StatusMeta = { key: string; label: string; kind: string }
+export type BoardMeta = { item_types: Record<string, ItemTypeMeta>; quota_categories: string[]; roles: Record<string, string[]>; statuses?: StatusMeta[] }
 export type Board = { id: number; name: string; columns: BoardColumn[]; tasks: Task[]; contracts: Contract[]; meta: BoardMeta }
 export type TaskDetail = Task & { comments: BoardComment[]; activity: BoardActivity[]; notifications: BoardNotification[] }
 
@@ -254,6 +265,14 @@ export const listContracts = () => jget<Contract[]>('/board/contracts')
 export const createContract = (body: Partial<Contract>) => jpost<Contract>('/board/contracts', body)
 export const updateContract = (id: number, patch: Partial<Contract>) => patchJson<Contract>(`/board/contracts/${id}`, patch)
 export const deleteContract = (id: number) => del(`/board/contracts/${id}`)
+
+/** AI 主理人晨報:待人動作 / 今日截止 / 逾期 / 排程 / Banner 到期 / 合約預警。 */
+export const getDigest = () => jget<Record<string, unknown> & { text: string }>('/board/digest')
+
+// ── 廣告版位共享持久層(取代 per-瀏覽器 localStorage)──
+export const listPlacements = () => jget<unknown[]>('/placements')
+export const syncPlacements = (items: unknown[]) =>
+  req('/placements', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(items) }, { retries: 0 }).then((r) => r.json() as Promise<unknown[]>)
 
 /** 看板即時串流(卡建立/移動/更新/刪除、留言、欄位變更)。回傳 cleanup 函式。 */
 export function streamBoard(onEvent: StreamHandler, signal?: AbortSignal): void {

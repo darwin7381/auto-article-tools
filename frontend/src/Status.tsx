@@ -22,13 +22,16 @@ const SUPERIOR = [
   'gpt-image-2 streaming(根治長連線被掐斷)',
   'instructor+pydantic 結構化驗證(殺壞 JSON)',
   'Dashboard UI + RWD + 主題 + 全頁拖放',
-  '廣告版位視覺化管理(版位地圖 / 規格 / 檔期甘特圖 / 當日預覽 / 狀態看板 + 素材狀態追蹤)',
+  '廣告版位視覺化管理(版位地圖 / 規格 / 檔期甘特圖 / 當日預覽 / 狀態看板 + 素材狀態追蹤)+ 後端共享持久層',
+  '細粒度狀態機(22 態,Notion A12+B16 全集)與 8 欄看板雙向連動,狀態驅動通知',
+  '排程心跳引擎:催稿 / 逾期 / 排程發佈提醒 / Banner 下架 / 合約額度預警(防重複觸發)',
+  '通知真外送(Telegram 可設定)+ 每日晨報(待人動作 / 今日截止 / 逾期 / 預警彙總)',
   '觀測:per-stage 耗時 + token + 結構評分;品質評審 routine 走 Claude subagent(訂閱、不燒 API)+ llm_judge 選用工具',
   '抽取位置保真:PDF 圖/表依座標插回原位(舊版圖片會被丟到頁尾)',
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 139 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 67',
+  '自動化測試 pytest 156 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 69',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -292,8 +295,8 @@ const MAIN_MODULES: MainMod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '139 通過 / 1 skip(OCR extra)', true],
-  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '67 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl/廣告版位地圖/檔期解析/狀態看板)', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '156 通過 / 1 skip(OCR extra)', true],
+  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '69 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl/廣告版位地圖/檔期解析/狀態看板)', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -325,7 +328,7 @@ function AuditsPanel() {
       <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
       <p className="hint" style={{ marginTop: 0 }}>
         獨立 Claude subagent(<code>module-capability-auditor</code>)讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴。
-        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→139 + 前端 67 vitest</b> → 稽核分全面回升至 78–88。
+        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→156 + 前端 69 vitest</b> → 稽核分全面回升至 78–88。
         欄位:稽核①=補測前、稽核③=最終。<b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
       </p>
       <div className="table-wrap"><table>
@@ -372,8 +375,8 @@ function StatCards() {
       <Stat label="Workflows" value={String(live.wf)} />
       <Stat label="Jobs 總數" value={String(live.jobs)} />
       <Stat label="完成 Jobs" value={String(live.done)} />
-      <Stat label="後端測試" value="139 ✓" ok />
-      <Stat label="前端測試" value="67 ✓" ok />
+      <Stat label="後端測試" value="156 ✓" ok />
+      <Stat label="前端測試" value="69 ✓" ok />
     </div>
   )
 }
@@ -425,7 +428,7 @@ export function StatusModules() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 139 通過 / 1 skip;前端 <code>pnpm test</code> 67 通過,並以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 156 通過 / 1 skip;前端 <code>pnpm test</code> 69 通過,並以隔離瀏覽器經 tunnel 實測。</p>
       </div>
     </div>
   )
@@ -549,7 +552,7 @@ function Method({ m }: { m: string }) {
 
 const DOC_TOC: [string, string][] = [
   ['intro', '平台簡介'], ['quickstart', '快速開始'], ['concepts', '核心概念'],
-  ['web', '網頁操作'], ['placements', '廣告版位'], ['cli', 'CLI 用法'], ['api', 'REST API'], ['deploy', '部署 / 維運'],
+  ['web', '網頁操作'], ['placements', '廣告版位'], ['automation', '自動化引擎'], ['cli', 'CLI 用法'], ['api', 'REST API'], ['deploy', '部署 / 維運'],
 ]
 const API_GROUPS: { group: string; rows: [string, string, string][] }[] = [
   {
@@ -580,7 +583,7 @@ const API_GROUPS: { group: string; rows: [string, string, string][] }[] = [
     rows: [
       ['GET', '/board', '整板快照:{columns, tasks, contracts, meta}'],
       ['POST', '/board/tasks', '建稿件卡(填 item_type 自動帶 pipeline/押註)'],
-      ['PATCH DELETE', '/board/tasks/{id}', '編輯 / 移欄(column_id+position)/ 刪除'],
+      ['PATCH DELETE', '/board/tasks/{id}', '編輯 / 移欄(column_id+position)/ 設細狀態(status,自動移欄+觸發通知)/ 刪除'],
       ['GET', '/board/tasks/{id}', '稿件詳情(含 comments / activity / notifications)'],
       ['POST', '/board/tasks/{id}/run', '觸發 bd-pr AI 轉稿(建 job + 掛上 + 移「製作中」)'],
       ['POST', '/board/tasks/{id}/comments', '留言:{body, author}'],
@@ -591,6 +594,15 @@ const API_GROUPS: { group: string; rows: [string, string, string][] }[] = [
       ['POST', '/board/columns', '新增欄位(階段)'],
       ['PATCH DELETE', '/board/columns/{id}', '更新 / 刪除欄位'],
       ['GET', '/board/stream', '看板即時 SSE(task.created/updated/deleted、comment.added、column.changed)'],
+      ['GET', '/board/digest', '每日晨報:待人動作 / 今日截止 / 逾期 / 今日排程 / Banner 到期 / 合約預警(含 text 版)'],
+    ],
+  },
+  {
+    group: '廣告版位 / 自動化',
+    rows: [
+      ['GET', '/placements', '共享版位清單(空表自動 seed;取代 per-瀏覽器 localStorage)'],
+      ['PUT', '/placements', '整份同步(以 id upsert,傳入順序即排序)'],
+      ['DELETE', '/placements/{id}', '刪除版位'],
     ],
   },
 ]
@@ -680,7 +692,29 @@ export function StatusDocs() {
             <b>展示模式(Pitch Mode)</b>
             <p className="muted" style={{ margin: '4px 0 0' }}>地圖頁可開「展示簡報模式」,遮去客戶名等內部資訊、保留檔期與版位視覺,適合對外 pitch。</p>
           </div>
-          <p className="muted">註:廣告版位目前為前端 localStorage 管理(尚未接後端 API),資料存各自瀏覽器,並對損壞 / 缺欄位的資料做正規化防護。示範資料帶 seed 版本,更新版本時既有使用者會自動重新播種看到新示範。</p>
+          <p className="muted">註:版位資料已落後端共享持久層(GET/PUT <code>/placements</code>,全部門看到同一份;localStorage 為離線備援),並對損壞 / 缺欄位的資料做正規化防護。C 線稿件卡可用 <code>placement_slot_id</code> 連回版位。</p>
+        </Doc>
+
+        <Doc id="automation" title="自動化引擎">
+          <p><b>平台的「心跳」</b> —— 之前一切都要人點;現在後端有一個排程引擎(預設每 60 秒掃一輪)+
+            細粒度狀態機 + 真實通知,把 Notion+n8n 靠人與外掛做的事內化成系統能力。</p>
+          <h3>細粒度狀態機(22 態)</h3>
+          <ul className="tick">
+            <li>Task 的 <code>status</code> 涵蓋 Notion A 線 12 態 + B 線 16 態全集(需求進線 → 撰寫/AI 轉稿 → 上稿 → 客戶過稿 → 排程 → 社群/LINE → 等待 BD 結案 → 結案),與 8 欄看板<b>雙向連動</b>:設狀態卡片自動移欄、拖欄自動套該欄預設狀態。</li>
+            <li>關鍵狀態進入時自動通知對的人:等待上稿→編輯部、初稿完成→主審、客戶過稿→BD、待 LINE 發佈→編輯部、等待 BD 結案→BD。</li>
+            <li>卡片抽屜可直接改「細狀態」;卡片與抽屜都顯示狀態標籤。</li>
+          </ul>
+          <h3>排程心跳(每分鐘)</h3>
+          <ul className="tick">
+            <li><b>催稿 / 逾期</b>:初稿、發佈 deadline 24 小時內預告 + 逾期升級提醒。</li>
+            <li><b>排程發佈</b>:<code>scheduled_publish_at</code> 到點提醒執行(發布 adapter 接上後改全自動)。</li>
+            <li><b>Banner 下架</b>:<code>takedown_date</code> 到期提醒。</li>
+            <li><b>合約預警</b>:兩週內到期 / 任一品項額度剩 ≤1 → 預警 BD。</li>
+            <li><b>每日晨報</b>(預設台北 9:00):待人動作 / 今日截止 / 逾期 / 今日排程 / 到期 Banner / 合約預警,一則彙總。</li>
+            <li>所有自動化以 <code>AutomationEvent</code> 唯一 key 防重複 —— 重啟安全、不重發。</li>
+          </ul>
+          <h3>通知通道</h3>
+          <p className="muted">通知一律寫 DB(卡片抽屜可稽核);設定 <code>TELEGRAM_BOT_TOKEN</code> + <code>TELEGRAM_CHAT_ID</code> 環境變數即真外送 Telegram;外送失敗絕不影響業務操作。</p>
         </Doc>
 
         <Doc id="cli" title="CLI 用法">
@@ -755,8 +789,8 @@ curl -N $BASE/board/stream`}</Code>
 cd frontend && pnpm build
 
 # 全套測試
-cd backend && uv run pytest -q          # 後端 139 通過 / 1 skip
-cd frontend && pnpm test -- --run       # 前端 67 通過
+cd backend && uv run pytest -q          # 後端 156 通過 / 1 skip
+cd frontend && pnpm test -- --run       # 前端 69 通過
 
 # 跑服務(本機)
 cd backend && uv run uvicorn app.main:app --port 8000
