@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # URL 進稿 fallback（Firecrawl，選用）
     firecrawl_api_key: str = ""
 
+    # Google Sheets 整合(BD/DM 財務真相帳本)。
+    # Service Account:bd-platform@miniai-crab-labs.iam.gserviceaccount.com(GCP miniai-crab-labs)
+    # 四份 Sheet 須共用給該 SA;schema 與 Sheet ID 見 docs/SHEETS-SCHEMA.md
+    google_service_account_json: str = ""  # SA key 路徑,如 .secrets/google-sa.json(gitignored)
+
     # 通知通道（Telegram，選用；沒設 = 只寫 DB 通知 log 不外送）
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""      # 部門群 / 頻道 chat id

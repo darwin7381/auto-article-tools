@@ -1,17 +1,30 @@
 # BD/DM Google Sheets 真帳本 schema(實讀分析)
 
-> 2026-07-02 以 SA `bd-platform@miniai-crab-labs.iam.gserviceaccount.com` 實際讀取分析。
-> key 在 `backend/.secrets/google-sa.json`(gitignored)。
-> **BD-2、DM-2 尚未分享給 SA(403),待補。**
+> 2026-07-02 實讀分析。
 
-## 四份 Sheet
+## 存取設定(接手的人看這裡)
 
-| 代號 | 標題 | 狀態 |
+- **Service Account:`bd-platform@miniai-crab-labs.iam.gserviceaccount.com`**(GCP 專案 `miniai-crab-labs`,2026-07-02 由 Joey 建立)
+- key:`backend/.secrets/google-sa.json`(gitignored,絕不進 git);env:`GOOGLE_SERVICE_ACCOUNT_JSON`(settings.py / .env.example)
+- 四份 Sheet 都已共用給該 SA(檢視者);之後要寫 Entry-執行 時升編輯者
+- 新增 Sheet 要給平台讀 → 共用給同一個 SA email 即可
+
+## 四份 Sheet(全部可讀 ✅)
+
+| 代號 | 標題 | Sheet ID |
 |---|---|---|
-| BD-1 | BD Media Service (2025) | ✅ 可讀,7 分頁 |
-| BD-2 | (1KLMlgNNXksTPnNK8VuMYBBSZOM1o1SohSvZj_Retetc) | ❌ 403 待分享 |
-| DM-1 | 業務執行/獎金紀錄表(2024.Oct~2025) | ✅ 可讀,16 分頁(2026 年仍在寫入) |
-| DM-2 | (1Ra9Awwz0E7wn4umaNG79a691q_MI6MvXfmMx1fzqY8E) | ❌ 403 待分享 |
+| BD-1 | BD Media Service (2025) | `1ONqVzIUJ2-2nkOES53UV-3g0NJlNAHYh67WFEe6vXYU` |
+| BD-2 | BD Media Service (2026)(現行) | `1KLMlgNNXksTPnNK8VuMYBBSZOM1o1SohSvZj_Retetc` |
+| DM-1 | 業務執行/獎金紀錄表(2024.Oct~2025) | `1Heyo59yqQys7DejBhSIAerZ3f9zSwfizqUmPHkGIbkU` |
+| DM-2 | 業務執行/獎金紀錄表 (2026)(現行) | `1Ra9Awwz0E7wn4umaNG79a691q_MI6MvXfmMx1fzqY8E` |
+
+2026 現行帳本(BD-2 / DM-2)分頁結構與 2025 版一致(DM-2 多「函式注記」)。
+
+## 2026 現況快照(2026-07-02 實讀)
+
+- **DM-2 Entry-合約 30 份:結案 10 / 執行中 9 / 等待執行 11** —— 注意 2026 的合約狀態詞彙改為「執行中/等待執行」(2025 是「生效/過期」),平台狀態機要吃兩套
+- Entry-執行(文章) 2026 年持續寫入(最近 7/2 MEXC 快訊);「合約名稱與合約期」有「待補」的髒資料,同步要能容錯
+- **BD-2:合約 31 列,已確認到帳 24 筆,2026 到帳總額 ≈ 226,130 USDT**
 
 ## DM-1(營運帳本)關鍵分頁
 
