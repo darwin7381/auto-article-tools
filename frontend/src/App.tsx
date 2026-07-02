@@ -14,10 +14,12 @@ import {
 } from './api'
 import { DesignSystemPanel } from './DesignSystem'
 import { PlacementsPanel } from './Placements'
+import { CalendarPanel, ClientsPanel, CommandPanel } from './Ops'
 
 type Tab = '/kanban' | '/' | '/history' | '/settings' | '/status'
   | '/status/modules' | '/status/article' | '/status/board' | '/status/docs' | '/design'
   | '/placements' | '/placements/specs' | '/placements/schedule' | '/placements/preview' | '/placements/board'
+  | '/ops' | '/ops/clients' | '/ops/calendar'
 type NavChild = { key: Tab; label: string }
 type Mode = 'auto' | 'manual'
 type ArticleType = 'regular' | 'sponsored' | 'press-release'
@@ -69,6 +71,15 @@ export function jobSource(j: Job): string {
 }
 
 const NAV: { key: Tab; label: string; sub: string; icon: ReactNode; children?: NavChild[] }[] = [
+  {
+    key: '/ops', label: '營運指揮', sub: '指揮中心 · 客戶 · 行事曆',
+    icon: <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" /><path d="M12 7.5v4.5l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M3.5 12h2M18.5 12h2M12 3.5v2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
+    children: [
+      { key: '/ops', label: '指揮中心' },
+      { key: '/ops/clients', label: '客戶 360' },
+      { key: '/ops/calendar', label: '發佈行事曆' },
+    ],
+  },
   {
     key: '/kanban', label: '部門看板', sub: '工作管理 · 全流程進度',
     icon: <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="5" height="15" rx="1.2" stroke="currentColor" strokeWidth="1.6" /><rect x="9.5" y="4.5" width="5" height="10" rx="1.2" stroke="currentColor" strokeWidth="1.6" /><rect x="15.5" y="4.5" width="5" height="13" rx="1.2" stroke="currentColor" strokeWidth="1.6" /></svg>,
@@ -217,6 +228,9 @@ export default function App() {
           <div style={{ display: path0 === '/' ? 'block' : 'none' }}>
             <RunPanel openJobId={openJobId} onOpened={() => { if (sp.has('job')) { sp.delete('job'); setSp(sp, { replace: true }) } }} />
           </div>
+          {path0 === '/ops' && <CommandPanel />}
+          {path0 === '/ops/clients' && <ClientsPanel />}
+          {path0 === '/ops/calendar' && <CalendarPanel />}
           {path0 === '/kanban' && <BoardPanel onOpenJob={(id) => navigate(`/?job=${id}`)} />}
           {path0.startsWith('/placements') && (
             <PlacementsPanel

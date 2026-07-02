@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test, vi, beforeEach } from 'vitest'
 import { BoardPanel } from '../Board'
 
@@ -37,7 +38,7 @@ beforeEach(() => { localStorage.clear() })
 describe('Delivery 看板', () => {
   test('看板視圖渲染階段欄位與稿件卡(客戶/品項)', async () => {
     mockFetch((url) => (url.endsWith('/board') ? BOARD : {}))
-    render(<BoardPanel onOpenJob={() => {}} />)
+    render(<MemoryRouter><BoardPanel onOpenJob={() => {}} /></MemoryRouter>)
     expect(await screen.findByText('JPEX 廣編稿')).toBeInTheDocument()
     expect(screen.getByText('需求進線')).toBeInTheDocument()
     expect(screen.getByText('製作中 / AI 轉稿')).toBeInTheDocument()
@@ -47,7 +48,7 @@ describe('Delivery 看板', () => {
 
   test('切換到表格視圖顯示欄位表頭', async () => {
     mockFetch((url) => (url.endsWith('/board') ? BOARD : {}))
-    render(<BoardPanel onOpenJob={() => {}} />)
+    render(<MemoryRouter><BoardPanel onOpenJob={() => {}} /></MemoryRouter>)
     await screen.findByText('JPEX 廣編稿')
     fireEvent.click(screen.getByText('表格'))
     // 查表頭(避開 group-by/篩選 下拉同名 option)
@@ -59,7 +60,7 @@ describe('Delivery 看板', () => {
 
   test('分組可切換成 Pipeline', async () => {
     mockFetch((url) => (url.endsWith('/board') ? BOARD : {}))
-    render(<BoardPanel onOpenJob={() => {}} />)
+    render(<MemoryRouter><BoardPanel onOpenJob={() => {}} /></MemoryRouter>)
     await screen.findByText('JPEX 廣編稿')
     const groupSel = screen.getByDisplayValue('階段')
     fireEvent.change(groupSel, { target: { value: 'pipeline' } })
@@ -68,7 +69,7 @@ describe('Delivery 看板', () => {
 
   test('篩選:Pipeline=B 時 A 稿件被濾掉', async () => {
     mockFetch((url) => (url.endsWith('/board') ? BOARD : {}))
-    render(<BoardPanel onOpenJob={() => {}} />)
+    render(<MemoryRouter><BoardPanel onOpenJob={() => {}} /></MemoryRouter>)
     await screen.findByText('JPEX 廣編稿')
     fireEvent.change(screen.getByDisplayValue('全部 Pipeline'), { target: { value: 'B' } })
     await waitFor(() => expect(screen.queryByText('JPEX 廣編稿')).not.toBeInTheDocument())
@@ -81,7 +82,7 @@ describe('Delivery 看板', () => {
       meta: { ...BOARD.meta, statuses: [{ key: 'scheduled', label: '已排程發佈', kind: 'publish' }] },
     }
     mockFetch((url) => (url.endsWith('/board') ? WITH_STATUS : {}))
-    render(<BoardPanel onOpenJob={() => {}} />)
+    render(<MemoryRouter><BoardPanel onOpenJob={() => {}} /></MemoryRouter>)
     await screen.findByText('JPEX 廣編稿')
     expect(screen.getByText(/◉ 已排程發佈/)).toBeInTheDocument()
   })
@@ -103,7 +104,7 @@ describe('Delivery 看板', () => {
       }
       return {}
     })
-    render(<BoardPanel onOpenJob={() => {}} />)
+    render(<MemoryRouter><BoardPanel onOpenJob={() => {}} /></MemoryRouter>)
     await screen.findByText('A 稿')
 
     const cardA = screen.getByText('A 稿').closest('.task-card') as HTMLElement
@@ -119,6 +120,26 @@ describe('Delivery 看板', () => {
     expect(typeof p.body.position).toBe('number')
   })
 
+  test('角色鏡頭:切「待 BD」只留 BD 佇列細狀態的卡', async () => {
+    const TWO = {
+      ...BOARD,
+      tasks: [
+        mkTask({ id: 21, title: 'BD 佇列卡', status: 'awaiting_bd_close', status_label: '等待 BD 結案' }),
+        mkTask({ id: 22, title: '編輯佇列卡', status: 'awaiting_upload', status_label: '等待上稿' }),
+      ],
+    }
+    mockFetch((url) => (url.endsWith('/board') ? TWO : {}))
+    render(<MemoryRouter><BoardPanel onOpenJob={() => {}} /></MemoryRouter>)
+    await screen.findByText('BD 佇列卡')
+    expect(screen.getByText('編輯佇列卡')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('待 BD'))
+    await waitFor(() => expect(screen.queryByText('編輯佇列卡')).not.toBeInTheDocument())
+    expect(screen.getByText('BD 佇列卡')).toBeInTheDocument()
+    // 切回全部
+    fireEvent.click(screen.getByText('全部'))
+    await screen.findByText('編輯佇列卡')
+  })
+
   test('新增稿件 modal 送出會 POST /board/tasks', async () => {
     const posted: unknown[] = []
     mockFetch((url, init) => {
@@ -129,7 +150,7 @@ describe('Delivery 看板', () => {
       }
       return {}
     })
-    render(<BoardPanel onOpenJob={() => {}} />)
+    render(<MemoryRouter><BoardPanel onOpenJob={() => {}} /></MemoryRouter>)
     await screen.findByText('JPEX 廣編稿')
     fireEvent.click(screen.getByText('＋ 新增稿件'))
     const input = await screen.findByPlaceholderText('稿件標題')

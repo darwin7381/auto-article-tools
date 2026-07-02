@@ -211,3 +211,105 @@ def test_placements_upsert_new_slot_and_delete():
         c.delete("/placements/custom-new")
         final = c.get("/placements").json()
         assert not any(s["id"] == "custom-new" for s in final)
+
+
+# ──────────────────────────── B 線 AI 初稿 / C 線版位連動 / 指揮中心資料 ────────────────────────────
+
+def test_draft_workflow_registered():
+    from app.core.registry import get_workflow
+
+    wf = get_workflow("draft")
+    assert wf is not None
+    assert [st.id for st in wf.stages] == ["draft_ai"]
+
+
+def test_run_task_draft_requires_brief():
+    with TestClient(app) as c:
+        t = c.post("/board/tasks", json={"title": "無 brief 軟文", "item_type": "常規"}).json()
+        r = c.post(f"/board/tasks/{t['id']}/draft", json={"actor": "Joe"})
+        assert r.status_code == 400
+        assert "brief" in r.json()["detail"]
+
+
+def test_run_task_draft_enqueues_and_sets_writing():
+    with TestClient(app) as c:
+        t = c.post("/board/tasks", json={"title": "OKX 深度軟文", "item_type": "深度", "client": "OKX",
+                                         "description": "OKX 錢包生態深度介紹,主打安全與多鏈"}).json()
+        r = c.post(f"/board/tasks/{t['id']}/draft", json={"actor": "Joe"}).json()
+        assert r["job_id"] is not None
+        assert r["status"] == "writing"
+
+
+def test_placement_sync_booked_and_release():
+    with TestClient(app) as c:
+        c.get("/placements")  # 確保 seed
+        t = c.post("/board/tasks", json={"title": "Banner 檔期卡", "item_type": "Banner", "client": "SyncCo"}).json()
+        # 綁版位 + 進入已上架 → 版位 booked、客戶同步
+        c.patch(f"/board/tasks/{t['id']}", json={"placement_slot_id": "hp-footer-1", "status": "banner_live"})
+        slot = next(s for s in c.get("/placements").json() if s["id"] == "hp-footer-1")
+        assert slot["status"] == "booked"
+        assert slot["client"] == "SyncCo"
+        assert slot["stage"] == "已上架"
+        # 結案 → 版位釋出
+        c.patch(f"/board/tasks/{t['id']}", json={"status": "closed"})
+        slot = next(s for s in c.get("/placements").json() if s["id"] == "hp-footer-1")
+        assert slot["status"] == "available"
+        assert slot["client"] == ""
+
+
+def test_banner_check_validates_spec():
+    with TestClient(app) as c:
+        c.get("/placements")
+        t = c.post("/board/tasks", json={"title": "規格驗證卡", "item_type": "Banner"}).json()
+        # 未綁版位
+        r = c.get(f"/board/tasks/{t['id']}/banner-check").json()
+        assert r["ok"] is False and "未綁定版位" in r["issues"][0]
+        # 綁 hp-leaderboard(728×90 / 300KB),給超規格素材
+        c.patch(f"/board/tasks/{t['id']}", json={"placement_slot_id": "hp-leaderboard",
+                                                 "banner_spec": '{"size":"300x250","kb":500}'})
+        r = c.get(f"/board/tasks/{t['id']}/banner-check").json()
+        assert r["ok"] is False
+        assert any("尺寸" in i for i in r["issues"])
+        assert any("超過" in i for i in r["issues"])
+        # 修正成合規 + 設下架日 → ok
+        c.patch(f"/board/tasks/{t['id']}", json={"banner_spec": '{"size":"728×90","kb":250}',
+                                                 "takedown_date": "2026-08-01T00:00:00Z"})
+        r = c.get(f"/board/tasks/{t['id']}/banner-check").json()
+        assert r["ok"] is True, r
+
+
+def test_global_activity_feed():
+    with TestClient(app) as c:
+        t = c.post("/board/tasks", json={"title": "活動流卡", "client": "FeedCo"}).json()
+        c.patch(f"/board/tasks/{t['id']}", json={"status": "awaiting_upload"})
+        acts = c.get("/board/activity?limit=50").json()
+        assert any(a["task_title"] == "活動流卡" for a in acts)
+        sys_acts = c.get("/board/activity?limit=50&actor=system").json()
+        assert all(a["actor"] == "system" for a in sys_acts)
+
+
+def test_clients_overview_aggregates():
+    with TestClient(app) as c:
+        ct = c.post("/board/contracts", json={"client": "AggCo", "quota": {"廣編": 4}}).json()
+        t = c.post("/board/tasks", json={"title": "AggCo 廣編", "item_type": "廣編稿",
+                                         "client": "AggCo", "contract_id": ct["id"]}).json()
+        c.patch(f"/board/tasks/{t['id']}", json={"status": "awaiting_upload"})
+        clients = c.get("/clients").json()
+        agg = next(x for x in clients if x["client"] == "AggCo")
+        assert agg["contracts"][0]["usage"]["廣編"]["remaining"] == 4
+        assert any(ot["title"] == "AggCo 廣編" for ot in agg["open_tasks"])
+
+
+def test_seed_demo_idempotent_and_rich():
+    with TestClient(app) as c:
+        r1 = c.post("/board/seed-demo").json()
+        assert r1["tasks"] >= 15 and r1["contracts"] == 4
+        # 再跑一次:先清舊 demo 再種,卡片數不翻倍
+        r2 = c.post("/board/seed-demo").json()
+        assert r2["removed_previous"] == r1["tasks"]
+        b = c.get("/board").json()
+        demo_tasks = [t for t in b["tasks"] if t["creator"] == "demo-seed"]
+        assert len(demo_tasks) == r2["tasks"]
+        # 晨報要因 demo 資料而「活」:有逾期、有待人動作
+        d = c.get("/board/digest").json()
+        assert d["overdue"] and d["human_action"]

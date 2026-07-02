@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, Fragment, type DragEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   addTaskComment, createColumn, createContract, createTask, deleteContract, deleteTask,
-  getBoard, getTask, notifyBd, runTask, setTaskUrls, streamBoard, streamJob, updateTask,
+  bannerCheck, getBoard, getTask, notifyBd, runTask, runTaskDraft, setTaskUrls, streamBoard, streamJob, updateTask,
+  HUMAN_QUEUES, listPlacements,
   type Board, type BoardComment, type Task, type TaskDetail,
 } from './api'
 import { STAGE_LABELS, weightedProgress } from './Stages'
@@ -107,6 +109,10 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
   const [groupBy, setGroupBy] = useState<GroupKey>(() => (localStorage.getItem('board:group') as GroupKey) || 'stage')
   const [filters, setFilters] = useState({ pipeline: '', item_type: '', client: '', dm_owner: '', editor: '', contract_id: '', q: '', overdue: false })
   const [openTaskId, setOpenTaskId] = useState<number | null>(null)
+  // 角色鏡頭:全部 / 待 BD / 待編輯部(細狀態 preset,一鍵變「我的佇列」)
+  const [lens, setLens] = useState<'all' | 'bd' | 'editor'>('all')
+  // 深連結:/kanban?task=ID 直接開卡片抽屜(指揮中心/客戶360 跳轉用)
+  const [sp2, setSp2] = useSearchParams()
   const [creating, setCreating] = useState<{ column_id?: number } | null>(null)
   const [showContracts, setShowContracts] = useState(false)
   const dragRef = useRef<Task | null>(null)
@@ -115,6 +121,11 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
 
   const load = () => getBoard().then(setBoard).catch((e) => toast.err(errMsg(e)))
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    const tid = sp2.get('task')
+    if (tid) { setOpenTaskId(Number(tid)); sp2.delete('task'); setSp2(sp2, { replace: true }) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => { localStorage.setItem('board:view', view) }, [view])
   useEffect(() => { localStorage.setItem('board:group', groupBy) }, [groupBy])
   useEffect(() => {
@@ -146,10 +157,11 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
       if (filters.editor && t.editor !== filters.editor) return false
       if (filters.contract_id && String(t.contract_id ?? '') !== filters.contract_id) return false
       if (filters.overdue) { const dl = dueOf(t); if (!dl || new Date(dl).getTime() >= Date.now()) return false }
+      if (lens !== 'all' && !HUMAN_QUEUES[lens].includes(t.status)) return false
       if (q && !`${t.title} ${t.client} ${t.supplier} ${t.bd_owner} ${t.dm_owner} ${t.editor} ${t.item_type}`.toLowerCase().includes(q)) return false
       return true
     })
-  }, [board, filters])
+  }, [board, filters, lens])
 
   if (!board) return <div className="panel"><p className="muted">載入看板中…</p></div>
 
@@ -214,6 +226,11 @@ export function BoardPanel({ onOpenJob }: { onOpenJob: (jobId: number) => void }
               {GROUPS.map((g) => <option key={g.k} value={g.k}>{g.label}</option>)}
             </select>
           </label>
+          <div className="seg view-seg" title="角色鏡頭:只看待自己的細狀態佇列">
+            <button className={lens === 'all' ? 'on' : ''} onClick={() => setLens('all')}>全部</button>
+            <button className={lens === 'bd' ? 'on' : ''} onClick={() => setLens('bd')}>待 BD</button>
+            <button className={lens === 'editor' ? 'on' : ''} onClick={() => setLens('editor')}>待編輯部</button>
+          </div>
         </div>
         <div className="bt-right">
           <button className="ghost sm" onClick={() => setShowContracts(true)}>📑 合約 / 額度</button>
@@ -393,6 +410,38 @@ function FilterBar({ board, clients, filters, setFilters, count, total }: {
       <label className="flt-chk"><input type="checkbox" checked={filters.overdue as boolean} onChange={(e) => set('overdue', e.target.checked)} /> 只看逾期</label>
       {active && <button className="link" onClick={() => setFilters({ pipeline: '', item_type: '', client: '', dm_owner: '', editor: '', contract_id: '', q: '', overdue: false } as never)}>清除</button>}
       <span className="flt-count muted">{count}/{total}</span>
+    </div>
+  )
+}
+
+/** C 線 Banner 區塊:綁版位 / 下架日 / 素材規格 + 一鍵規格驗證(對版位尺寸與 KB 上限)。 */
+function BannerSection({ t, patch }: { t: Task; patch: (p: Partial<Task>) => void }) {
+  const [slots, setSlots] = useState<{ id: string; name: string; surfaceName: string; size: string }[]>([])
+  const [check, setCheck] = useState<{ ok: boolean; issues: string[] } | null>(null)
+  useEffect(() => {
+    listPlacements().then((rows) => setSlots((rows as { id: string; name: string; surfaceName: string; size: string }[]) ?? [])).catch(() => {})
+  }, [])
+  const spec = (() => { try { return JSON.parse(t.banner_spec || '{}') } catch { return {} } })()
+  const saveSpec = (k: string, v: string) => patch({ banner_spec: JSON.stringify({ ...spec, [k]: k === 'kb' ? Number(v) || v : v }) })
+  const doCheck = () => bannerCheck(t.id).then(setCheck).catch(() => setCheck({ ok: false, issues: ['驗證失敗'] }))
+  return (
+    <div className="dr-article">
+      <div className="dr-sec-title">🖼 Banner / 版位</div>
+      <label>綁定版位
+        <select value={t.placement_slot_id || ''} onChange={(e) => patch({ placement_slot_id: e.target.value })} title="綁定後卡片狀態會自動同步版位(洽談中/已售/釋出)">
+          <option value="">—(未綁定)</option>
+          {slots.map((s) => <option key={s.id} value={s.id}>{s.surfaceName} · {s.name}({s.size})</option>)}
+        </select>
+      </label>
+      <label>下架日<input type="date" value={t.takedown_date ? t.takedown_date.slice(0, 10) : ''} onChange={(e) => patch({ takedown_date: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
+      <label>素材尺寸<input value={spec.size || ''} onChange={(e) => saveSpec('size', e.target.value)} placeholder="例 728×90" /></label>
+      <label>檔案大小 KB<input value={spec.kb ?? ''} onChange={(e) => saveSpec('kb', e.target.value)} placeholder="例 280" /></label>
+      <div className="dr-run" style={{ alignItems: 'center', gap: 10 }}>
+        <button className="ghost sm" onClick={doCheck}>🔍 檢查規格</button>
+        {check && (check.ok
+          ? <span className="tag done">✅ 規格符合版位</span>
+          : <span style={{ color: 'var(--warn)', fontSize: 12 }}>{check.issues.join(';')}</span>)}
+      </div>
     </div>
   )
 }
@@ -684,9 +733,12 @@ function TaskDrawer({ taskId, me, board, onClose, onChanged, onOpenJob }: {
   async function doNotify() { try { await notifyBd(taskId, me); toast.info('已通知 BD 回傳客戶'); reload() } catch (e) { toast.err(errMsg(e)) } }
   async function remove() { if (!confirm('確定刪除這張卡?')) return; try { await deleteTask(taskId); onClose(); onChanged() } catch (e) { toast.err(errMsg(e)) } }
   async function saveUrl(key: string, val: string) { try { await setTaskUrls(taskId, { [key]: val }, me); reload() } catch (e) { toast.err(errMsg(e)) } }
+  async function runDraft() { setBusy(true); try { await runTaskDraft(taskId, me); toast.info('已觸發 AI 初稿'); reload(); onChanged() } catch (e) { toast.err(errMsg(e)) } finally { setBusy(false) } }
 
   const hasSource = Boolean(t.source_file || t.source_url)
   const isA = t.pipeline === 'A'
+  const isB = t.pipeline === 'B'
+  const isBanner = t.item_type === 'Banner' || t.pipeline === 'C'
   const URL_KEYS = [['website', '官網'], ['tg', 'TG'], ['fb', 'FB'], ['x', 'X'], ['line', 'LINE']]
   return (
     <div className="drawer-scrim" onClick={onClose}>
@@ -737,6 +789,25 @@ function TaskDrawer({ taskId, me, board, onClose, onChanged, onOpenJob }: {
             </div>
           </div>
         )}
+
+        {isB && (
+          <div className="dr-article">
+            <div className="dr-sec-title">🖋 AI 初稿（軟文）</div>
+            <p className="hint" style={{ margin: '0 0 8px' }}>brief 取自「特別提醒 / 描述」；AI 產出初稿 → 進「已完成初稿」通知主審精修。</p>
+            <label>初稿 Doc 連結<input value={t.draft_doc_url || ''} onChange={(e) => setT({ ...t, draft_doc_url: e.target.value })} onBlur={() => patch({ draft_doc_url: t.draft_doc_url })} placeholder="https://docs.google.com/…（B 線過稿用）" /></label>
+            <div className="dr-run">
+              {t.job_id && t.job ? (
+                <div className="dr-jobstate">
+                  <span className={`tag ${t.job.status}`}>AI 初稿:{t.job.status === 'running' ? '撰寫中' : t.job.status === 'done' ? '完成' : t.job.status === 'error' ? '失敗' : t.job.status}</span>
+                  <button className="ghost sm" onClick={() => onOpenJob(t.job_id!)}>看初稿內容 →</button>
+                  <button className="link" disabled={busy || t.job.status === 'running'} onClick={runDraft}>重寫</button>
+                </div>
+              ) : <button className="primary" disabled={busy || !(t.description || t.notes)} onClick={runDraft} title={(t.description || t.notes) ? '' : '先在描述/特別提醒寫需求 brief'}>🖋 跑 AI 初稿</button>}
+            </div>
+          </div>
+        )}
+
+        {isBanner && <BannerSection t={t} patch={patch} />}
 
         <div className="dr-block">
           <div className="dr-sec-title">🔗 發佈連結回填</div>

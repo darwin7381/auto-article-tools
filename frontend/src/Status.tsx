@@ -26,12 +26,15 @@ const SUPERIOR = [
   '細粒度狀態機(22 態,Notion A12+B16 全集)與 8 欄看板雙向連動,狀態驅動通知',
   '排程心跳引擎:催稿 / 逾期 / 排程發佈提醒 / Banner 下架 / 合約額度預警(防重複觸發)',
   '通知真外送(Telegram 可設定)+ 每日晨報(待人動作 / 今日截止 / 逾期 / 預警彙總)',
+  '營運指揮新展示層:指揮中心(待人雙佇列+AI 主理人動態+預警)/ 客戶 360 / 發佈行事曆(與既有頁並存供對比)',
+  'B 線軟文 AI 初稿(brief → 初稿 → 通知主審精修)—— 三條 pipeline 都有 AI',
+  'C 線 Banner:卡片↔版位自動同步(洽談/已售/釋出)+ 素材規格一鍵驗證;demo seed 一鍵種示範資料',
   '觀測:per-stage 耗時 + token + 結構評分;品質評審 routine 走 Claude subagent(訂閱、不燒 API)+ llm_judge 選用工具',
   '抽取位置保真:PDF 圖/表依座標插回原位(舊版圖片會被丟到頁尾)',
   'DOCX 超連結保真 [text](url)(python-docx .text 預設會丟連結)',
   '進稿格式更廣:docx/pdf/md/txt/html/rtf(舊版上傳只收 pdf/docx)',
   '免付費:PyMuPDF 取代 ConvertAPI(PDF→DOCX 付費轉檔)',
-  '自動化測試 pytest 156 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 69',
+  '自動化測試 pytest 164 通過 / 1 skip(含合成夾具斷言圖片排列位置;skip 需 OCR extra)+ 前端 vitest 73',
 ]
 const PARITY = [
   '進稿全格式(docx 简繁 / pdf 英繁 / md / Google Docs / Medium / WeChat)',
@@ -295,8 +298,8 @@ const MAIN_MODULES: MainMod[] = [
   },
 ]
 const UNIT_TESTS: Row[] = [
-  ['後端自動化測試 pytest', 'uv run pytest', '156 通過 / 1 skip(OCR extra)', true],
-  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '69 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl/廣告版位地圖/檔期解析/狀態看板)', true],
+  ['後端自動化測試 pytest', 'uv run pytest', '164 通過 / 1 skip(OCR extra)', true],
+  ['前端自動化測試 vitest', 'pnpm test(jsdom+RTL)', '73 通過(路由/子導覽/看板三視圖/上傳/保真守門/XSS/進度估算/safeUrl/廣告版位地圖/檔期解析/狀態看板)', true],
   ['進階組稿六項(正規化/引言/押註位置/dropcap/TG/紅連結)', 'test_format_article_full', '通過', true],
   ['D1 內嵌圖片抽取', 'ingest 實跑 HashKey docx', '抽到 1 圖 ✅', true],
   ['D2 圖片 figure 包裝 + lazy', 'test_md_to_html_figure_wrap', '通過', true],
@@ -328,7 +331,7 @@ function AuditsPanel() {
       <h2>🔬 Subagent 獨立稽核（走訂閱,不燒 API）</h2>
       <p className="hint" style={{ marginTop: 0 }}>
         獨立 Claude subagent(<code>module-capability-auditor</code>)讀程式碼+測試評分,偏重「自動化測試覆蓋」故較嚴。
-        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→156 + 前端 69 vitest</b> → 稽核分全面回升至 78–88。
+        <b>第一輪</b>發現多模組缺單元測試 → <b>分輪補測至 pytest 48→164 + 前端 73 vitest</b> → 稽核分全面回升至 78–88。
         欄位:稽核①=補測前、稽核③=最終。<b>輔助佐證,不覆寫上方模組分數。</b>紀錄 <code>evals/records/2026-06-21-…</code>。
       </p>
       <div className="table-wrap"><table>
@@ -375,8 +378,8 @@ function StatCards() {
       <Stat label="Workflows" value={String(live.wf)} />
       <Stat label="Jobs 總數" value={String(live.jobs)} />
       <Stat label="完成 Jobs" value={String(live.done)} />
-      <Stat label="後端測試" value="156 ✓" ok />
-      <Stat label="前端測試" value="69 ✓" ok />
+      <Stat label="後端測試" value="164 ✓" ok />
+      <Stat label="前端測試" value="73 ✓" ok />
     </div>
   )
 }
@@ -428,7 +431,7 @@ export function StatusModules() {
       <div className="panel">
         <h2>🔬 單項測試（unit / 元件）</h2>
         <TestTable rows={UNIT_TESTS} />
-        <p className="hint">後端 <code>uv run pytest</code> 156 通過 / 1 skip;前端 <code>pnpm test</code> 69 通過,並以隔離瀏覽器經 tunnel 實測。</p>
+        <p className="hint">後端 <code>uv run pytest</code> 164 通過 / 1 skip;前端 <code>pnpm test</code> 73 通過,並以隔離瀏覽器經 tunnel 實測。</p>
       </div>
     </div>
   )
@@ -595,6 +598,11 @@ const API_GROUPS: { group: string; rows: [string, string, string][] }[] = [
       ['PATCH DELETE', '/board/columns/{id}', '更新 / 刪除欄位'],
       ['GET', '/board/stream', '看板即時 SSE(task.created/updated/deleted、comment.added、column.changed)'],
       ['GET', '/board/digest', '每日晨報:待人動作 / 今日截止 / 逾期 / 今日排程 / Banner 到期 / 合約預警(含 text 版)'],
+      ['GET', '/board/activity', '跨卡片活動流(?actor=system 只看 AI 動作)—— 指揮中心動態'],
+      ['POST', '/board/tasks/{id}/draft', 'B 線:觸發 AI 初稿(brief 取卡片描述/提醒)→ 完成進「已完成初稿」'],
+      ['GET', '/board/tasks/{id}/banner-check', 'C 線:素材規格 vs 綁定版位驗證(尺寸/KB/下架日)'],
+      ['POST', '/board/seed-demo', '種示範資料(可重複;只動 demo 標記資料)'],
+      ['GET', '/clients', '客戶 360 聚合:合約額度 / 進行中稿件 / 發佈連結 / 版位檔期'],
     ],
   },
   {
@@ -789,8 +797,8 @@ curl -N $BASE/board/stream`}</Code>
 cd frontend && pnpm build
 
 # 全套測試
-cd backend && uv run pytest -q          # 後端 156 通過 / 1 skip
-cd frontend && pnpm test -- --run       # 前端 69 通過
+cd backend && uv run pytest -q          # 後端 164 通過 / 1 skip
+cd frontend && pnpm test -- --run       # 前端 73 通過
 
 # 跑服務(本機)
 cd backend && uv run uvicorn app.main:app --port 8000

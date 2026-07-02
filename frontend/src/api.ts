@@ -267,7 +267,47 @@ export const updateContract = (id: number, patch: Partial<Contract>) => patchJso
 export const deleteContract = (id: number) => del(`/board/contracts/${id}`)
 
 /** AI 主理人晨報:待人動作 / 今日截止 / 逾期 / 排程 / Banner 到期 / 合約預警。 */
-export const getDigest = () => jget<Record<string, unknown> & { text: string }>('/board/digest')
+export type DigestItem = { id: number; title: string; client: string; status: string; status_label: string; deadline?: string; which?: string; at?: string; takedown?: string }
+export type ContractAlert = { id: number; client: string; name: string; kind: 'expiry' | 'quota_low'; end_date?: string; category?: string; total?: number; used?: number; remaining?: number }
+export type Digest = {
+  generated_at: string; open_count: number
+  human_action: Record<string, DigestItem[]>
+  due_today: DigestItem[]; overdue: DigestItem[]; scheduled_today: DigestItem[]; takedown_due: DigestItem[]
+  contract_alerts: ContractAlert[]; text: string
+}
+export const getDigest = () => jget<Digest>('/board/digest')
+
+/** 跨卡片活動流(指揮中心);actor=system 只看 AI/自動化動作。 */
+export type GlobalActivity = BoardActivity & { task_title: string; task_client: string }
+export const getActivity = (limit = 80, actor?: string) =>
+  jget<GlobalActivity[]>(`/board/activity?limit=${limit}${actor ? `&actor=${actor}` : ''}`)
+
+/** 種示範資料(可重複執行;只動 demo 標記資料)。 */
+export const seedDemo = () => jpost<{ ok: boolean; tasks: number; contracts: number }>('/board/seed-demo', {})
+
+/** B 線軟文:觸發 AI 初稿(brief = 卡片描述/特別提醒)。 */
+export const runTaskDraft = (id: number, actor = '') => jpost<Task>(`/board/tasks/${id}/draft`, { actor })
+
+/** C 線 Banner:素材規格 vs 綁定版位的驗證。 */
+export type BannerCheck = { ok: boolean; slot: string | null; slot_size?: string; slot_max_kb?: number | null; issues: string[] }
+export const bannerCheck = (id: number) => jget<BannerCheck>(`/board/tasks/${id}/banner-check`)
+
+/** 客戶 360 聚合。 */
+export type ClientOverview = {
+  client: string
+  contracts: Contract[]
+  open_tasks: { id: number; title: string; item_type: string; pipeline: string; status: string; status_label: string; publish_deadline: string | null }[]
+  closed_count: number
+  published: { task: string; channel: string; url: string }[]
+  placements: { id: string; name: string; surface_name: string; schedule: string; status: string }[]
+}
+export const listClients = () => jget<ClientOverview[]>('/clients')
+
+/** 待人動作的細狀態分組(看板角色鏡頭 / 指揮中心雙佇列共用)。 */
+export const HUMAN_QUEUES: Record<'bd' | 'editor', string[]> = {
+  bd: ['awaiting_bd_close', 'client_review', 'quota_check'],
+  editor: ['awaiting_upload', 'draft_done', 'awaiting_line', 'awaiting_accept'],
+}
 
 // ── 廣告版位共享持久層(取代 per-瀏覽器 localStorage)──
 export const listPlacements = () => jget<unknown[]>('/placements')
